@@ -36,7 +36,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [x64, ARM64]
+        # ARM64 is only built on manual runs and tags to keep push feedback fast.
+        platform: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && fromJSON('["x64","ARM64"]') || fromJSON('["x64"]') }}
     steps:
       - uses: actions/checkout@v4
 
