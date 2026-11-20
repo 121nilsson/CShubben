@@ -9,6 +9,9 @@ public sealed record LinearTeam(string Id, string Key, string Name);
 
 public sealed record LinearLabel(string Id, string Name);
 
+/// <summary>A workflow state of a team (Todo, In Progress, Done, ...). <paramref name="Position"/> orders states of one type.</summary>
+public sealed record LinearState(string Id, string Name, LinearStateType Type, double Position);
+
 /// <summary>A Linear issue. Priority follows Linear: 0 none, 1 urgent, 2 high, 3 medium, 4 low.</summary>
 public sealed record LinearIssue(
     string Id,

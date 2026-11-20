@@ -110,6 +110,31 @@ public sealed class LinearClient
         return LinearMapper.ParseLabels(JsonRead.Path(data, "team", "labels"));
     }
 
+    /// <summary>The workflow states of a team, in Linear's order.</summary>
+    public async Task<IReadOnlyList<LinearState>> GetTeamStatesAsync(string teamId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(teamId)) throw new ArgumentException("A team id is required.", nameof(teamId));
+        var data = await PostAsync(LinearQueries.TeamStates(teamId), cancellationToken).ConfigureAwait(false);
+        return LinearMapper.ParseStates(JsonRead.Path(data, "team", "states"));
+    }
+
+    /// <summary>Moves an issue to a workflow state and returns the updated issue.</summary>
+    public async Task<LinearIssue> UpdateIssueStateAsync(string issueId, string stateId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(issueId)) throw new ArgumentException("An issue id is required.", nameof(issueId));
+        if (string.IsNullOrWhiteSpace(stateId)) throw new ArgumentException("A state id is required.", nameof(stateId));
+
+        var data = await PostAsync(LinearQueries.UpdateIssueState(issueId, stateId), cancellationToken).ConfigureAwait(false);
+        var payload = JsonRead.Obj(data, "issueUpdate");
+        if (payload is JsonElement p && JsonRead.Bool(p, "success") == true && JsonRead.Obj(p, "issue") is JsonElement node)
+        {
+            var issue = LinearMapper.ParseIssue(node);
+            if (issue is not null) return issue;
+        }
+
+        throw new LinearApiException("Linear did not update the issue.", Array.Empty<string>(), false);
+    }
+
     public async Task<LinearIssue> CreateIssueAsync(
         string teamId,
         string title,

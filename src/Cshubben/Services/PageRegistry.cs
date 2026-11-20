@@ -60,7 +60,7 @@ static class PageRegistry
             c => OverviewPage.Build(c.Snapshot, c.SelectedId, c.Select),
             c => new PageBadge(OverviewModel.Compute(c.Snapshot).NeedsYou, Tone.Warning), NeedsData: true),
         new(Page.Feed, "Overview", "", "Feed",
-            c => FeedPage.Build(c.Snapshot), NeedsData: true),
+            c => FeedPage.Build(c.Snapshot, c.Select), NeedsData: true),
 
         new(Page.Mine, "Pull requests", "", "My PRs",
             c => PrListPages.Mine(c.Snapshot, c.SelectedId, c.Select),
@@ -96,6 +96,7 @@ static class PageRegistry
         {
             // Writes stay in dry-run until the user opts in from Settings (not wired yet), so nothing is sent by accident.
             _liveReview ??= new GitHubReviewData(hub.Rest, hub.GraphQl, hub.Writer) { DryRun = true };
+            _liveReview.DryRun = !c.Services.Settings.AllowGitHubWrites;
             ReviewPage.Data = _liveReview;
         }
 

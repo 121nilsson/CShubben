@@ -1,5 +1,6 @@
 using Cshubben.Core.Data;
 using Cshubben.Core.Features.Claude;
+using Cshubben.Core.Features.Feed;
 using Cshubben.Core.Features.GitHub;
 using Cshubben.Core.Features.Linear;
 using Cshubben.Core.Features.Notes;
@@ -34,6 +35,10 @@ sealed class AppServices
         Secrets = secrets;
         Settings = settingsStore.Load();
         Http = new HttpClient();
+        // Demo mode pretends the user last looked at the feed seven hours ago, so the new/seen divider is visible.
+        FeedSeen = forcedDemo
+            ? new InMemoryFeedSeenStore(DateTimeOffset.UtcNow - TimeSpan.FromHours(7))
+            : new FileFeedSeenStore(FileFeedSeenStore.DefaultPath(AppPaths.DataDirectory));
     }
 
     /// <summary>The services of this process. Call <see cref="Initialize"/> once at startup.</summary>
@@ -79,6 +84,9 @@ sealed class AppServices
 
     public HttpClient Http { get; }
 
+    /// <summary>When the user last marked the feed as seen (drives the new/seen divider on the Feed page).</summary>
+    public IFeedSeenStore FeedSeen { get; }
+
     /// <summary>Current settings. The shell keeps this in step with what it shows.</summary>
     public AppSettings Settings { get; set; }
 
@@ -91,7 +99,7 @@ sealed class AppServices
         get
         {
             if (!ForcedDemo) return null;
-            _initialSnapshot ??= _demo.Build();
+            _initialSnapshot ??= SnapshotFilter.Apply(_demo.Build(), Settings);
             return _initialSnapshot;
         }
     }
@@ -99,21 +107,22 @@ sealed class AppServices
     /// <summary>
     /// The data source to load from: demo with --demo, otherwise GitHub when a token can be found, otherwise
     /// demo data with <see cref="DemoReason"/> set. Safe to call again to retry after the user fixed the token.
+    /// The returned source drops muted repos and organisations from every snapshot it loads.
     /// </summary>
     public async Task<IHubData> GetHubDataAsync(CancellationToken cancellationToken = default)
     {
-        if (ForcedDemo) return _demo;
-        if (GitHub is not null) return GitHub;
+        if (ForcedDemo) return new FilteringHubData(_demo, () => Settings);
+        if (GitHub is not null) return new FilteringHubData(GitHub, () => Settings);
         try
         {
             GitHub = await GitHubHubData.CreateAsync(Http, null, null, cancellationToken);
             DemoReason = null;
-            return GitHub;
+            return new FilteringHubData(GitHub, () => Settings);
         }
         catch (GitHubAuthException ex)
         {
             DemoReason = ex.Message;
-            return _demo;
+            return new FilteringHubData(_demo, () => Settings);
         }
     }
 

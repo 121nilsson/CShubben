@@ -45,6 +45,20 @@ public static class LinearQueries
         "query($id: String!) { team(id: $id) { labels(first: 100) { nodes { id name } } } }",
         Vars(("id", teamId)));
 
+    /// <summary>The workflow states of one team.</summary>
+    public static LinearRequest TeamStates(string teamId) => new(
+        "query($id: String!) { team(id: $id) { states(first: 100) { nodes { id name type position } } } }",
+        Vars(("id", teamId)));
+
+    /// <summary>Moves an issue to another workflow state.</summary>
+    public static LinearRequest UpdateIssueState(string issueId, string stateId)
+    {
+        var input = new Dictionary<string, object?> { ["stateId"] = stateId };
+        return new LinearRequest(
+            "mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success issue { " + IssueFields + " } } }",
+            Vars(("id", issueId), ("input", input)));
+    }
+
     public static LinearRequest CreateIssue(string teamId, string title, string? description, int? priority, IReadOnlyList<string>? labelIds)
     {
         var input = new Dictionary<string, object?>

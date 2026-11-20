@@ -175,6 +175,30 @@ public static class LinearMapper
         return items;
     }
 
+    public static IReadOnlyList<LinearState> ParseStates(JsonElement? connection)
+    {
+        var items = new List<LinearState>();
+        if (connection is JsonElement c && JsonRead.Arr(c, "nodes") is JsonElement nodes)
+        {
+            foreach (var node in nodes.EnumerateArray())
+            {
+                var id = JsonRead.Str(node, "id");
+                var name = JsonRead.Str(node, "name");
+                if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name)) continue;
+                items.Add(new LinearState(id, name, ParseStateType(JsonRead.Str(node, "type")), JsonRead.Num(node, "position") ?? 0));
+            }
+        }
+
+        return items;
+    }
+
+    /// <summary>The team's "done" state: the completed state with the lowest position (Linear's own "Done"), or null.</summary>
+    public static LinearState? PickDoneState(IEnumerable<LinearState> states) =>
+        states.Where(s => s.Type == LinearStateType.Completed)
+            .OrderBy(s => s.Position)
+            .ThenBy(s => s.Name, StringComparer.Ordinal)
+            .FirstOrDefault();
+
     public static LinearStateType ParseStateType(string? type) => type?.Trim().ToLowerInvariant() switch
     {
         "triage" => LinearStateType.Triage,

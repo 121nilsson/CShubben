@@ -58,6 +58,11 @@ public sealed record AppSettings
     /// <summary>Notes folder override. Empty means the default folder in the data directory.</summary>
     public string NotesDirectory { get; init; } = "";
 
+    /// <summary>
+    /// Opt-in: when false (the default) write actions on GitHub (approve, request changes) are only simulated as a dry run.
+    /// </summary>
+    public bool AllowGitHubWrites { get; init; }
+
     public const int DefaultRefreshSeconds = 60;
 
     public static readonly IReadOnlyList<int> RefreshChoices = new[] { 30, 60, 120, 300 };
