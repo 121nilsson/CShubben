@@ -131,7 +131,7 @@ sealed class AppRoot : Component
 
         // Responsive: on narrow windows the sidebar becomes an icon rail and the inspector gets slimmer,
         // so the page in the middle keeps enough room for its rows.
-        var compact = windowWidth < 1200;
+        var compact = windowWidth < 1200 || page == Page.Review;
         // Below this width the inspector replaces the list as a full-page view with a Back button.
         var narrow = windowWidth < 900;
         var railWidth = compact ? 64.0 : 248.0;
