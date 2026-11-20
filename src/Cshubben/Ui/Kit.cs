@@ -1,6 +1,7 @@
 using Cshubben.Core.Logic;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
+using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Xaml;
 using static Microsoft.UI.Reactor.Factories;
 
@@ -74,4 +75,40 @@ static class Kit
     public static Element ComingSoon(string title, string what) =>
         VStack(4, PageHeader(title, what),
             Card(VStack(8, BodyStrong("Coming soon"), Muted("This page is being built. See PLAN.md for the scope."))));
+
+    /// <summary>
+    /// A calm full-width message strip with an optional action button (for example "Retry").
+    /// Colour comes from the tone's theme tokens.
+    /// </summary>
+    public static Element Banner(Tone tone, string title, string message, string? actionLabel = null, Action? onAction = null) =>
+        Border(Grid(
+                columns: [GridSize.Star(), GridSize.Auto],
+                rows: [GridSize.Auto],
+                VStack(2,
+                    BodyStrong(title),
+                    TextBlock(message).FontSize(12).Foreground(Theme.SecondaryText).TextWrapping()).Grid(column: 0),
+                actionLabel is null || onAction is null
+                    ? Empty()
+                    : Button(actionLabel, onAction).VAlign(VerticalAlignment.Center).Margin(12, 0, 0, 0).Grid(column: 1)))
+            .Background(Bg(tone)).CornerRadius(8).Padding(14, 10);
+
+    /// <summary>First-load state: a spinner, a sentence, and grey placeholder rows so the page does not jump.</summary>
+    public static Element LoadingState(string message, int rows = 4)
+    {
+        var children = new List<Element>
+        {
+            HStack(12,
+                ProgressRing().IsActive().Width(20).Height(20).VAlign(VerticalAlignment.Center),
+                BodyStrong(message).VAlign(VerticalAlignment.Center)).Margin(0, 0, 0, 8),
+        };
+        for (var i = 0; i < rows; i++)
+            children.Add(Border(Empty()).Height(56).CornerRadius(8).Background(Theme.SubtleFill).Opacity(0.6));
+        return ScrollView(Capped(VStack(12, children.ToArray()).Margin(24, 16)));
+    }
+
+    /// <summary>A titled card used by the Settings page: heading, optional one-line help, then the content.</summary>
+    public static Element SettingsCard(string title, string? help, params Element[] content) =>
+        Card(VStack(12,
+            VStack(2, BodyStrong(title), help is null ? Empty() : Muted(help).TextWrapping()),
+            VStack(10, content)));
 }

@@ -1,6 +1,8 @@
+using Cshubben.Core.Features.Settings;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
-using Cshubben.Ui.Pages;
+using Cshubben.Core.Shared;
+using Cshubben.Services;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -9,16 +11,123 @@ using static Microsoft.UI.Reactor.Factories;
 
 namespace Cshubben.Ui;
 
-/// <summary>Window shell: sidebar, current page and (when a PR is selected) the inspector on the right.</summary>
+/// <summary>
+/// Window shell: sidebar (built from <see cref="PageRegistry"/>), current page and (when a PR is selected) the
+/// inspector on the right. Owns the data: the current snapshot, loading/error state and the background refresh.
+/// </summary>
 sealed class AppRoot : Component
 {
+    private const int TickSeconds = 15;
+
     public override Element Render()
     {
-        var snap = AppOptions.Snapshot;
+        var services = AppServices.Current;
+
+        // Navigation state.
         var (page, setPage) = UseState(AppOptions.StartPage);
         var (selectedId, setSelected) = UseState<string?>(AppOptions.SelectedPr);
         var (tab, setTab) = UseState(AppOptions.StartTab);
         var (windowWidth, _) = UseWindowSize();
+
+        // Data state. Setters may be called from background threads, hence threadSafe.
+        var (snapshot, setSnapshot) = UseState<HubSnapshot?>(services.InitialSnapshot, true);
+        var (error, setError) = UseState<string?>(null, true);
+        var (notice, setNotice) = UseState<string?>(null, true);
+        var (warning, setWarning) = UseState<string?>(null, true);
+        var (refreshing, setRefreshing) = UseState(false, true);
+        var (now, setNow) = UseState(MinuteOf(DateTimeOffset.UtcNow), true);
+        var (settings, setSettings) = UseState(services.Settings);
+
+        var inFlight = UseRef(false);
+        var windowActive = UseRef(true);
+        var intervalSeconds = UseRef(AppSettings.DefaultRefreshSeconds);
+        var isActive = UseIsActive();
+        windowActive.Current = isActive;
+        intervalSeconds.Current = settings.RefreshSeconds;
+
+        async Task RefreshAsync()
+        {
+            if (inFlight.Current) return;
+            inFlight.Current = true;
+            setRefreshing(true);
+            try
+            {
+                var data = await services.GetHubDataAsync();
+                var loaded = await data.LoadAsync();
+                setSnapshot(loaded);
+                setError(null);
+                setNotice(services.DemoReason is { } reason ? "Showing demo data. " + reason : null);
+                var warnings = services.GitHub?.LastWarnings;
+                setWarning(warnings is { Count: > 0 }
+                    ? "Some data may be incomplete: " + string.Join(" ", warnings.Take(2))
+                    : null);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Keep whatever is on screen; the banner says the data may be old.
+                setError(ErrorText.Describe(ex));
+            }
+            finally
+            {
+                inFlight.Current = false;
+                setRefreshing(false);
+                setNow(MinuteOf(DateTimeOffset.UtcNow));
+            }
+        }
+
+        void Refresh() => _ = RefreshAsync();
+
+        // First load (live mode only; --demo already has its snapshot).
+        UseEffect(() =>
+        {
+            if (!services.ForcedDemo) Refresh();
+            return () => { };
+        }, new object[0]);
+
+        // Background refresh while the window is active, and a slow tick so "Updated 2 min ago" stays true.
+        UseEffect(() =>
+        {
+            var cts = new CancellationTokenSource();
+            _ = Task.Run(async () =>
+            {
+                var elapsed = 0;
+                try
+                {
+                    using var timer = new PeriodicTimer(TimeSpan.FromSeconds(TickSeconds));
+                    while (await timer.WaitForNextTickAsync(cts.Token))
+                    {
+                        elapsed += TickSeconds;
+                        setNow(MinuteOf(DateTimeOffset.UtcNow));
+                        if (elapsed >= intervalSeconds.Current)
+                        {
+                            elapsed = 0;
+                            if (windowActive.Current && !services.ForcedDemo) await RefreshAsync();
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Component unmounted.
+                }
+            });
+            return () => cts.Cancel();
+        }, new object[0]);
+
+        void SaveSettings(AppSettings next)
+        {
+            var clean = next.Sanitized();
+            try
+            {
+                services.SettingsStore.Save(clean);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                setError("Could not save settings: " + ex.Message);
+            }
+
+            services.Settings = clean;
+            setSettings(clean);
+        }
 
         // Responsive: on narrow windows the sidebar becomes an icon rail and the inspector gets slimmer,
         // so the page in the middle keeps enough room for its rows.
@@ -28,70 +137,95 @@ sealed class AppRoot : Component
         var railWidth = compact ? 64.0 : 248.0;
         var inspectorWidth = windowWidth >= 1500 ? 480.0 : windowWidth >= 1200 ? 420.0 : 340.0;
 
+        var loadedOnce = snapshot is not null;
+        var snap = snapshot ?? AppServices.EmptySnapshot;
         var selected = snap.Find(selectedId);
-        var overview = OverviewModel.Compute(snap);
-        var waitingOnYou = snap.Reviews.Count(p => ReviewQueue.StateOf(snap.ReviewInfos.GetValueOrDefault(p.Id)) is
-            ReviewQueueState.WaitingOnYou or ReviewQueueState.UpdatedSinceReview);
 
         void Select(string id) { setSelected(id); setTab(0); }
 
-        Element Item(Page target, string glyph, string label, int? count = null, Tone tone = Tone.Neutral)
+        var ctx = new PageContext(snap, loadedOnce, selectedId, Select, services, settings, SaveSettings, Refresh);
+
+        Element Item(PageDef def)
         {
-            var active = page == target;
+            var active = page == def.Id;
+            var badge = def.Badge?.Invoke(ctx);
+            var count = badge?.Count;
+            var tone = badge?.Tone ?? Tone.Neutral;
             Element row = compact
                 ? VStack(2,
-                    Kit.Glyph(glyph).HAlign(HorizontalAlignment.Center),
+                    Kit.Glyph(def.Glyph).HAlign(HorizontalAlignment.Center),
                     count is > 0
                         ? TextBlock(count.Value.ToString()).FontSize(10).SemiBold().Foreground(Kit.Fg(tone)).HAlign(HorizontalAlignment.Center)
                         : null)
                 : Grid(
                     columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
                     rows: [GridSize.Auto],
-                    Kit.Glyph(glyph).VAlign(VerticalAlignment.Center).Grid(column: 0),
-                    (active ? BodyStrong(label) : Body(label)).VAlign(VerticalAlignment.Center).Grid(column: 1),
+                    Kit.Glyph(def.Glyph).VAlign(VerticalAlignment.Center).Grid(column: 0),
+                    (active ? BodyStrong(def.Label) : Body(def.Label)).VAlign(VerticalAlignment.Center).Grid(column: 1),
                     count is > 0 ? Kit.Pill(count.Value.ToString(), tone).Grid(column: 2) : Empty());
-            return Border(Button(row, () => { setPage(target); if (narrow) setSelected(null); })
+            return Border(Button(row, () => { setPage(def.Id); if (narrow) setSelected(null); })
                     .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
-                    .ToolTip(label).AutomationName(label))
+                    .ToolTip(def.Label).AutomationName(def.Label))
                 .Selected(active).CornerRadius(6);
         }
 
         Element Section(string text) => compact ? Border(Empty()).Height(12) : Kit.SectionLabel(text);
 
-        var sidebar = FlexColumn(
-                (compact
-                    ? (Element)TextBlock("◆").FontSize(18).Foreground(Theme.AccentText).HAlign(HorizontalAlignment.Center)
-                    : HStack(8, TextBlock("◆").FontSize(18).Foreground(Theme.AccentText), TextBlock("Cshubben").FontSize(16).SemiBold()))
-                    .Margin(compact ? 0 : 12, 8, 0, 8),
-                Section("Overview"),
-                Item(Page.Overview, "", "Overview", overview.NeedsYou, Tone.Warning),
-                Item(Page.Feed, "", "Feed"),
-                Section("Pull requests"),
-                Item(Page.Mine, "", "My PRs", snap.Authored.Count),
-                Item(Page.Reviews, "", "Review queue", waitingOnYou, Tone.Accent),
-                Section("Workspace"),
-                Item(Page.Drift, "", "Drift"),
-                Item(Page.Linear, "", "Linear"),
-                Item(Page.Notes, "", "Notes"),
-                Item(Page.Stats, "", "Stats"),
-                Empty().Flex(grow: 1),
-                Item(Page.Settings, "", "Settings"))
-            .FlexPadding(8, 4);
-
-        Element content = page switch
+        // Sidebar entries come from the registry: grouped by section in registry order, pinned ones at the bottom.
+        var sidebarChildren = new List<Element>
         {
-            Page.Overview => OverviewPage.Build(snap, selectedId, Select),
-            Page.Feed => FeedPage.Build(snap),
-            Page.Mine => PrListPages.Mine(snap, selectedId, Select),
-            Page.Reviews => PrListPages.Reviews(snap, selectedId, Select),
-            Page.Drift => Kit.ComingSoon("Drift", "Actions and deployments on your repos"),
-            Page.Linear => Kit.ComingSoon("Linear", "Your issues, linked to pull requests"),
-            Page.Notes => Component<NotesPage>(),
-            Page.Stats => Kit.ComingSoon("Stats", "Cycle time and review load"),
-            _ => Kit.ComingSoon("Settings", "Repos, notifications and integrations"),
+            (compact
+                ? (Element)TextBlock("◆").FontSize(18).Foreground(Theme.AccentText).HAlign(HorizontalAlignment.Center)
+                : HStack(8, TextBlock("◆").FontSize(18).Foreground(Theme.AccentText), TextBlock("Cshubben").FontSize(16).SemiBold()))
+                .Margin(compact ? 0 : 12, 8, 0, 8),
         };
+        string? currentSection = null;
+        foreach (var def in PageRegistry.All)
+        {
+            if (def.Pinned) continue;
+            if (def.Section != currentSection)
+            {
+                currentSection = def.Section;
+                sidebarChildren.Add(Section(def.Section));
+            }
 
-        var main = Border(content).Background(Theme.LayerFill).CornerRadius(8).Margin(0, 0, selected is null ? 8 : 8, 8);
+            sidebarChildren.Add(Item(def).WithKey(def.Id.ToString()));
+        }
+
+        sidebarChildren.Add(Empty().Flex(grow: 1));
+        sidebarChildren.Add(RefreshFooter(compact, snapshot, now, refreshing, services.IsDemo, Refresh));
+        foreach (var def in PageRegistry.All)
+            if (def.Pinned) sidebarChildren.Add(Item(def).WithKey(def.Id.ToString()));
+
+        var sidebar = FlexColumn(sidebarChildren.ToArray()).FlexPadding(8, 4);
+
+        var pageDef = PageRegistry.Find(page);
+        Element content = pageDef is null
+            ? Kit.ComingSoon(page.ToString(), "This page is not registered.")
+            : pageDef.NeedsData && !loadedOnce
+                ? Kit.LoadingState("Loading your pull requests...")
+                : pageDef.Build(ctx);
+
+        // Banners never replace the page: stale data stays visible under an error.
+        var banners = new List<Element>();
+        if (error is not null)
+            banners.Add(Kit.Banner(Tone.Danger, loadedOnce ? "Could not refresh. Showing the last data." : "Could not load your data.",
+                error, "Retry", Refresh));
+        if (notice is not null)
+            banners.Add(Kit.Banner(Tone.Accent, "Demo data", notice, "Retry", Refresh));
+        if (warning is not null && error is null)
+            banners.Add(Kit.Banner(Tone.Warning, "Partial data", warning));
+
+        var bannerStack = banners.Count == 0
+            ? Empty()
+            : VStack(8, banners.ToArray()).Margin(12, 12, 12, 0);
+
+        var main = Border(Grid(
+                columns: [GridSize.Star()],
+                rows: [GridSize.Auto, GridSize.Star()],
+                bannerStack.Grid(row: 0),
+                content.Grid(row: 1)))
+            .Background(Theme.LayerFill).CornerRadius(8).Margin(0, 0, 8, 8);
 
         Element grid = selected is not null && narrow
             ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
@@ -105,6 +239,41 @@ sealed class AppRoot : Component
                 Inspector.Build(selected, snap, tab, setTab, () => setSelected(null)).Grid(column: 2));
 
         return FlexColumn(TitleBar("Cshubben").Flex(shrink: 0), grid.Flex(grow: 1, basis: 0))
+            .RequestedTheme(ThemeOf(settings.Theme))
             .Backdrop(BackdropKind.Mica);
     }
+
+    /// <summary>Refresh button plus "Updated 2 min ago" (and a "Demo data" hint) at the bottom of the sidebar.</summary>
+    private static Element RefreshFooter(bool compact, HubSnapshot? snapshot, DateTimeOffset now, bool refreshing, bool demo, Action refresh)
+    {
+        var text = snapshot is null
+            ? "Loading..."
+            : Freshness.Label(snapshot.At, now);
+        if (demo && snapshot is not null) text = "Demo data · " + text;
+
+        Element icon = refreshing
+            ? ProgressRing().IsActive().Width(16).Height(16)
+            : Kit.Glyph("");
+        var button = Button(icon, refresh)
+            .SubtleButton().IsEnabled(!refreshing)
+            .ToolTip(text + ". Click to refresh.").AutomationName("Refresh");
+
+        if (compact) return button.HAlign(HorizontalAlignment.Center).Margin(0, 4, 0, 4);
+
+        return Grid(
+            columns: [GridSize.Star(), GridSize.Auto],
+            rows: [GridSize.Auto],
+            Kit.Muted(text).TextTrimming(TextTrimming.CharacterEllipsis).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            button.Grid(column: 1)).Margin(12, 4, 4, 4);
+    }
+
+    private static DateTimeOffset MinuteOf(DateTimeOffset t) =>
+        new(t.UtcTicks - t.UtcTicks % TimeSpan.TicksPerMinute, TimeSpan.Zero);
+
+    private static ElementTheme ThemeOf(string theme) => ThemeChoice.Normalize(theme) switch
+    {
+        ThemeChoice.Light => ElementTheme.Light,
+        ThemeChoice.Dark => ElementTheme.Dark,
+        _ => ElementTheme.Default,
+    };
 }

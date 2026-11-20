@@ -16,7 +16,14 @@ public static class AppOptions
     public static string? SelectedPr { get; private set; }
     public static int StartTab { get; private set; }
 
-    /// <summary>Data shown in the app. Demo data until the GitHub client is wired in.</summary>
+    /// <summary>True when <c>--demo</c> was passed: demo data, no network, no real settings or credentials.</summary>
+    public static bool Demo { get; private set; }
+
+    /// <summary>
+    /// Demo data, kept only so older call sites still compile. Pages must read the live snapshot from
+    /// <c>PageContext.Snapshot</c> instead.
+    /// </summary>
+    [Obsolete("Read the snapshot from PageContext.Snapshot.")]
     public static HubSnapshot Snapshot { get; private set; } = new DemoData().Build();
 
     public static void Parse(string[] args)
@@ -26,6 +33,9 @@ public static class AppOptions
             var next = i + 1 < args.Length ? args[i + 1] : null;
             switch (args[i])
             {
+                case "--demo":
+                    Demo = true;
+                    break;
                 case "--start" when next is not null && Enum.TryParse<Page>(next, ignoreCase: true, out var page):
                     StartPage = page;
                     break;
