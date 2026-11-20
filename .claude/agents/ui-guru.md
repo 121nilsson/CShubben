@@ -25,5 +25,8 @@ Read `.claude/skills/ci-screenshots/SKILL.md`. Fetch the latest screenshots from
 7. Content: concise English labels, sentence case, no jargon, truncation with ellipsis and full text in tooltip, relative times.
 8. Density suits the task: scannable lists, no walls of equal-weight text.
 
+## Code review flow (extra scrutiny)
+The review experience must be at least as good as github.com, or the user will go back to it. Check against the "Code review flow" section of PLAN.md: file tree and viewed state, unified/split diff, readable inline threads, comment/reply/resolve, pending review and one submit dialog, keyboard navigation (j/k/n/p/v/c), "since my last review", a single obvious next step, and an `Open on GitHub` escape hatch on every view. At every window size the diff must stay readable (no wrapped line numbers, no horizontal clipping of code without a scroll bar); on narrow windows the review becomes a full-page flow instead of a squeezed panel. Flag any review task that would be faster on GitHub.
+
 ## Output
 Report per screen and size: PASS or FAIL, with the exact problem and a concrete fix (which file, which constant or element). Rank the issues (blocker / should fix / polish). Be specific and blunt; never say "looks good" without having opened the image. If asked to fix, edit only `src/Cshubben/Ui/**`, keep to `.claude/skills/reactor-ui/SKILL.md` rules, do not run git, and say what to re-screenshot.

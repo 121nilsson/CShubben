@@ -44,3 +44,26 @@ E. Persistence, background sync and notifications, tray.
 ## Status log
 - 2026-11-20: repo, CI (core tests on Linux, app + screenshots on Windows), Core with tested NextAction/Overview/ReviewQueue,
   shell with Overview, Feed, My PRs, Review queue and the new inspector on demo data.
+
+## Code review flow (must beat the GitHub web UI, or people go back to it)
+Goal: reviewing a PR here is faster than on github.com for the common case, and anything not supported is one click away
+(`Open on GitHub` on every view, deep-linked to the same file/line/thread) so nobody has to leave for a missing feature.
+
+Parity checklist (a review is not "done" in the app until all of these work):
+- **Files**: file tree with +/- counts, status icons, filter, collapse folders, per-file *Viewed* checkbox (synced to GitHub), progress "7/12 viewed".
+- **Diff**: unified and split view, syntax highlighting, word-level changes, expand context, collapse generated/lockfiles by default, renames, binary/large-diff fallback.
+- **Comments**: inline on single lines and ranges, threads with reply/resolve/unresolve, *suggested changes* (with apply), pending (batched) review, edit/delete own comments, markdown with preview, @mentions.
+- **Submit**: one dialog (Approve / Request changes / Comment) with the summary text, shows number of pending comments.
+- **Navigation**: keyboard first: `j/k` next/prev file, `n/p` next/prev unresolved thread or comment, `v` toggle viewed, `c` comment, `Ctrl+Enter` submit comment, `a`/`r` approve / request changes, `?` shortcut help.
+- **Context**: CI checks with failing log excerpt linked to the line, commits list, review state of other reviewers, linked Linear issue, description.
+
+Where it should be better than the web:
+- **"Since my last review"** is the default for a re-review (diff between my last reviewed commit and head), with a toggle for the full diff.
+- **Next unresolved thread / next unviewed file** as a single always-visible primary button (the review's NEXT STEP).
+- **Claude assist, human in control**: summary and risk-ordered file list, "explain this change", drafted comments that appear as drafts in the pending review; nothing is posted without the user pressing submit. Diff text is untrusted DATA in the prompt.
+- **Overview first**: size, risk, CI and who is waiting, before any code; review time estimate from lines changed.
+- **Never lose work**: drafts of comments persist locally across restarts and failed network calls.
+- **Fast**: diff and file list stream in; the first file is visible while the rest loads; large PRs virtualized.
+
+Layout rule: the review view needs the full window width. On narrow windows the inspector's Files tab becomes a full-page route (list -> file tree -> diff) instead of a squeezed side panel; on wide windows it is tree | diff | thread pane.
+Slice F (after D): Review view, in order: file tree + unified diff read-only -> viewed state -> inline threads read -> comment/reply/resolve -> pending review + submit -> split view, suggestions, since-last-review -> Claude assist.
