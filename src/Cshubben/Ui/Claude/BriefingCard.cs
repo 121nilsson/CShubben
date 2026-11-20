@@ -1,0 +1,171 @@
+using System.Globalization;
+using Cshubben.Core.Features.Claude;
+using Cshubben.Core.Logic;
+using Cshubben.Core.Model;
+using Cshubben.Services;
+using Microsoft.UI.Reactor;
+using Microsoft.UI.Reactor.Core;
+using Microsoft.UI.Reactor.Layout;
+using Microsoft.UI.Xaml;
+using static Microsoft.UI.Reactor.Factories;
+
+namespace Cshubben.Ui.Assist;
+
+sealed record BriefingProps(HubSnapshot Snapshot, Action<string> OnSelect);
+
+/// <summary>A generated briefing, kept for the session so leaving the Overview does not throw it away.</summary>
+sealed record BriefingCache(BriefingResult Result, DateTimeOffset At, string Model, double CostUsd, bool Demo);
+
+/// <summary>
+/// "Today's briefing" at the top of the Overview. Never runs on its own: the Generate button asks Claude (Prompts.Briefing, parsed
+/// by BriefingParser) and the result is cached. Demo mode starts with a ready-made demo briefing.
+/// </summary>
+sealed class BriefingCard : Component<BriefingProps>
+{
+    /// <summary>The last generated briefing. Null until one was generated (or, in demo mode, until the first render).</summary>
+    public static BriefingCache? Cached { get; set; }
+
+    public override Element Render()
+    {
+        var snap = Props.Snapshot;
+        var onSelect = Props.OnSelect;
+        var claude = IntegrationServices.Claude;
+
+        var (running, setRunning) = UseState(false, true);
+        var (error, setError) = UseState("", true);
+        var (tick, setTick) = UseState(0, true);
+
+        if (Cached is null && claude.IsDemo)
+            Cached = new BriefingCache(DemoClaudeData.Briefing(snap), snap.At, "demo", 0, true);
+        var cache = Cached;
+
+        async Task Generate()
+        {
+            setRunning(true);
+            setError("");
+            try
+            {
+                if (claude is DemoClaudeData)
+                {
+                    await Task.Delay(900);
+                    Cached = new BriefingCache(DemoClaudeData.Briefing(snap), snap.At, "demo", 0, true);
+                }
+                else
+                {
+                    var result = await claude.RunAsync(ClaudeRequest.From(Prompts.Briefing(snap)), CancellationToken.None);
+                    if (!result.Success)
+                    {
+                        setError(result.Error == ClaudeErrorKind.AuthFailed ? ClaudeAuth.Hint : (result.ErrorMessage ?? "Claude could not write the briefing."));
+                    }
+                    else
+                    {
+                        var parsed = BriefingParser.Parse(result.Text);
+                        if (parsed is null) setError("Claude's answer could not be read as a briefing. Try again.");
+                        else Cached = new BriefingCache(parsed, DateTimeOffset.UtcNow, result.Model, result.CostUsd, false);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                setError(ex.Message);
+            }
+
+            setRunning(false);
+            setTick(tick + 1);
+        }
+
+        void Open(string url)
+        {
+            var pr = snap.All.FirstOrDefault(p => p.Url == url);
+            if (pr is not null) onSelect(pr.Id);
+            else ExternalActions.OpenUrl(url);
+        }
+
+        var title = HStack(8, TextBlock("✦").Foreground(Theme.AccentText), BodyStrong("Today's briefing"));
+
+        Element body;
+        Element? action = null;
+        if (!claude.IsAvailable)
+        {
+            body = VStack(6,
+                BodyStrong("Claude Code is not installed"),
+                Kit.Muted("Install Claude Code and sign in (claude auth login) to get a written briefing of what needs you today. "
+                    + "Everything else on this page works without it.").TextWrapping());
+        }
+        else
+        {
+            action = Button(running ? "Working…" : cache is null ? "Generate" : "Regenerate", () => _ = Generate())
+                .AccentButton().IsEnabled(!running).VAlign(VerticalAlignment.Top).AutomationName("Generate the briefing");
+
+            Element content;
+            if (cache is null)
+            {
+                content = running
+                    ? Parts.Busy("Claude is reading your pull requests…")
+                    : Kit.Muted("Ask Claude for a short briefing of what needs you today. It runs only when you press Generate.").TextWrapping();
+            }
+            else
+            {
+                content = Result(cache, snap.At, running, Open);
+            }
+
+            body = VStack(10,
+                content,
+                error.Length > 0 ? Parts.Banner("No briefing", error, Tone.Danger) : null);
+        }
+
+        var header = Grid(
+            columns: [GridSize.Star(), GridSize.Auto],
+            rows: [GridSize.Auto],
+            title.VAlign(VerticalAlignment.Center).Grid(column: 0),
+            (action ?? Empty()).Grid(column: 1));
+
+        return Card(VStack(12, header, body));
+    }
+
+    private static Element Result(BriefingCache cache, DateTimeOffset now, bool running, Action<string> open)
+    {
+        var result = cache.Result;
+        var age = Age.Format(cache.At, DateTimeOffset.UtcNow);
+        var meta = new List<string>
+        {
+            cache.Demo ? "Demo briefing" : age == "now" ? "Generated just now" : "Generated " + age + " ago",
+        };
+        if (cache.Model.Length > 0 && !cache.Demo) meta.Add(cache.Model);
+        if (cache.CostUsd > 0) meta.Add("$" + cache.CostUsd.ToString("0.000", CultureInfo.InvariantCulture));
+
+        var items = result.Items.Select((item, index) => ItemRow(item, index, open)).ToArray();
+
+        return VStack(10,
+            result.Headline.Length > 0 ? TextBlock(result.Headline).FontSize(18).SemiBold().TextWrapping() : null,
+            result.Summary.Length > 0 ? Body(result.Summary).Foreground(Theme.SecondaryText).TextWrapping() : null,
+            items.Length > 0 ? FlexColumn(items) with { RowGap = 2 } : null,
+            running ? Parts.Busy("Writing a new briefing…") : null,
+            Kit.Muted(string.Join(" · ", meta)));
+    }
+
+    private static Element ItemRow(BriefingItem item, int index, Action<string> open)
+    {
+        var (label, tone) = item.Kind switch
+        {
+            BriefingItemKind.Action => ("Do", Tone.Accent),
+            BriefingItemKind.Watch => ("Watch", Tone.Warning),
+            _ => ("Info", Tone.Neutral),
+        };
+
+        var content = Grid(
+            columns: [GridSize.Px(64), GridSize.Star(), GridSize.Auto],
+            rows: [GridSize.Auto],
+            Kit.Pill(label, tone).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Top).Grid(column: 0),
+            TextBlock(item.Text).TextWrapping().Grid(column: 1),
+            item.PrUrl is null ? Empty().Grid(column: 2) : Kit.Muted("↗").VAlign(VerticalAlignment.Top).Margin(8, 0, 0, 0).Grid(column: 2));
+
+        if (item.PrUrl is not string url)
+            return Border(content).Padding(12, 6).WithKey("item-" + index);
+
+        return Border(Button(content, () => open(url))
+                .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
+                .AutomationName(item.Text))
+            .CornerRadius(6).WithKey("item-" + index);
+    }
+}

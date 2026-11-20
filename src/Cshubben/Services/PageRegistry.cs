@@ -72,11 +72,11 @@ static class PageRegistry
         new(Page.Drift, "Workspace", "", "Drift",
             _ => Kit.ComingSoon("Drift", "Actions and deployments on your repos")),
         new(Page.Linear, "Workspace", "", "Linear",
-            _ => Kit.ComingSoon("Linear", "Your issues, linked to pull requests")),
+            ctx => LinearPage.Build(ctx.Snapshot, null, ctx.Select, null)),
         new(Page.Notes, "Workspace", "", "Notes",
             _ => Component<NotesPage>()),
         new(Page.Stats, "Workspace", "", "Stats",
-            _ => Kit.ComingSoon("Stats", "Cycle time and review load")),
+            ctx => StatsPage.Build(ctx.Snapshot, null)),
 
         new(Page.Settings, "", "", "Settings",
             c => Component<SettingsPage, PageContext>(c), Pinned: true),

@@ -1,5 +1,6 @@
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
+using Cshubben.Ui.Assist;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -16,6 +17,12 @@ namespace Cshubben.Ui;
 static class Inspector
 {
     public static readonly string[] Tabs = ["Overview", "Conversation", "Files", "Pipeline"];
+
+    /// <summary>
+    /// Called with the PR id when the user presses "Start review" or "Re-review". The app assigns this to open the review page;
+    /// the default does nothing. Where the Claude, GitHub-action and Linear services come from: see <c>IntegrationServices</c>.
+    /// </summary>
+    public static Action<string> OpenReview { get; set; } = _ => { };
 
     public static Element Build(PullRequest pr, HubSnapshot snap, int tab, Action<int> setTab, Action close, bool fullPage = false)
     {
@@ -39,21 +46,18 @@ static class Inspector
                 pr.UnresolvedThreads == 0 ? Tone.Neutral : Tone.Warning),
             Chip("Merge", MergeText(pr.Merge), MergeTone(pr.Merge))) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 8 });
 
+        var isReviewStep = action.Kind is NextActionKind.StartReview or NextActionKind.ReReview;
         var nextStep = Border(VStack(10,
                 Kit.Muted("NEXT STEP"),
                 action.IsActionable
-                    ? Button(action.Label, () => { }).AccentButton().HAlign(HorizontalAlignment.Stretch)
+                    ? Button(isReviewStep ? "▶ " + action.Label : action.Label, () => RunNextStep(pr, action))
+                        .AccentButton().HAlign(HorizontalAlignment.Stretch).AutomationName(action.Label)
                     : TextBlock(action.Label).FontSize(16).SemiBold().Foreground(Kit.Fg(action.Tone)),
                 Kit.Muted(action.Reason).TextWrapping()))
             .Background(Kit.Bg(action.Tone)).CornerRadius(8).Padding(16);
 
-        var quick = (FlexRow(
-            pr.Role == PrRole.ReviewRequested ? Button("Approve", () => { }).SubtleButton() : null,
-            pr.Role == PrRole.ReviewRequested ? Button("Request changes", () => { }).SubtleButton() : null,
-            Button("✦ Ask Claude", () => { }).SubtleButton(),
-            Button("◇ Linear issue", () => { }).SubtleButton(),
-            Button("✎ Save to notes", () => { }).SubtleButton(),
-            Button("↗ GitHub", () => { }).SubtleButton()) with { Wrap = FlexWrap.Wrap, ColumnGap = 4, RowGap = 4 });
+        // Approve, Request changes, Ask Claude, Linear issue, Save to notes and GitHub, with their panels. Keyed by PR so state resets.
+        var quick = Component<QuickActions, QuickActionsProps>(new QuickActionsProps(pr)).WithKey("quick-" + pr.Id);
 
         var tabs = SelectorBar([.. Tabs.Select(t => SelectorBarItem(t))], tab, setTab);
 
@@ -63,15 +67,26 @@ static class Inspector
             _ => Card(VStack(6, BodyStrong(Tabs[tab]), Kit.Muted("Coming soon.")))
         };
 
+        // Everything under the header scrolls, so an open panel (Claude answer, composer) never squeezes the tabs out of view.
+        var scrolling = FlexColumn(
+            status.Flex(shrink: 0),
+            nextStep.Flex(shrink: 0),
+            Border(quick).Flex(shrink: 0),
+            tabs.Flex(shrink: 0),
+            body.Flex(shrink: 0)) with { RowGap = 12 };
+
         var panel = Border(FlexColumn(
                 header.Flex(shrink: 0),
-                status.Flex(shrink: 0),
-                nextStep.Flex(shrink: 0),
-                quick.Flex(shrink: 0),
-                tabs.Flex(shrink: 0),
-                ScrollView(body).Flex(grow: 1, basis: 0)) with { RowGap = 12 })
+                ScrollView(scrolling).Flex(grow: 1, basis: 0)) with { RowGap = 12 })
             .Background(Theme.LayerFill).CornerRadius(8).Padding(20).Margin(0, 0, 8, 8);
         return fullPage ? Kit.Capped(panel, 760) : panel;
+    }
+
+    /// <summary>Review steps open the review page; everything else is one click away on GitHub.</summary>
+    private static void RunNextStep(PullRequest pr, NextAction action)
+    {
+        if (action.Kind is NextActionKind.StartReview or NextActionKind.ReReview) OpenReview(pr.Id);
+        else ExternalActions.OpenUrl(pr.Url);
     }
 
     private static Element OverviewTab(PullRequest pr, DateTimeOffset now)

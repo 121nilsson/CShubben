@@ -1,5 +1,6 @@
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
+using Cshubben.Ui.Assist;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -32,6 +33,7 @@ static class OverviewPage
         return ScrollView(Kit.Capped(
             FlexColumn(
                 Kit.PageHeader("Overview", "What needs you right now"),
+                Border(Component<BriefingCard, BriefingProps>(new BriefingProps(snap, onSelect))).Margin(0, 0, 0, 16),
                 (FlexRow(
                     Tile("Needs you", o.NeedsYou, o.NeedsYou > 0 ? Tone.Warning : Tone.Neutral, "across your PRs and reviews"),
                     Tile("Ready to merge", o.ReadyToMerge.Count, Tone.Success, "approved, green, no conflicts"),
