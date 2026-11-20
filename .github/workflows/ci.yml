@@ -1,6 +1,6 @@
 name: CI
 
-# Bygger appen vid varje push och PR. WinUI 3 kräver Windows-runner och explicit plattform.
+# Builds the app on every push and PR. WinUI 3 needs a Windows runner and an explicit platform.
 on:
   push:
     branches: [main]
@@ -9,7 +9,7 @@ on:
     paths-ignore: ["**.md", "docs/**"]
   workflow_dispatch:
 
-# En ny push avbryter den pågående körningen för samma gren.
+# A new push cancels the in-progress run for the same ref.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -32,7 +32,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: NuGet-cache
+      - name: NuGet cache
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
@@ -42,7 +42,7 @@ jobs:
       - name: Restore
         run: dotnet restore src/Cshubben/Cshubben.csproj -p:Platform=${{ matrix.platform }}
 
-      # Bygg alltid med explicit plattform, annars ger WindowsAppSDKSelfContained fel.
+      # Always build with an explicit platform, otherwise WindowsAppSDKSelfContained fails.
       - name: Build
         run: dotnet build src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=${{ matrix.platform }}
 

@@ -1,18 +1,18 @@
 # Cshubben
 
-Systerprojekt till My-hub, byggt med **.NET 11 / C# 15** och **Microsoft.UI.Reactor** (deklarativt, React-liknande UI i ren C# för WinUI 3).
+A sibling project to My-hub, built with **.NET 11 / C# 15** and **Microsoft.UI.Reactor** (declarative, React-style UI in plain C# for WinUI 3).
 
-> Status: grunduppsättning. Reactor är experimentellt (preview) och bara för Windows.
+> Status: initial setup. Reactor is experimental (preview) and Windows-only.
 
-## Bygga lokalt (Windows)
+## Build locally (Windows)
 
 ```
-dotnet build -p:Platform=x64
+dotnet build src/Cshubben/Cshubben.csproj -p:Platform=x64
 dotnet run --project src/Cshubben -p:Platform=x64
 ```
 
-Bygg alltid med explicit `-p:Platform=x64` (eller `ARM64`).
+Always build with an explicit `-p:Platform=x64` (or `ARM64`).
 
 ## CI
 
-`.github/workflows/ci.yml` bygger och publicerar x64 och ARM64 på `windows-latest` och sparar resultatet som artefakter.
+`.github/workflows/ci.yml` builds and publishes x64 and ARM64 on `windows-latest` and uploads the output as artifacts.

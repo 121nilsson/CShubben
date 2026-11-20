@@ -4,7 +4,7 @@ using static Microsoft.UI.Reactor.Factories;
 
 ReactorApp.Run<RootComponent>("Cshubben");
 
-/// <summary>Startkomponent. Här byggs appen ut (navigation, sidor, state).</summary>
+/// <summary>Root component. The app grows from here (navigation, pages, state).</summary>
 sealed class RootComponent : Component
 {
     public override Element Render()
@@ -13,7 +13,7 @@ sealed class RootComponent : Component
 
         return VStack(
             Heading("Cshubben"),
-            Heading($"Klick: {count}"),
+            Heading($"Clicks: {count}"),
             HStack(8,
                 Button("-", () => setCount(count - 1)),
                 Button("+", () => setCount(count + 1))
