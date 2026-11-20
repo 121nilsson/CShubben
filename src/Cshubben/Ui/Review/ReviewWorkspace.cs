@@ -57,7 +57,7 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
         Update = update;
         Narrow = narrow;
         ThreeColumns = windowWidth >= 1360;
-        var rail = windowWidth < 1200 ? 64.0 : 248.0;
+        var rail = 64.0; // the shell shows the icon rail while reviewing
         var treeWidth = windowWidth >= 1500 ? 320.0 : 280.0;
         var rightWidth = windowWidth >= 1500 ? 400.0 : 320.0;
         var diffWidth = windowWidth - rail - treeWidth - (ThreeColumns ? rightWidth : 0.0);

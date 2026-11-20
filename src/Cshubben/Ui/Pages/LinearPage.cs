@@ -245,8 +245,8 @@ sealed class LinearView : Component<LinearProps>
             : Card(FlexColumn(
                     HStack(8, BodyStrong("Out of sync"), Kit.Pill(items.Count.ToString(), Tone.Warning)),
                     Kit.Muted("Places where a pull request and its Linear issue disagree. Each has a one-click fix.").TextWrapping(),
-                    FlexColumn(items.Select(item => ReconRow(
-                        item, snap, data, onSelectPr, activeKey, setActiveKey, pick, setPick, busyKey, teams, run)).ToArray()) with { RowGap = 8 })
+                    FlexColumn(items.Select((item, index) => ReconRow(
+                        item, snap, data, onSelectPr, activeKey, setActiveKey, pick, setPick, busyKey, teams, run, index == 0)).ToArray()) with { RowGap = 8 })
                 with { RowGap = 8 })
                 .Margin(0, 0, 0, 12);
 
@@ -389,8 +389,11 @@ sealed class LinearView : Component<LinearProps>
         Action<int> setPick,
         string busyKey,
         IReadOnlyList<LinearTeam> teams,
-        Func<string, Func<Task<string>>, Task> run)
+        Func<string, Func<Task<string>>, Task> run,
+        bool first)
     {
+        // Only the first card in the list gets the accent button; the others are quiet until it is done.
+        ButtonElement Lead(ButtonElement b) => first ? b.AccentButton() : b;
         var key = KeyOf(item);
         var active = activeKey == key;
         var busy = busyKey == key;
@@ -432,17 +435,17 @@ sealed class LinearView : Component<LinearProps>
                         })).AccentButton().IsEnabled(!busy),
                         Cancel(), busy)
                     : FlexRow(
-                        Button("Mark done", () => setActiveKey(key)).AccentButton().AutomationName("Mark " + issue.Identifier + " done"),
+                        Lead(Button("Mark done", () => setActiveKey(key))).AutomationName("Mark " + issue.Identifier + " done"),
                         OpenPr(), OpenIssue()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
                 break;
 
             case ReconKind.IssueDoneButPrOpen:
                 actions = FlexRow(
-                    Button("Review the PR", () =>
+                    Lead(Button("Review the PR", () =>
                     {
                         if (snapPr is not null) onSelectPr(snapPr.Id);
                         else if (pr is not null) ExternalActions.OpenUrl(pr.Url);
-                    }).AccentButton().AutomationName("Review the open pull request"),
+                    })).AutomationName("Review the open pull request"),
                     OpenIssue()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
                 break;
 
@@ -470,7 +473,7 @@ sealed class LinearView : Component<LinearProps>
                 else
                 {
                     actions = FlexRow(
-                        Button("Create issue", () => { setPick(0); setActiveKey(key); }).AccentButton().AutomationName("Create a Linear issue for this pull request"),
+                        Lead(Button("Create issue", () => { setPick(0); setActiveKey(key); })).AutomationName("Create a Linear issue for this pull request"),
                         OpenPr()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
                 }
 
@@ -498,7 +501,7 @@ sealed class LinearView : Component<LinearProps>
                 else
                 {
                     actions = FlexRow(
-                        Button("Link a PR…", () => { setPick(0); setActiveKey(key); }).AccentButton().AutomationName("Link a pull request to " + issue.Identifier),
+                        Lead(Button("Link a PR…", () => { setPick(0); setActiveKey(key); })).AutomationName("Link a pull request to " + issue.Identifier),
                         OpenIssue()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
                 }
 

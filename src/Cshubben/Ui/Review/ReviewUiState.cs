@@ -68,6 +68,13 @@ sealed record ReviewUiState
 
     public bool ShowCommits { get; init; }
 
+    public bool ShowResolved { get; init; }
+
+    public bool ShowDescription { get; init; }
+
+    /// <summary>Wrap long code lines instead of cutting them off (off by default so line numbers stay aligned).</summary>
+    public bool Wrap { get; init; }
+
     /// <summary>True while a text box has focus or a dialog is open: single-key shortcuts must stay quiet then.</summary>
     public bool Typing =>
         Composer is not null || ReplyThreadId is not null || EditCommentId is not null || SubmitOpen || HelpOpen || FilterFocused;

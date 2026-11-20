@@ -34,6 +34,7 @@ sealed class BriefingCard : Component<BriefingProps>
         var (running, setRunning) = UseState(false, true);
         var (error, setError) = UseState("", true);
         var (tick, setTick) = UseState(0, true);
+        var (expanded, setExpanded) = UseState(false);
 
         if (Cached is null && claude.IsDemo)
             Cached = new BriefingCache(DemoClaudeData.Briefing(snap), snap.At, "demo", 0, true);
@@ -106,7 +107,7 @@ sealed class BriefingCard : Component<BriefingProps>
             }
             else
             {
-                content = Result(cache, snap.At, running, Open);
+                content = Result(cache, snap.At, running, Open, expanded, () => setExpanded(!expanded));
             }
 
             body = VStack(10,
@@ -123,7 +124,9 @@ sealed class BriefingCard : Component<BriefingProps>
         return Card(VStack(12, header, body));
     }
 
-    private static Element Result(BriefingCache cache, DateTimeOffset now, bool running, Action<string> open)
+    private const int CompactItems = 3;
+
+    private static Element Result(BriefingCache cache, DateTimeOffset now, bool running, Action<string> open, bool expanded, Action toggle)
     {
         var result = cache.Result;
         var age = Age.Format(cache.At, DateTimeOffset.UtcNow);
@@ -134,12 +137,21 @@ sealed class BriefingCard : Component<BriefingProps>
         if (cache.Model.Length > 0 && !cache.Demo) meta.Add(cache.Model);
         if (cache.CostUsd > 0) meta.Add("$" + cache.CostUsd.ToString("0.000", CultureInfo.InvariantCulture));
 
-        var items = result.Items.Select((item, index) => ItemRow(item, index, open)).ToArray();
+        var total = result.Items.Count;
+        var visible = expanded ? result.Items : result.Items.Take(CompactItems).ToList();
+        var items = visible.Select((item, index) => ItemRow(item, index, open)).ToArray();
+        Element? more = total > CompactItems
+            ? Button(expanded ? "Show less" : "Show all " + total + " items", toggle).SubtleButton().HAlign(HorizontalAlignment.Left)
+                .AutomationName(expanded ? "Show fewer briefing items" : "Show all briefing items")
+            : null;
 
-        return VStack(10,
-            result.Headline.Length > 0 ? TextBlock(result.Headline).FontSize(18).SemiBold().TextWrapping() : null,
-            result.Summary.Length > 0 ? Body(result.Summary).Foreground(Theme.SecondaryText).TextWrapping() : null,
+        var summary = result.Summary.Length > 0 ? Body(result.Summary).Foreground(Theme.SecondaryText).TextWrapping() : null;
+        if (summary is not null && !expanded) summary = summary.MaxLines(2).TextTrimming(TextTrimming.CharacterEllipsis);
+        return VStack(8,
+            result.Headline.Length > 0 ? TextBlock(result.Headline).FontSize(16).SemiBold().TextWrapping() : null,
+            summary,
             items.Length > 0 ? FlexColumn(items) with { RowGap = 2 } : null,
+            more,
             running ? Parts.Busy("Writing a new briefing…") : null,
             Kit.Muted(string.Join(" · ", meta)));
     }
@@ -154,10 +166,12 @@ sealed class BriefingCard : Component<BriefingProps>
         };
 
         var content = Grid(
-            columns: [GridSize.Px(64), GridSize.Star(), GridSize.Auto],
+            columns: [GridSize.Px(56), GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
-            Kit.Pill(label, tone).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Top).Grid(column: 0),
-            TextBlock(item.Text).TextWrapping().Grid(column: 1),
+            item.Kind == BriefingItemKind.Action
+                ? TextBlock("●").FontSize(8).Foreground(Theme.AccentText).HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Top).Margin(0, 5, 0, 0).Grid(column: 0)
+                : Kit.Pill(label, tone).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Top).Grid(column: 0),
+            TextBlock(item.Text).TextWrapping().MaxLines(2).TextTrimming(TextTrimming.CharacterEllipsis).ToolTip(item.Text).Grid(column: 1),
             item.PrUrl is null ? Empty().Grid(column: 2) : Kit.Muted("↗").VAlign(VerticalAlignment.Top).Margin(8, 0, 0, 0).Grid(column: 2));
 
         if (item.PrUrl is not string url)

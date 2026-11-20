@@ -96,6 +96,7 @@ sealed partial class ReviewWorkspace
         var nav = FlexRow(
             Button(Kit.Glyph("", 12), () => MoveFile(-1)).SubtleButton().AutomationName("Previous file").ToolTip("Previous file (k)"),
             Button(Kit.Glyph("", 12), () => MoveFile(1)).SubtleButton().AutomationName("Next file").ToolTip("Next file (j)"),
+            ToggleButton("Wrap", S.Wrap, v => Update(s => s with { Wrap = v })).AutomationName("Wrap long lines").ToolTip("Wrap long lines"),
             CheckBox(viewed, v => ToggleViewed(file.Path, v), label: "Viewed").AutomationName("Viewed (v)"),
             ReviewKit.OpenOnGitHub(ReviewKit.FileUrl(Target, file.Path), "Open file on GitHub")) with { ColumnGap = 4 };
 
@@ -109,7 +110,7 @@ sealed partial class ReviewWorkspace
         var children = new List<Element>();
         if (Narrow) children.Add(BackToFiles());
         children.Add(titleLine);
-        children.Add(HStack(10, tags.ToArray()));
+        children.Add(FlexRow(tags.ToArray()) with { ColumnGap = 10, AlignItems = FlexAlign.Center });
         return Border(VStack(8, children.ToArray()))
             .Padding(16, 10).BorderThickness(0, 0, 0, 1).BorderBrush(Theme.DividerStroke);
     }
@@ -167,7 +168,7 @@ sealed partial class ReviewWorkspace
         var label = number is null ? string.Empty : number.Value.ToString();
         var text = active
             ? TextBlock("+").FontFamily(ReviewKit.Mono).FontSize(13).SemiBold().Foreground(Theme.AccentText)
-            : TextBlock(label).FontFamily(ReviewKit.Mono).FontSize(11).Foreground(Theme.SecondaryText);
+            : TextBlock(label).FontFamily(ReviewKit.Mono).FontSize(11).Foreground(Theme.SecondaryText).TextWrapping(TextWrapping.NoWrap);
         var cell = Border(text.HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center)).Padding(0, 0, 8, 0);
         if (!commentable || number is null) return cell;
         return cell
@@ -179,7 +180,7 @@ sealed partial class ReviewWorkspace
             .ToolTip("Comment on this line (c)");
     }
 
-    private static Element CodeCell(LineRow row)
+    private Element CodeCell(LineRow row)
     {
         var line = row.Line;
         if (row.Partner is not null && (line.Kind == DiffLineKind.Add || line.Kind == DiffLineKind.Remove))
@@ -190,14 +191,17 @@ sealed partial class ReviewWorkspace
             if (result.IsUseful)
             {
                 var spans = line.Kind == DiffLineKind.Remove ? result.OldSpans : result.NewSpans;
-                return Segments(spans, line.Kind == DiffLineKind.Add ? Theme.SystemSuccess : Theme.SystemCritical);
+                return Segments(spans, S.Wrap, line.Kind == DiffLineKind.Add ? Theme.SystemSuccess : Theme.SystemCritical);
             }
         }
 
-        return TextBlock(ReviewKit.CodeText(line.Text)).FontFamily(ReviewKit.Mono).FontSize(12).TextWrapping();
+        var plain = TextBlock(ReviewKit.CodeText(line.Text)).FontFamily(ReviewKit.Mono).FontSize(12);
+        return S.Wrap
+            ? plain.TextWrapping()
+            : plain.TextWrapping(TextWrapping.NoWrap).TextTrimming(TextTrimming.CharacterEllipsis).ToolTip(line.Text.Trim());
     }
 
-    private static Element Segments(IReadOnlyList<DiffSpan> spans, ThemeRef strong)
+    private static Element Segments(IReadOnlyList<DiffSpan> spans, bool wrap, ThemeRef strong)
     {
         var parts = new List<Element>();
         foreach (var span in spans)
@@ -217,7 +221,7 @@ sealed partial class ReviewWorkspace
                 parts.Add(piece.Flex(shrink: 0));
             }
         }
-        return FlexRow(parts.ToArray()) with { Wrap = FlexWrap.Wrap };
+        return FlexRow(parts.ToArray()) with { Wrap = wrap ? FlexWrap.Wrap : FlexWrap.NoWrap };
     }
 
     private Element LineView(DiffFile file, LineRow row)

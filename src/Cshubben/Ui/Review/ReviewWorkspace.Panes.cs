@@ -69,7 +69,7 @@ sealed partial class ReviewWorkspace
             facts.Add(ToggleButton("Split view", S.Split, v => Update(s => s with { Split = v })).AutomationName("Split view"));
         }
 
-        var factRow = FlexRow(facts.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 8 };
+        var factRow = FlexRow(facts.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 8, AlignItems = FlexAlign.Center };
         return Border(FlexColumn(titleRow.Flex(shrink: 0), factRow.Flex(shrink: 0)) with { RowGap = 10 })
             .Padding(16, 12).BorderThickness(0, 0, 0, 1).BorderBrush(Theme.DividerStroke);
     }
@@ -83,7 +83,7 @@ sealed partial class ReviewWorkspace
         };
         if (Progress.UnresolvedThreads > 0) parts.Add(Kit.Pill(Progress.ThreadsLabel, Tone.Warning));
         if (Progress.PendingComments > 0) parts.Add(Kit.Pill(Progress.PendingComments + " pending", Tone.Accent));
-        return HStack(10, parts.ToArray());
+        return (FlexRow(parts.ToArray()) with { ColumnGap = 10, AlignItems = FlexAlign.Center });
     }
 
     private Element? BuildRangeToggle()
@@ -239,7 +239,8 @@ sealed partial class ReviewWorkspace
 
         var description = Props.Pr?.Description ?? Props.Context.Description;
         if (description.Trim().Length > 0)
-            parts.Add(Expander("Description", Border(Kit.Md(description)).Padding(4, 8)).HAlign(HorizontalAlignment.Stretch));
+            parts.Add(Collapsible("Description", S.ShowDescription, v => Update(s => s with { ShowDescription = v }),
+                Border(Kit.Md(description)).Padding(4, 4)));
 
         return ScrollView(FlexColumn(parts.ToArray()).FlexPadding(12, 12) with { RowGap = 12 });
     }
@@ -263,8 +264,8 @@ sealed partial class ReviewWorkspace
         {
             BodyStrong("Your review"),
             Kit.Muted(pending.Count == 0
-                ? "No pending comments. Click a line number to write one; nothing is posted until you submit."
-                : pending.Count + (pending.Count == 1 ? " pending comment, posted when you submit." : " pending comments, posted when you submit.")),
+                ? "Click a line number to comment. Nothing is posted until you submit."
+                : pending.Count + (pending.Count == 1 ? " pending comment, posted when you submit." : " pending comments, posted when you submit.")).TextWrapping(),
         };
         if (items.Length > 0) content.Add(VStack(2, items));
         content.Add(Button("Submit review…", () => Update(s => s with { SubmitOpen = true, Error = string.Empty }))
@@ -282,7 +283,8 @@ sealed partial class ReviewWorkspace
         if (ordered.Count == 0) content.Add(Kit.Muted("No conversations yet."));
         foreach (var t in open) content.Add(ThreadItem(t));
         if (resolved.Count > 0)
-            content.Add(Expander("Resolved (" + resolved.Count + ")", VStack(2, resolved.Select(ThreadItem).ToArray())).HAlign(HorizontalAlignment.Stretch));
+            content.Add(Collapsible("Resolved (" + resolved.Count + ")", S.ShowResolved, v => Update(s => s with { ShowResolved = v }),
+                VStack(2, resolved.Select(ThreadItem).ToArray())));
         return VStack(6, content.ToArray());
     }
 
@@ -319,7 +321,23 @@ sealed partial class ReviewWorkspace
             TextBlock(c.Headline).FontSize(12).TextTrimming(TextTrimming.CharacterEllipsis).VAlign(VerticalAlignment.Center).Grid(column: 1),
             fresh.Contains(c.Sha) ? Kit.Pill("new", Tone.Accent).Margin(6, 0, 0, 0).Grid(column: 2) : Empty().Grid(column: 2))
             .Padding(0, 3).WithKey(c.Sha)).ToArray();
-        return Expander("Commits (" + commits.Count + ")", VStack(2, items)).HAlign(HorizontalAlignment.Stretch);
+        return Collapsible("Commits (" + commits.Count + ")", S.ShowCommits, v => Update(s => s with { ShowCommits = v }), VStack(2, items));
+    }
+
+    /// <summary>A light section: a subtle header button with a chevron, content only when open (no heavy card).</summary>
+    private static Element Collapsible(string title, bool open, Action<bool> set, Element content)
+    {
+        var header = Button(
+                Grid(
+                    columns: [GridSize.Star(), GridSize.Auto],
+                    rows: [GridSize.Auto],
+                    BodyStrong(title).VAlign(VerticalAlignment.Center).Grid(column: 0),
+                    Kit.Glyph(open ? ReviewKit.GlyphChevronDown : ReviewKit.GlyphChevronRight, 10).Foreground(Theme.SecondaryText)
+                        .VAlign(VerticalAlignment.Center).Grid(column: 1)),
+                () => set(!open))
+            .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
+            .Padding(8, 4).AutomationName((open ? "Collapse " : "Expand ") + title);
+        return open ? VStack(4, header, content) : header;
     }
 
     private static string FileName(string path)
