@@ -91,35 +91,6 @@ foreach ($shot in ($Shots -split ';')) {
   $g.ReleaseHdc($hdc); $g.Dispose()
   $bmp.Save((Join-Path $OutDir "$name.png"), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
 
-  $log.Add("${name}: app exited early with code $($proc.ExitCode)")
-    continue
-  }
-  Start-Sleep -Seconds $WaitSeconds
-  $proc.Refresh()
-  $h = $proc.MainWindowHandle
-  [Win]::MoveWindow($h, 0, 0, [Math]::Min($sw, $screen.Width), [Math]::Min($sh, $screen.Height), $true) | Out-Null
-  [Win]::SetForegroundWindow($h) | Out-Null
-  Start-Sleep -Milliseconds 800
-
-  $r = New-Object Win+RECT
-  [Win]::GetWindowRect($h, [ref]$r) | Out-Null
-  $w = [Math]::Max(1, $r.Right - $r.Left); $hh = [Math]::Max(1, $r.Bottom - $r.Top)
-
-  # 1) PrintWindow of the window itself (works even if it is partly off-screen).
-  $bmp = New-Object System.Drawing.Bitmap $w, $hh
-  $g = [System.Drawing.Graphics]::FromImage($bmp)
-  $hdc = $g.GetHdc()
-  $ok = [Win]::PrintWindow($h, $hdc, 2)
-  $g.ReleaseHdc($hdc); $g.Dispose()
-  $bmp.Save((Join-Path $OutDir "$name.png"), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
-
-  # 2) Screen copy of the window area as a fallback/comparison.
-  $bmp2 = New-Object System.Drawing.Bitmap $w, $hh
-  $g2 = [System.Drawing.Graphics]::FromImage($bmp2)
-  $g2.CopyFromScreen($r.Left, $r.Top, 0, 0, (New-Object System.Drawing.Size $w, $hh))
-  $g2.Dispose()
-  $bmp2.Save((Join-Path $OutDir "$name.screen.png"), [System.Drawing.Imaging.ImageFormat]::Png); $bmp2.Dispose()
-
   $log.Add("${name}: ${w}x${hh} printwindow=$ok")
   Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
   Start-Sleep -Milliseconds 300
