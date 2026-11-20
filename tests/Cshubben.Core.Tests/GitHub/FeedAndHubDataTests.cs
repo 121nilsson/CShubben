@@ -121,7 +121,6 @@ public class FeedAndHubDataTests
             return feedFails ? FakeHandler.Status(HttpStatusCode.InternalServerError) : FakeHandler.Ok("[]");
         }
         var q = r.Query;
-        if (q.Contains("viewer")) return FakeHandler.Ok("{\"data\":{\"viewer\":{\"login\":\"alex\"}}}");
         if (q.Contains("search("))
         {
             var search = r.Variables.GetProperty("q").GetString() ?? "";
@@ -131,6 +130,7 @@ public class FeedAndHubDataTests
         }
         if (q.Contains("latestReviews")) return FakeHandler.Ok("{\"data\":{\"nodes\":[" + Fixtures.ReviewInfoNode + "]}}");
         if (q.Contains("reviewThreads")) return FakeHandler.Ok("{\"data\":{\"nodes\":[" + Fixtures.EnrichNode + "]}}");
+        if (q.Contains("viewer")) return FakeHandler.Ok("{\"data\":{\"viewer\":{\"login\":\"alex\"}}}");
         return FakeHandler.Status(HttpStatusCode.NotFound);
     }
 
