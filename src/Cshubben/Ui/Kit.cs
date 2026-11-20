@@ -39,7 +39,7 @@ static class Kit
     public static Element Md(string markdown) =>
         Microsoft.UI.Reactor.Advanced.Factories.Markdown(markdown, MdOptions);
 
-    private static readonly Microsoft.UI.Reactor.Advanced.MarkdownOptions MdOptions = new()
+    private static readonly Microsoft.UI.Reactor.Markdown.MarkdownOptions MdOptions = new()
     {
         Heading = (level, element) => element is RichTextBlockElement rich
             ? rich.FontSize(level switch { 1 => 18, 2 => 16, 3 => 14, _ => 13 })
