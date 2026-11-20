@@ -1,5 +1,9 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Cshubben.Core/Cshubben.Core.csproj" />
     <Project Path="src/Cshubben/Cshubben.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Cshubben.Core.Tests/Cshubben.Core.Tests.csproj" />
   </Folder>
 </Solution>

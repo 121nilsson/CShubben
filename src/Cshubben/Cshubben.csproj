@@ -13,5 +13,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.UI.Reactor" />
+    <ProjectReference Include="../Cshubben.Core/Cshubben.Core.csproj" />
   </ItemGroup>
 </Project>

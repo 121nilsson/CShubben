@@ -1,12 +1,13 @@
 name: CI
 
-# Builds the app on every push and PR. WinUI 3 needs a Windows runner and an explicit platform.
+# Core tests on Linux, the WinUI app on Windows (it needs a Windows runner and an explicit platform),
+# plus screenshots of every page with demo data so the design can be reviewed from the artifacts.
 on:
   push:
     branches: [main]
-    paths-ignore: ["**.md", "docs/**"]
+    paths-ignore: ["**.md"]
   pull_request:
-    paths-ignore: ["**.md", "docs/**"]
+    paths-ignore: ["**.md"]
   workflow_dispatch:
 
 # A new push cancels the in-progress run for the same ref.
@@ -19,7 +20,16 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
 
 jobs:
-  build:
+  core-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet test tests/Cshubben.Core.Tests -c Release
+
+  app:
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -43,14 +53,25 @@ jobs:
         run: dotnet restore src/Cshubben/Cshubben.csproj -p:Platform=${{ matrix.platform }}
 
       # Always build with an explicit platform, otherwise WindowsAppSDKSelfContained fails.
-      - name: Build
-        run: dotnet build src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=${{ matrix.platform }}
-
       - name: Publish
-        run: dotnet publish src/Cshubben/Cshubben.csproj -c Release -p:Platform=${{ matrix.platform }} -o publish/${{ matrix.platform }}
+        run: dotnet publish src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=${{ matrix.platform }} -o publish/${{ matrix.platform }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: cshubben-win-${{ matrix.platform }}
           path: publish/${{ matrix.platform }}
           if-no-files-found: error
+
+      # Screenshots only make sense on the x64 runner (the ARM64 build cannot run there).
+      - name: Screenshots
+        if: matrix.platform == 'x64'
+        continue-on-error: true
+        shell: pwsh
+        run: ./scripts/screenshot.ps1 -Exe publish/x64/Cshubben.exe -OutDir shots
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.platform == 'x64' && always()
+        with:
+          name: screenshots
+          path: shots
+          if-no-files-found: warn
