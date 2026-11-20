@@ -2,6 +2,7 @@ using Cshubben.Core.Features.Notifications;
 using Cshubben.Core.Features.Settings;
 using Cshubben.Core.Model;
 using Microsoft.UI.Reactor;
+using Microsoft.UI.Reactor.Core;
 using static Microsoft.UI.Reactor.Factories;
 
 namespace Cshubben.Services;

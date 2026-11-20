@@ -183,7 +183,7 @@ public class MergeAndMiscTests
         var clean = LogExcerpt.Clean(text, maxLines: 3)!;
         Assert.StartsWith("Error: boom\nline 1\nline 2", clean);
         Assert.EndsWith("…", clean);
-        Assert.DoesNotContain("\u001b", clean);
+        Assert.False(clean.Contains('\u001b', StringComparison.Ordinal));
     }
 
     [Fact]

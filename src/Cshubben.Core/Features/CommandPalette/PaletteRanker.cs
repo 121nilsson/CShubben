@@ -111,7 +111,7 @@ public static class PaletteRanker
 
         if (subtitle is not null && subtitle.Score / 2 > score) score = subtitle.Score / 2;
         if (keywords is not null && keywords.Score / 2 > score) score = keywords.Score / 2;
-        if (numberScore > score) score = numberScore;
+        if (numberScore > 0 && numberScore > score) score = numberScore;
         if (score == int.MinValue) return null;
 
         // Commands and pages first when the text matches equally well.
