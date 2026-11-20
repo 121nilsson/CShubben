@@ -69,6 +69,8 @@ static class PageRegistry
             c => PrListPages.Reviews(c.Snapshot, c.SelectedId, c.Select),
             c => new PageBadge(WaitingOnYou(c.Snapshot), Tone.Accent), NeedsData: true),
 
+        new(Page.Review, "Pull requests", "\uE943", "Code review", BuildReview),
+
         new(Page.Drift, "Workspace", "", "Drift",
             _ => Kit.ComingSoon("Drift", "Actions and deployments on your repos")),
         new(Page.Linear, "Workspace", "", "Linear",
@@ -81,6 +83,24 @@ static class PageRegistry
         new(Page.Settings, "", "", "Settings",
             c => Component<SettingsPage, PageContext>(c), Pinned: true),
     };
+
+    private static GitHubReviewData? _liveReview;
+
+    /// <summary>Code review page for the selected PR (or the first review request). Keyed by PR so state resets per PR.</summary>
+    private static Element BuildReview(PageContext c)
+    {
+        ReviewPage.Snapshot = c.Snapshot;
+        ReviewPage.PullRequestId = c.SelectedId ?? AppOptions.SelectedPr;
+        ReviewPage.InitialFile = null;
+        if (c.Services.GitHub is { } hub)
+        {
+            // Writes stay in dry-run until the user opts in from Settings (not wired yet), so nothing is sent by accident.
+            _liveReview ??= new GitHubReviewData(hub.Rest, hub.GraphQl, hub.Writer) { DryRun = true };
+            ReviewPage.Data = _liveReview;
+        }
+
+        return Component<ReviewPage>().WithKey(ReviewPage.PullRequestId ?? "none");
+    }
 
     public static PageDef? Find(Page id)
     {

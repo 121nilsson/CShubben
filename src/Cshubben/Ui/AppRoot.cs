@@ -139,7 +139,14 @@ sealed class AppRoot : Component
 
         var loadedOnce = snapshot is not null;
         var snap = snapshot ?? AppServices.EmptySnapshot;
-        var selected = snap.Find(selectedId);
+        // The review page uses the full window, so the inspector is hidden while it is open.
+        var selected = page == Page.Review ? null : snap.Find(selectedId);
+        Inspector.OpenReview = id => { setSelected(id); setPage(Page.Review); };
+        void SetInspectorTab(int t)
+        {
+            if (t == 2 && snap.Find(selectedId) is { } pr) { setSelected(pr.Id); setPage(Page.Review); }
+            else setTab(t);
+        }
 
         void Select(string id) { setSelected(id); setTab(0); }
 
@@ -230,13 +237,13 @@ sealed class AppRoot : Component
         Element grid = selected is not null && narrow
             ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
                 sidebar.Grid(column: 0),
-                Inspector.Build(selected, snap, tab, setTab, () => setSelected(null), fullPage: true).Grid(column: 1))
+                Inspector.Build(selected, snap, tab, SetInspectorTab, () => setSelected(null), fullPage: true).Grid(column: 1))
             : selected is null
             ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
                 sidebar.Grid(column: 0), main.Grid(column: 1))
             : Grid(columns: [GridSize.Px(railWidth), GridSize.Star(), GridSize.Px(inspectorWidth)], rows: [GridSize.Star()],
                 sidebar.Grid(column: 0), main.Grid(column: 1),
-                Inspector.Build(selected, snap, tab, setTab, () => setSelected(null)).Grid(column: 2));
+                Inspector.Build(selected, snap, tab, SetInspectorTab, () => setSelected(null)).Grid(column: 2));
 
         return FlexColumn(TitleBar("Cshubben").Flex(shrink: 0), grid.Flex(grow: 1, basis: 0))
             .RequestedTheme(ThemeOf(settings.Theme))
