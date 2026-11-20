@@ -51,8 +51,12 @@ $exePath = (Resolve-Path $Exe).Path
 foreach ($shot in ($Shots -split ';')) {
   $parts = $shot.Trim() -split '\s+'
   $page = $parts[0]
-  $extra = if ($parts.Length -gt 1) { $parts[1..($parts.Length - 1)] } else { @() }
-  $name = ($shot.Trim() -replace '--select ', '' -replace '--tab ', 'tab' -replace '\s+', '-')
+  $rest = if ($parts.Length -gt 1) { $parts[1..($parts.Length - 1)] } else { @() }
+  # A token like @1000x800 sets the window size for this shot (default 1440x900).
+  $sizeTok = $rest | Where-Object { $_ -like '@*' } | Select-Object -First 1
+  $extra = @($rest | Where-Object { $_ -notlike '@*' })
+  $sw, $sh = if ($sizeTok) { ($sizeTok.Substring(1) -split 'x') | ForEach-Object { [int]$_ } } else { 1440, 900 }
+  $name = ($shot.Trim() -replace '--select ', '' -replace '--tab ', 'tab' -replace '@', '' -replace '\s+', '-')
   $appArgs = @('--demo', '--start', $page) + $extra
 
   $proc = Start-Process -FilePath $exePath -ArgumentList $appArgs -PassThru
@@ -68,7 +72,7 @@ foreach ($shot in ($Shots -split ';')) {
   Start-Sleep -Seconds $WaitSeconds
   $proc.Refresh()
   $h = $proc.MainWindowHandle
-  [Win]::MoveWindow($h, 0, 0, [Math]::Min(1440, $screen.Width), [Math]::Min(900, $screen.Height), $true) | Out-Null
+  [Win]::MoveWindow($h, 0, 0, [Math]::Min($sw, $screen.Width), [Math]::Min($sh, $screen.Height), $true) | Out-Null
   [Win]::SetForegroundWindow($h) | Out-Null
   Start-Sleep -Seconds 2
 
