@@ -1,5 +1,5 @@
 using Cshubben.Core.Logic;
-using Cshubben.Core.Notes;
+using Cshubben.Core.Features.Notes;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
