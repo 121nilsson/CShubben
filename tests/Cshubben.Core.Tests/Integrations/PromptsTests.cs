@@ -126,8 +126,8 @@ public class PromptsTests
         var pr = Fx.Pr(title: "safe\u0000title‮​ end\u0007");
         var prompt = Prompts.PrSummary(pr, "+ x").UserPrompt;
         Assert.Contains("safetitle end", prompt);
-        Assert.DoesNotContain("‮", prompt);
-        Assert.DoesNotContain("\u0000", prompt);
+        Assert.False(prompt.Contains('\u202E', StringComparison.Ordinal));
+        Assert.False(prompt.Contains('\u0000', StringComparison.Ordinal));
     }
 
     [Fact]
