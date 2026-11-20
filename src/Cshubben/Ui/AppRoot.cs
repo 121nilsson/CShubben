@@ -23,8 +23,10 @@ sealed class AppRoot : Component
         // Responsive: on narrow windows the sidebar becomes an icon rail and the inspector gets slimmer,
         // so the page in the middle keeps enough room for its rows.
         var compact = windowWidth < 1200;
+        // Below this width the inspector replaces the list as a full-page view with a Back button.
+        var narrow = windowWidth < 900;
         var railWidth = compact ? 64.0 : 248.0;
-        var inspectorWidth = windowWidth >= 1500 ? 480.0 : windowWidth >= 1200 ? 420.0 : 360.0;
+        var inspectorWidth = windowWidth >= 1500 ? 480.0 : windowWidth >= 1200 ? 420.0 : 340.0;
 
         var selected = snap.Find(selectedId);
         var overview = OverviewModel.Compute(snap);
@@ -48,7 +50,7 @@ sealed class AppRoot : Component
                     Kit.Glyph(glyph).VAlign(VerticalAlignment.Center).Grid(column: 0),
                     (active ? BodyStrong(label) : Body(label)).VAlign(VerticalAlignment.Center).Grid(column: 1),
                     count is > 0 ? Kit.Pill(count.Value.ToString(), tone).Grid(column: 2) : Empty());
-            return Border(Button(row, () => setPage(target))
+            return Border(Button(row, () => { setPage(target); if (narrow) setSelected(null); })
                     .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
                     .ToolTip(label).AutomationName(label))
                 .Selected(active).CornerRadius(6);
@@ -91,7 +93,11 @@ sealed class AppRoot : Component
 
         var main = Border(content).Background(Theme.LayerFill).CornerRadius(8).Margin(0, 0, selected is null ? 8 : 8, 8);
 
-        Element grid = selected is null
+        Element grid = selected is not null && narrow
+            ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
+                sidebar.Grid(column: 0),
+                Inspector.Build(selected, snap, tab, setTab, () => setSelected(null), fullPage: true).Grid(column: 1))
+            : selected is null
             ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
                 sidebar.Grid(column: 0), main.Grid(column: 1))
             : Grid(columns: [GridSize.Px(railWidth), GridSize.Star(), GridSize.Px(inspectorWidth)], rows: [GridSize.Star()],

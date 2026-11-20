@@ -21,9 +21,9 @@ static class FeedPage
                 Kit.Heading2(g.Key, g.Count()).Margin(0, 0, 0, 4),
                 FlexColumn(g.Select(i => Rows.FeedRow(i, snap.At)).ToArray()))).Margin(0, 0, 0, 12));
 
-        return ScrollView(
+        return ScrollView(Kit.Capped(
             FlexColumn(new[] { Kit.PageHeader("Feed", "What is happening in your repos") }.Concat(sections).ToArray())
-                .FlexPadding(24, 16));
+                .FlexPadding(24, 16)));
     }
 
     private static string DayLabel(DateTimeOffset at, DateTimeOffset now) =>

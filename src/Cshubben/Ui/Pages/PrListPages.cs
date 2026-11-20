@@ -50,5 +50,5 @@ static class PrListPages
                 .Margin(0, 0, 0, 12);
 
     private static Element Page(string title, string subtitle, IEnumerable<Element> groups) =>
-        ScrollView(FlexColumn(new[] { Kit.PageHeader(title, subtitle) }.Concat(groups).ToArray()).FlexPadding(24, 16));
+        ScrollView(Kit.Capped(FlexColumn(new[] { Kit.PageHeader(title, subtitle) }.Concat(groups).ToArray()).FlexPadding(24, 16)));
 }

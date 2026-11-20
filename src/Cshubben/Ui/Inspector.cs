@@ -17,7 +17,7 @@ static class Inspector
 {
     public static readonly string[] Tabs = ["Overview", "Conversation", "Files", "Pipeline"];
 
-    public static Element Build(PullRequest pr, HubSnapshot snap, int tab, Action<int> setTab, Action close)
+    public static Element Build(PullRequest pr, HubSnapshot snap, int tab, Action<int> setTab, Action close, bool fullPage = false)
     {
         snap.ReviewInfos.TryGetValue(pr.Id, out var info);
         var action = NextAction.For(pr, info);
@@ -28,14 +28,16 @@ static class Inspector
             VStack(4,
                 Kit.Muted($"{pr.Repo} · #{pr.Number}"),
                 TextBlock(pr.Title).FontSize(18).SemiBold().TextWrapping()).Grid(column: 0),
-            Button("✕", close).SubtleButton().AutomationName("Close").VAlign(VerticalAlignment.Top).Grid(column: 1));
+            (fullPage
+                ? Button("← Back", close).SubtleButton().AutomationName("Back to list")
+                : Button("✕", close).SubtleButton().AutomationName("Close")).VAlign(VerticalAlignment.Top).Grid(column: 1));
 
         var status = (FlexRow(
             Chip("CI", CiText(pr.Ci), CiTone(pr.Ci)),
             Chip("Review", ReviewText(pr.Review), ReviewTone(pr.Review)),
             Chip("Threads", pr.UnresolvedThreads == 0 ? "None open" : $"{pr.UnresolvedThreads} open",
                 pr.UnresolvedThreads == 0 ? Tone.Neutral : Tone.Warning),
-            Chip("Merge", MergeText(pr.Merge), MergeTone(pr.Merge))) with { ColumnGap = 8 });
+            Chip("Merge", MergeText(pr.Merge), MergeTone(pr.Merge))) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 8 });
 
         var nextStep = Border(VStack(10,
                 Kit.Muted("NEXT STEP"),
@@ -61,7 +63,7 @@ static class Inspector
             _ => Card(VStack(6, BodyStrong(Tabs[tab]), Kit.Muted("Coming soon.")))
         };
 
-        return Border(FlexColumn(
+        var panel = Border(FlexColumn(
                 header.Flex(shrink: 0),
                 status.Flex(shrink: 0),
                 nextStep.Flex(shrink: 0),
@@ -69,6 +71,7 @@ static class Inspector
                 tabs.Flex(shrink: 0),
                 ScrollView(body).Flex(grow: 1, basis: 0)) with { RowGap = 12 })
             .Background(Theme.LayerFill).CornerRadius(8).Padding(20).Margin(0, 0, 8, 8);
+        return fullPage ? Kit.Capped(panel, 760) : panel;
     }
 
     private static Element OverviewTab(PullRequest pr, DateTimeOffset now)
@@ -96,7 +99,7 @@ static class Inspector
     private static Element Chip(string label, string value, Tone tone) =>
         Border(VStack(2, Kit.Muted(label), TextBlock(value).SemiBold().Foreground(Kit.Fg(tone))))
             .Background(Theme.CardBackground).WithBorder(Theme.ControlStroke).CornerRadius(8).Padding(10, 8)
-            .Flex(grow: 1, basis: 0);
+            .Flex(grow: 1, basis: 120);
 
     private static string CiText(CiState s) => s switch { CiState.Success => "Passing", CiState.Failure => "Failing", CiState.Pending => "Running", _ => "–" };
     private static Tone CiTone(CiState s) => s switch { CiState.Success => Tone.Success, CiState.Failure => Tone.Danger, CiState.Pending => Tone.Warning, _ => Tone.Neutral };

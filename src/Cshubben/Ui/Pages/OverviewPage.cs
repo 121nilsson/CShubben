@@ -18,7 +18,7 @@ static class OverviewPage
             Card(VStack(2,
                 Kit.Muted(label),
                 TextBlock(value.ToString()).FontSize(32).SemiBold().Foreground(value > 0 ? Kit.Fg(tone) : Theme.PrimaryText),
-                Kit.Muted(hint))).Flex(grow: 1, basis: 150);
+                Kit.Muted(hint).TextWrapping())).Flex(grow: 1, basis: 200);
 
         Element Section(string title, string empty, IReadOnlyList<Attention> items) =>
             Card(FlexColumn(
@@ -29,7 +29,7 @@ static class OverviewPage
                         Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect)).ToArray())))
             ;
 
-        return ScrollView(
+        return ScrollView(Kit.Capped(
             FlexColumn(
                 Kit.PageHeader("Overview", "What needs you right now"),
                 (FlexRow(
@@ -41,6 +41,6 @@ static class OverviewPage
                 Section("Ready to merge", "Nothing is ready to merge.", o.ReadyToMerge).Margin(0, 0, 0, 12),
                 Section("Needs your action", "All clear.", o.NeedsAction).Margin(0, 0, 0, 12),
                 Section("Reviews waiting on you", "No reviews waiting.", o.ReviewsForYou))
-            .FlexPadding(24, 16));
+            .FlexPadding(24, 16)));
     }
 }

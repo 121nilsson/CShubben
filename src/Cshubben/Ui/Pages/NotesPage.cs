@@ -27,6 +27,8 @@ sealed class NotesPage : Component
     public override Element Render()
     {
         var store = Store;
+        var (windowWidth, _) = UseWindowSize();
+        var narrow = windowWidth < 900;
         var now = DateTimeOffset.UtcNow;
 
         var (tick, setTick) = UseState(0);
@@ -139,10 +141,15 @@ sealed class NotesPage : Component
         var shownError = error.Length > 0 ? error : loadError;
 
         var left = BuildList(notes, visible, allTags, activeTag, selected, now, query, setQuery, setTagFilter, LoadDraft, NewNote, shownError);
+        Action? back = narrow ? () => { setSelectedId(null); setConfirmDelete(false); } : null;
         var right = selected is null
             ? BuildEmpty(NewNote)
             : BuildEditor(selected, title, setTitle, body, setBody, tagsText, setTagsText, preview, setPreview, dirty,
-                confirmDelete, setConfirmDelete, now, Save, TogglePin, Delete, OpenAttachment);
+                confirmDelete, setConfirmDelete, now, Save, TogglePin, Delete, OpenAttachment, back);
+
+        // Narrow windows: one pane at a time (list, or the editor with a Back button).
+        if (narrow)
+            return selected is null ? left : right;
 
         return Grid(
             columns: [GridSize.Px(300), GridSize.Star()],
@@ -202,7 +209,7 @@ sealed class NotesPage : Component
             chips,
             errorLine,
             ScrollView(rows).Flex(grow: 1, basis: 0)) with { RowGap = 12 };
-        return column.FlexPadding(16, 16, 8, 16);
+        return column.FlexPadding(24, 16, 16, 16);
     }
 
     private static Element TagChip(string tag, bool active, Action<string?> setTagFilter) =>
@@ -282,7 +289,8 @@ sealed class NotesPage : Component
         Action save,
         Action togglePin,
         Action delete,
-        Action<string, string> openAttachment)
+        Action<string, string> openAttachment,
+        Action? back = null)
     {
         var titleBox = TextBox(title, setTitle, placeholderText: "Title").Set(tb => { tb.FontSize = 20; });
 
@@ -350,7 +358,12 @@ sealed class NotesPage : Component
             tagsView = TextBox(tagsText, setTagsText, placeholderText: "Tags, separated by commas");
         }
 
+        Element? backButton = back is null
+            ? null
+            : Button("← Notes", back).SubtleButton().AutomationName("Back to notes").HAlign(HorizontalAlignment.Left);
+
         var column = FlexColumn(
+            backButton,
             titleBox,
             meta,
             tagsView,
@@ -359,7 +372,7 @@ sealed class NotesPage : Component
             LinksSection(note),
             AttachmentsSection(note, openAttachment)) with { RowGap = 12 };
 
-        var panel = ScrollView(column.FlexPadding(20, 16));
+        var panel = ScrollView(Border(column.FlexPadding(20, 16)).MaxWidth(900).HAlign(HorizontalAlignment.Left));
         return Border(panel)
             .Background(Theme.CardBackground)
             .WithBorder(Theme.CardStroke)

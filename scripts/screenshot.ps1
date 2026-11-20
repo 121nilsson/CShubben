@@ -34,10 +34,13 @@ $log = New-Object System.Collections.Generic.List[string]
 # Best effort: the hosted runner starts at 1024x768, which hides how the app looks on a normal monitor.
 if ($Resolution) {
   try {
-    Install-Module -Name DisplayConfig -Scope CurrentUser -Force -ErrorAction Stop | Out-Null
-    Import-Module DisplayConfig -ErrorAction Stop
     $w0, $h0 = $Resolution -split 'x'
-    Set-DisplayResolution -Width ([int]$w0) -Height ([int]$h0) -ErrorAction Stop
+    # Built-in on some images; otherwise fall back to the DisplayConfig module.
+    if (-not (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue)) {
+      Install-Module -Name DisplayConfig -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop | Out-Null
+      Import-Module DisplayConfig -ErrorAction Stop
+    }
+    Set-DisplayResolution -Width ([int]$w0) -Height ([int]$h0) -Force -ErrorAction Stop
     Start-Sleep -Seconds 3
     $log.Add("resolution: set to $Resolution")
   } catch {

@@ -64,6 +64,10 @@ static class Kit
             BodyStrong(text),
             count is null ? null : Pill(count.Value.ToString(), Tone.Neutral));
 
+    /// <summary>Caps page content width on large windows so it never floats in space (centered when capped).</summary>
+    public static Element Capped(Element content, double max = 1100) =>
+        Border(content).MaxWidth(max).HAlign(HorizontalAlignment.Stretch);
+
     public static Element EmptyNote(string text) =>
         Muted(text).Margin(4, 8);
 
