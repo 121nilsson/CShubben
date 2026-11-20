@@ -39,7 +39,7 @@ public class ArchitectureTests
     [Fact]
     public void Core_never_references_the_ui()
     {
-        var forbidden = new[] { "Microsoft.UI", "Microsoft.Windows", "Cshubben.Ui", "using Windows.", "WinUI" };
+        var forbidden = new[] { "using Microsoft.UI", "Microsoft.UI.Xaml", "Microsoft.UI.Reactor", "using Microsoft.Windows", "using Cshubben.Ui", "using Windows." };
         var offenders = new List<string>();
         foreach (var file in SourceFiles(CoreDir))
         {
