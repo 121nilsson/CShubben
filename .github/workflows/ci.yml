@@ -65,39 +65,69 @@ jobs:
           path: publish/${{ matrix.platform }}
           if-no-files-found: error
 
-      # Screenshots only make sense on the x64 runner (the ARM64 build cannot run there).
-      - name: Screenshots
-        if: matrix.platform == 'x64'
-        continue-on-error: true
-        shell: pwsh
-        run: ./scripts/screenshot.ps1 -Exe publish/x64/Cshubben.exe -OutDir shots -Shots "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings;overview @1000x760;overview --select a1 @1000x760;reviews --select r3 @1000x760;notes @1000x760;overview @640x900;overview --select a1 @640x900;reviews @640x900;notes @640x900;notes --select n-decision @1000x760;notes --select n-decision @640x900;notes --select n-decision;review --select a1;review --select a1 @1000x760;review --select a1 @640x900;review --select a1 @1920x1080;linear @1000x760;linear @640x900;stats @1000x760;stats @640x900;settings @1000x760;settings @640x900;linear @1920x1080;stats @1920x1080;overview @1920x1080;overview --select a1 @1920x1080"
+  # Screenshots run as parallel shards (each one starts the app once per picture, which is the slow part).
+  screenshots:
+    needs: app
+    if: always() && needs.app.result == 'success'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            shots: "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings;notes --select n-decision;review --select a1"
+          - shard: 2
+            shots: "overview @1000x760;overview --select a1 @1000x760;reviews --select r3 @1000x760;notes @1000x760;notes --select n-decision @1000x760;review --select a1 @1000x760;linear @1000x760;stats @1000x760;settings @1000x760;overview @640x900;overview --select a1 @640x900"
+          - shard: 3
+            shots: "reviews @640x900;notes @640x900;notes --select n-decision @640x900;review --select a1 @640x900;linear @640x900;stats @640x900;settings @640x900;review --select a1 @1920x1080;linear @1920x1080;stats @1920x1080;overview @1920x1080;overview --select a1 @1920x1080"
+    steps:
+      - uses: actions/checkout@v7
 
-      - uses: actions/upload-artifact@v7
-        if: matrix.platform == 'x64' && always()
+      - uses: actions/download-artifact@v8
         with:
-          name: screenshots
-          path: shots
-          if-no-files-found: warn
+          name: cshubben-win-x64
+          path: publish/x64
 
-      # The sandbox that Claude works in cannot download Actions artifacts, but it can fetch git branches.
-      # So the latest screenshots are also force-pushed to an orphan branch (no history, no CI trigger).
-      - name: Publish screenshots to branch
-        if: matrix.platform == 'x64' && github.event_name == 'push' && always()
+      - name: Screenshots
         continue-on-error: true
         shell: pwsh
         env:
+          SHOTS: ${{ matrix.shots }}
+        run: ./scripts/screenshot.ps1 -Exe publish/x64/Cshubben.exe -OutDir shots -Shots $env:SHOTS
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screenshots-${{ matrix.shard }}
+          path: shots
+          if-no-files-found: warn
+
+  # The sandbox that Claude works in cannot download Actions artifacts, but it can fetch git branches.
+  # So the latest screenshots are also force-pushed to an orphan branch (no history, no CI trigger).
+  publish-screenshots:
+    needs: screenshots
+    if: always() && github.event_name == 'push' && needs.screenshots.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: screenshots-*
+          merge-multiple: true
+          path: shots
+
+      - name: Publish screenshots to branch
+        continue-on-error: true
+        env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if (-not (Test-Path shots)) { Write-Host "no shots"; exit 0 }
-          $tmp = Join-Path $env:RUNNER_TEMP "shots-repo"
-          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-          Copy-Item shots/* $tmp
-          "commit $env:GITHUB_SHA`n$(Get-Date -Format o)" | Set-Content (Join-Path $tmp "SOURCE.txt")
-          Push-Location $tmp
+          [ -d shots ] && [ "$(ls -A shots)" ] || { echo "no shots"; exit 0; }
+          printf 'commit %s\n%s\n' "$GITHUB_SHA" "$(date -u +%FT%TZ)" > shots/SOURCE.txt
+          cd shots
           git init -q -b ci-screenshots
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
           git add -A
-          git commit -q -m "Screenshots for $env:GITHUB_SHA"
-          git push -f "https://x-access-token:$($env:GH_TOKEN)@github.com/$($env:GITHUB_REPOSITORY).git" HEAD:refs/heads/ci-screenshots
-          Pop-Location
+          git commit -q -m "Screenshots for $GITHUB_SHA"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ci-screenshots
