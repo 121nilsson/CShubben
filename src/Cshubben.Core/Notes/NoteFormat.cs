@@ -162,7 +162,7 @@ public static class NoteFormat
                         sb.Append(c).Append(s[i + 1]);
                         i++;
                     }
-                    else if (c < ' ' || char.IsSurrogate(c) || c == '\u0085' || c == ' ' || c == ' ')
+                    else if (c < ' ' || char.IsSurrogate(c) || c == '\u0085' || c == '\u2028' || c == '\u2029')
                     {
                         sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
                     }
