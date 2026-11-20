@@ -42,7 +42,7 @@ public class NoteFormatTests
     {
         var tags = new[] { "idea", "a: b", "quote\"d", "multi\nline", "emoji🎉", "  spaced  " };
         var note = Note.Create("t", "b", tags, now: At, id: "a1");
-        Assert.Equal(tags, RoundTrip(note).Tags);
+        Assert.Equal(tags, RoundTrip(note).Tags.ToArray());
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public class NoteFormatTests
             new NoteLink(NoteLinkKind.Repo, "acme/api", "acme/api"),
         };
         var note = Note.Create("t", "b", null, links, now: At, id: "a1");
-        Assert.Equal(links, RoundTrip(note).Links);
+        Assert.Equal(links, RoundTrip(note).Links.ToArray());
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class NoteFormatTests
         var note = NoteFormat.Parse("x", text, At);
         Assert.Equal("Hi", note.Title);
         Assert.True(note.Pinned);
-        Assert.Equal(new[] { "a" }, note.Tags);
+        Assert.Equal(new[] { "a" }, note.Tags.ToArray());
         Assert.Equal("body", note.Body);
     }
 
@@ -118,7 +118,7 @@ public class NoteFormatTests
         var text = "---\ntitle: \"ok\"\ntags:\n- \"bad\\q\"\n- \"good\"\nlinks:\n- Nonsense \"x\" \"y\"\n---\n";
         var note = NoteFormat.Parse("x", text, At);
         Assert.Equal("ok", note.Title);
-        Assert.Equal(new[] { "good" }, note.Tags);
+        Assert.Equal(new[] { "good" }, note.Tags.ToArray());
         Assert.Empty(note.Links);
     }
 

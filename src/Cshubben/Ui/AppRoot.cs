@@ -84,7 +84,7 @@ sealed class AppRoot : Component
             Page.Reviews => PrListPages.Reviews(snap, selectedId, Select),
             Page.Drift => Kit.ComingSoon("Drift", "Actions and deployments on your repos"),
             Page.Linear => Kit.ComingSoon("Linear", "Your issues, linked to pull requests"),
-            Page.Notes => Kit.ComingSoon("Notes", "Ideas, notes and files in one place"),
+            Page.Notes => Component<NotesPage>(),
             Page.Stats => Kit.ComingSoon("Stats", "Cycle time and review load"),
             _ => Kit.ComingSoon("Settings", "Repos, notifications and integrations"),
         };

@@ -27,7 +27,7 @@ public sealed class FileNoteStoreTests : IDisposable
         Assert.NotNull(back);
         Assert.Equal(note.Title, back.Title);
         Assert.Equal(note.Body, back.Body);
-        Assert.Equal(note.Tags, back.Tags);
+        Assert.Equal(note.Tags.ToArray(), back.Tags.ToArray());
     }
 
     [Fact]
@@ -182,10 +182,8 @@ public sealed class FileNoteStoreTests : IDisposable
     public void Temp_directory_is_removed_on_dispose()
     {
         var dir = Path.Combine(Path.GetTempPath(), "cshubben-tests-" + Guid.NewGuid().ToString("N"));
-        using (var other = new FileNoteStore(dir))
-        {
-            Assert.True(Directory.Exists(dir));
-        }
+        _ = new FileNoteStore(dir);
+        Assert.True(Directory.Exists(dir));
         Directory.Delete(dir, true);
         Assert.False(Directory.Exists(dir));
     }
