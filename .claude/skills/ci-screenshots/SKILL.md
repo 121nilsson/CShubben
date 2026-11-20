@@ -15,14 +15,17 @@ The sandbox cannot run WinUI, so CI runs the app on a Windows runner with determ
 - App options are parsed in `src/Cshubben/AppOptions.cs`; add new ones there when a view needs a special starting state.
 
 ## Get the images
+`gh run download` does NOT work from the sandbox (the artifact host is blocked by the egress proxy). CI therefore also force-pushes the
+latest screenshots to the orphan branch `ci-screenshots` (only on pushes to main), which git can fetch:
 ```
 RUN=$(gh run list -R 121nilsson/CShubben --branch main --limit 1 --json databaseId -q '.[0].databaseId')
-gh run watch $RUN -R 121nilsson/CShubben --exit-status
-rm -rf /tmp/shots && gh run download $RUN -R 121nilsson/CShubben -n screenshots -D /tmp/shots
-cat /tmp/shots/log.txt
+gh run watch $RUN -R 121nilsson/CShubben --exit-status          # wait for the run to finish
+cd /home/claude/cshubben && rm -rf /tmp/shots && mkdir -p /tmp/shots
+git fetch -q --depth 1 origin ci-screenshots && git --work-tree=/tmp/shots checkout FETCH_HEAD -- . && git reset -q
+cat /tmp/shots/SOURCE.txt /tmp/shots/log.txt        # SOURCE.txt must name the commit you just pushed
 ```
-Then `Read` the PNGs (the Read tool shows images). If `.png` is black or blank, look at `.screen.png`.
-If the artifact is missing, the app probably crashed on start: check `log.txt` ("exited early") and the run log.
+Then `Read` the PNGs in /tmp/shots (the Read tool shows images). If `<shot>.png` is black or blank, look at `<shot>.screen.png`.
+If the branch is missing or stale, the app probably crashed on start: read `log.txt` ("exited early") and `gh run view $RUN --log`.
 
 ## Reviewing a design
 Look at: hierarchy (is the next step obvious in 2 seconds?), spacing on the 4 px grid, text clipped or overlapping, contrast, whether

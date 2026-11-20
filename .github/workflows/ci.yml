@@ -31,6 +31,8 @@ jobs:
 
   app:
     runs-on: windows-latest
+    permissions:
+      contents: write   # to publish screenshots to the ci-screenshots branch
     strategy:
       fail-fast: false
       matrix:
@@ -75,3 +77,26 @@ jobs:
           name: screenshots
           path: shots
           if-no-files-found: warn
+
+      # The sandbox that Claude works in cannot download Actions artifacts, but it can fetch git branches.
+      # So the latest screenshots are also force-pushed to an orphan branch (no history, no CI trigger).
+      - name: Publish screenshots to branch
+        if: matrix.platform == 'x64' && github.event_name == 'push' && always()
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if (-not (Test-Path shots)) { Write-Host "no shots"; exit 0 }
+          $tmp = Join-Path $env:RUNNER_TEMP "shots-repo"
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+          Copy-Item shots/* $tmp
+          "commit $env:GITHUB_SHA`n$(Get-Date -Format o)" | Set-Content (Join-Path $tmp "SOURCE.txt")
+          Push-Location $tmp
+          git init -q -b ci-screenshots
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Screenshots for $env:GITHUB_SHA"
+          git push -f "https://x-access-token:$($env:GH_TOKEN)@github.com/$($env:GITHUB_REPOSITORY).git" HEAD:refs/heads/ci-screenshots
+          Pop-Location
