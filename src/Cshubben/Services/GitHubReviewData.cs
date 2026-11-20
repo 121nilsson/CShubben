@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Cshubben.Core.Features.GitHub;
 using Cshubben.Core.Features.Review;
+using ReviewVerdict = Cshubben.Core.Features.Review.ReviewVerdict;
 
 namespace Cshubben.Services;
 
