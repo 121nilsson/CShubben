@@ -26,10 +26,10 @@ public static class PromptText
             if (c == '\n' || c == '\t') sb.Append(c);
             else if (c == '\u2028' || c == '\u2029') sb.Append('\n');
             else if (char.IsControl(c)) continue;
-            else if (c is >= '​' and <= '‏') continue;
-            else if (c is >= '‪' and <= '‮') continue;
-            else if (c is >= '⁦' and <= '⁩') continue;
-            else if (c == '﻿') continue;
+            else if (c is >= '\u200B' and <= '\u200F') continue;
+            else if (c is >= '\u202A' and <= '\u202E') continue;
+            else if (c is >= '\u2066' and <= '\u2069') continue;
+            else if (c == '\uFEFF') continue;
             else sb.Append(c);
         }
 
