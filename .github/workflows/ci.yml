@@ -23,8 +23,8 @@ jobs:
   core-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - run: dotnet test tests/Cshubben.Core.Tests -c Release
@@ -39,14 +39,14 @@ jobs:
         # ARM64 is only built on manual runs and tags to keep push feedback fast.
         platform: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && fromJSON('["x64","ARM64"]') || fromJSON('["x64"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       - name: NuGet cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
@@ -59,7 +59,7 @@ jobs:
       - name: Publish
         run: dotnet publish src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=${{ matrix.platform }} -o publish/${{ matrix.platform }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cshubben-win-${{ matrix.platform }}
           path: publish/${{ matrix.platform }}
@@ -72,7 +72,7 @@ jobs:
         shell: pwsh
         run: ./scripts/screenshot.ps1 -Exe publish/x64/Cshubben.exe -OutDir shots -Shots "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings;overview @1000x760;overview --select a1 @1000x760;reviews --select r3 @1000x760;notes @1000x760;overview @640x900;overview --select a1 @640x900;reviews @640x900;notes @640x900;notes --select n-decision @1000x760;notes --select n-decision @640x900;notes --select n-decision;review --select a1;review --select a1 @1000x760;review --select a1 @640x900;review --select a1 @1920x1080;linear @1000x760;linear @640x900;stats @1000x760;stats @640x900;settings @1000x760;settings @640x900;linear @1920x1080;stats @1920x1080;overview @1920x1080;overview --select a1 @1920x1080"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.platform == 'x64' && always()
         with:
           name: screenshots
