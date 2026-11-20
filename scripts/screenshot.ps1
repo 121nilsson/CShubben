@@ -10,7 +10,7 @@ param(
   [Parameter(Mandatory)] [string] $Exe,
   [Parameter(Mandatory)] [string] $OutDir,
   [string] $Shots = "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings",
-  [int] $WaitSeconds = 8,
+  [int] $WaitSeconds = 4,
   [string] $Resolution = "1920x1080"
 )
 
@@ -77,7 +77,29 @@ foreach ($shot in ($Shots -split ';')) {
   $h = $proc.MainWindowHandle
   [Win]::MoveWindow($h, 0, 0, [Math]::Min($sw, $screen.Width), [Math]::Min($sh, $screen.Height), $true) | Out-Null
   [Win]::SetForegroundWindow($h) | Out-Null
-  Start-Sleep -Seconds 2
+  Start-Sleep -Milliseconds 800
+
+  $r = New-Object Win+RECT
+  [Win]::GetWindowRect($h, [ref]$r) | Out-Null
+  $w = [Math]::Max(1, $r.Right - $r.Left); $hh = [Math]::Max(1, $r.Bottom - $r.Top)
+
+  # 1) PrintWindow of the window itself (works even if it is partly off-screen).
+  $bmp = New-Object System.Drawing.Bitmap $w, $hh
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $hdc = $g.GetHdc()
+  $ok = [Win]::PrintWindow($h, $hdc, 2)
+  $g.ReleaseHdc($hdc); $g.Dispose()
+  $bmp.Save((Join-Path $OutDir "$name.png"), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+
+  $log.Add("${name}: app exited early with code $($proc.ExitCode)")
+    continue
+  }
+  Start-Sleep -Seconds $WaitSeconds
+  $proc.Refresh()
+  $h = $proc.MainWindowHandle
+  [Win]::MoveWindow($h, 0, 0, [Math]::Min($sw, $screen.Width), [Math]::Min($sh, $screen.Height), $true) | Out-Null
+  [Win]::SetForegroundWindow($h) | Out-Null
+  Start-Sleep -Milliseconds 800
 
   $r = New-Object Win+RECT
   [Win]::GetWindowRect($h, [ref]$r) | Out-Null
@@ -100,7 +122,7 @@ foreach ($shot in ($Shots -split ';')) {
 
   $log.Add("${name}: ${w}x${hh} printwindow=$ok")
   Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-  Start-Sleep -Seconds 1
+  Start-Sleep -Milliseconds 300
 }
 
 $log | Tee-Object -FilePath (Join-Path $OutDir "log.txt")
