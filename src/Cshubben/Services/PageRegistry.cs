@@ -4,6 +4,7 @@ using Cshubben.Core.Model;
 using Cshubben.Ui;
 using Cshubben.Ui.Pages;
 using Microsoft.UI.Reactor;
+using Microsoft.UI.Reactor.Core;
 using static Microsoft.UI.Reactor.Factories;
 
 namespace Cshubben.Services;
