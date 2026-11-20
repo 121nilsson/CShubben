@@ -73,3 +73,9 @@ Slice F (after D): Review view, in order: file tree + unified diff read-only -> 
 - Screenshots: sizes 1920x1080 (runner resolution now works), 1440x900, 1000x760, 640x900 are produced on every push; ui-guru agent reviews them.
 - Next: wire the real data (`GitHubHubData`) behind `--demo` off, settings page (tokens via credential store), Linear page, Drift/Stats, inspector tabs (Conversation, Files/diff, Pipeline), review flow (slice F), restructure into Features/* with architecture tests, quick actions (Ask Claude, Linear issue, Save to notes).
 - Polish seen in screenshots: quick-action row wraps "GitHub" onto a second line at 480 px inspector; status chips wrap 3+1.
+
+## Status log (2026-11-21, night)
+- Wave 2 done and green on CI: Feed (new/seen divider, grouping, filters, muted repos), Drift page, inspector Conversation and Pipeline tabs, merge flow with two-step confirm (dry-run unless "Allow writes to GitHub" is on in Settings), notifications (toasts, quiet hours, digest), tray and autostart, command palette (Ctrl+K), keyboard shortcuts help, real Linear/Claude/GitHub wiring.
+- CI: x64 build + core tests + 3 parallel screenshot shards, about 4 minutes. ARM64 only on manual runs and tags.
+- Not verified with a real account yet (no token in the sandbox): live GitHub loading, Linear key flow, Claude CLI discovery, toasts/tray on a real desktop. These are the first things to try on the owner's machine; report anything that misbehaves.
+- Known gaps vs My-hub: Windows installer/auto-update, syntax highlighting in diffs, suggestion apply, split-diff polish, background sync while the window is closed (tray exists, but it needs a real-world check).
