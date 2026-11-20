@@ -35,6 +35,17 @@ static class Kit
     public static TextBlockElement Glyph(string glyph, double size = 16) =>
         TextBlock(glyph).FontFamily("Segoe Fluent Icons").FontSize(size);
 
+    /// <summary>Markdown with calmer headings than the framework default (28 px h1 is too loud inside a panel).</summary>
+    public static Element Md(string markdown) =>
+        Microsoft.UI.Reactor.Advanced.Factories.Markdown(markdown, MdOptions);
+
+    private static readonly Microsoft.UI.Reactor.Advanced.MarkdownOptions MdOptions = new()
+    {
+        Heading = (level, element) => element is RichTextBlockElement rich
+            ? rich.FontSize(level switch { 1 => 18, 2 => 16, 3 => 14, _ => 13 })
+            : element,
+    };
+
     public static TextBlockElement Muted(string text) =>
         TextBlock(text).FontSize(12).Foreground(Theme.SecondaryText);
 

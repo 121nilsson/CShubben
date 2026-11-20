@@ -10,7 +10,8 @@ param(
   [Parameter(Mandatory)] [string] $Exe,
   [Parameter(Mandatory)] [string] $OutDir,
   [string] $Shots = "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings",
-  [int] $WaitSeconds = 8
+  [int] $WaitSeconds = 8,
+  [string] $Resolution = "1920x1080"
 )
 
 Add-Type -AssemblyName System.Drawing
@@ -28,8 +29,24 @@ public static class Win {
 "@
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$exePath = (Resolve-Path $Exe).Path
 $log = New-Object System.Collections.Generic.List[string]
+
+# Best effort: the hosted runner starts at 1024x768, which hides how the app looks on a normal monitor.
+if ($Resolution) {
+  try {
+    Install-Module -Name DisplayConfig -Scope CurrentUser -Force -ErrorAction Stop | Out-Null
+    Import-Module DisplayConfig -ErrorAction Stop
+    $w0, $h0 = $Resolution -split 'x'
+    Set-DisplayResolution -Width ([int]$w0) -Height ([int]$h0) -ErrorAction Stop
+    Start-Sleep -Seconds 3
+    $log.Add("resolution: set to $Resolution")
+  } catch {
+    $log.Add("resolution: could not set $Resolution ($($_.Exception.Message))")
+  }
+}
+$screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$log.Add("screen: $($screen.Width)x$($screen.Height)")
+$exePath = (Resolve-Path $Exe).Path
 
 foreach ($shot in ($Shots -split ';')) {
   $parts = $shot.Trim() -split '\s+'
@@ -51,7 +68,7 @@ foreach ($shot in ($Shots -split ';')) {
   Start-Sleep -Seconds $WaitSeconds
   $proc.Refresh()
   $h = $proc.MainWindowHandle
-  [Win]::MoveWindow($h, 0, 0, 1440, 900, $true) | Out-Null
+  [Win]::MoveWindow($h, 0, 0, [Math]::Min(1440, $screen.Width), [Math]::Min(900, $screen.Height), $true) | Out-Null
   [Win]::SetForegroundWindow($h) | Out-Null
   Start-Sleep -Seconds 2
 

@@ -12,3 +12,16 @@ Stack: **.NET 11 / C# 15**, UI with **Microsoft.UI.Reactor** (React-style declar
 - **Skills:** `.claude/skills/reactor-ui` (how to write the UI) and `.claude/skills/ci-screenshots` (how to see the app).
 - **Plan and decisions:** `PLAN.md`.
 - Never commit secrets. Tokens come from the environment or the Windows credential store, never from files in the repo.
+
+## Architecture rules (keep the code easy to change)
+- **Vertical feature slices.** Group by feature, not by technical layer: `Features/<Name>/` holds that feature's model, logic, data access
+  and UI together (e.g. Notes, PullRequests, Linear, Claude, GitHub). `Shared` is a small kernel (Tone, Age, common records).
+  A feature may depend on `Shared` and on another feature's *public contract* (its interfaces and records), never on its internals.
+- **Core never references UI.** `Cshubben.Core` has no WinUI/Reactor dependency; UI is `Cshubben`. Architecture tests enforce both rules.
+- **Dependency inversion at I/O boundaries only**: network, process, file system, clock, secrets sit behind small interfaces
+  (`IHubData`, `INoteStore`, `IProcessRunner`, `ISecretStore`). Do not add an interface for a pure function or a single implementation.
+- **Single responsibility, small files.** Pure logic (sorting, grouping, "next action", mapping JSON to models) lives in static classes that are
+  unit tested on Linux. UI pages are functions from data to `Element`; only a few components own state.
+- **Open for extension without editing the shell:** pages and PR-inspector actions are registered by each feature in a registry, so adding a
+  feature does not touch `AppRoot`.
+- **Tests:** every non-trivial rule gets a test; fixtures are inline JSON/strings. Secrets never in tests or logs.

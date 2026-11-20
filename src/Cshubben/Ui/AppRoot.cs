@@ -18,6 +18,13 @@ sealed class AppRoot : Component
         var (page, setPage) = UseState(AppOptions.StartPage);
         var (selectedId, setSelected) = UseState<string?>(AppOptions.SelectedPr);
         var (tab, setTab) = UseState(AppOptions.StartTab);
+        var (windowWidth, _) = UseWindowSize();
+
+        // Responsive: on narrow windows the sidebar becomes an icon rail and the inspector gets slimmer,
+        // so the page in the middle keeps enough room for its rows.
+        var compact = windowWidth < 1200;
+        var railWidth = compact ? 64.0 : 248.0;
+        var inspectorWidth = windowWidth >= 1500 ? 480.0 : windowWidth >= 1200 ? 420.0 : 360.0;
 
         var selected = snap.Find(selectedId);
         var overview = OverviewModel.Compute(snap);
@@ -29,28 +36,38 @@ sealed class AppRoot : Component
         Element Item(Page target, string glyph, string label, int? count = null, Tone tone = Tone.Neutral)
         {
             var active = page == target;
-            var row = Grid(
-                columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
-                rows: [GridSize.Auto],
-                Kit.Glyph(glyph).VAlign(VerticalAlignment.Center).Grid(column: 0),
-                (active ? BodyStrong(label) : Body(label)).VAlign(VerticalAlignment.Center).Grid(column: 1),
-                count is > 0 ? Kit.Pill(count.Value.ToString(), tone).Grid(column: 2) : Empty());
+            Element row = compact
+                ? VStack(2,
+                    Kit.Glyph(glyph).HAlign(HorizontalAlignment.Center),
+                    count is > 0
+                        ? TextBlock(count.Value.ToString()).FontSize(10).SemiBold().Foreground(Kit.Fg(tone)).HAlign(HorizontalAlignment.Center)
+                        : null)
+                : Grid(
+                    columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
+                    rows: [GridSize.Auto],
+                    Kit.Glyph(glyph).VAlign(VerticalAlignment.Center).Grid(column: 0),
+                    (active ? BodyStrong(label) : Body(label)).VAlign(VerticalAlignment.Center).Grid(column: 1),
+                    count is > 0 ? Kit.Pill(count.Value.ToString(), tone).Grid(column: 2) : Empty());
             return Border(Button(row, () => setPage(target))
                     .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
-                    .AutomationName(label))
+                    .ToolTip(label).AutomationName(label))
                 .Selected(active).CornerRadius(6);
         }
 
+        Element Section(string text) => compact ? Border(Empty()).Height(12) : Kit.SectionLabel(text);
+
         var sidebar = FlexColumn(
-                HStack(8, TextBlock("◆").FontSize(18).Foreground(Theme.AccentText), TextBlock("Cshubben").FontSize(16).SemiBold())
-                    .Margin(12, 8, 0, 8),
-                Kit.SectionLabel("Overview"),
+                (compact
+                    ? (Element)TextBlock("◆").FontSize(18).Foreground(Theme.AccentText).HAlign(HorizontalAlignment.Center)
+                    : HStack(8, TextBlock("◆").FontSize(18).Foreground(Theme.AccentText), TextBlock("Cshubben").FontSize(16).SemiBold()))
+                    .Margin(compact ? 0 : 12, 8, 0, 8),
+                Section("Overview"),
                 Item(Page.Overview, "", "Overview", overview.NeedsYou, Tone.Warning),
                 Item(Page.Feed, "", "Feed"),
-                Kit.SectionLabel("Pull requests"),
+                Section("Pull requests"),
                 Item(Page.Mine, "", "My PRs", snap.Authored.Count),
                 Item(Page.Reviews, "", "Review queue", waitingOnYou, Tone.Accent),
-                Kit.SectionLabel("Workspace"),
+                Section("Workspace"),
                 Item(Page.Drift, "", "Drift"),
                 Item(Page.Linear, "", "Linear"),
                 Item(Page.Notes, "", "Notes"),
@@ -75,9 +92,9 @@ sealed class AppRoot : Component
         var main = Border(content).Background(Theme.LayerFill).CornerRadius(8).Margin(0, 0, selected is null ? 8 : 8, 8);
 
         Element grid = selected is null
-            ? Grid(columns: [GridSize.Px(248), GridSize.Star()], rows: [GridSize.Star()],
+            ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
                 sidebar.Grid(column: 0), main.Grid(column: 1))
-            : Grid(columns: [GridSize.Px(248), GridSize.Star(), GridSize.Px(460)], rows: [GridSize.Star()],
+            : Grid(columns: [GridSize.Px(railWidth), GridSize.Star(), GridSize.Px(inspectorWidth)], rows: [GridSize.Star()],
                 sidebar.Grid(column: 0), main.Grid(column: 1),
                 Inspector.Build(selected, snap, tab, setTab, () => setSelected(null)).Grid(column: 2));
 
