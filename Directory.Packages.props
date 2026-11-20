@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
+    <PackageVersion Include="Microsoft.UI.Reactor" Version="0.1.0-preview.18" />
+  </ItemGroup>
+</Project>
