@@ -36,16 +36,16 @@ foreach ($shot in ($Shots -split ';')) {
   $page = $parts[0]
   $extra = if ($parts.Length -gt 1) { $parts[1..($parts.Length - 1)] } else { @() }
   $name = ($shot.Trim() -replace '--select ', '' -replace '--tab ', 'tab' -replace '\s+', '-')
-  $args = @('--demo', '--start', $page) + $extra
+  $appArgs = @('--demo', '--start', $page) + $extra
 
-  $proc = Start-Process -FilePath $exePath -ArgumentList $args -PassThru
+  $proc = Start-Process -FilePath $exePath -ArgumentList $appArgs -PassThru
   $deadline = (Get-Date).AddSeconds(40)
   while ((Get-Date) -lt $deadline -and -not $proc.HasExited -and $proc.MainWindowHandle -eq [IntPtr]::Zero) {
     Start-Sleep -Milliseconds 300
     $proc.Refresh()
   }
   if ($proc.HasExited) {
-    $log.Add("$name: app exited early with code $($proc.ExitCode)")
+    $log.Add("${name}: app exited early with code $($proc.ExitCode)")
     continue
   }
   Start-Sleep -Seconds $WaitSeconds
@@ -74,7 +74,7 @@ foreach ($shot in ($Shots -split ';')) {
   $g2.Dispose()
   $bmp2.Save((Join-Path $OutDir "$name.screen.png"), [System.Drawing.Imaging.ImageFormat]::Png); $bmp2.Dispose()
 
-  $log.Add("$name: ${w}x${hh} printwindow=$ok")
+  $log.Add("${name}: ${w}x${hh} printwindow=$ok")
   Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
   Start-Sleep -Seconds 1
 }
