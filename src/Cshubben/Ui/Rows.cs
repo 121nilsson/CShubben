@@ -34,7 +34,7 @@ static class Rows
             .AutomationName($"{pr.Repo} #{pr.Number} {pr.Title}");
 
         return Border(button)
-            .Background(selected ? Theme.SubtleFill : "transparent")
+            .Selected(selected)
             .CornerRadius(6)
             .WithKey(pr.Id);
     }
@@ -66,7 +66,7 @@ static class Rows
     public static Element FeedRow(FeedItem item, DateTimeOffset now)
     {
         var what = item.Title is null ? item.Detail : $"{item.Detail} · #{item.Number} {item.Title}";
-        var tone = item.Personal ? Kit.KindTone(item.Kind) : Tone.Neutral;
+        var tone = item.Personal ? KindTone(item.Kind) : Tone.Neutral;
         return Grid(
             columns: [GridSize.Px(32), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
             rows: [GridSize.Auto],

@@ -32,13 +32,13 @@ sealed class AppRoot : Component
             var row = Grid(
                 columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
                 rows: [GridSize.Auto],
-                FontIcon(glyph, "Segoe Fluent Icons", 16).VAlign(VerticalAlignment.Center).Grid(column: 0),
+                Kit.Glyph(glyph).VAlign(VerticalAlignment.Center).Grid(column: 0),
                 (active ? BodyStrong(label) : Body(label)).VAlign(VerticalAlignment.Center).Grid(column: 1),
                 count is > 0 ? Kit.Pill(count.Value.ToString(), tone).Grid(column: 2) : Empty());
             return Border(Button(row, () => setPage(target))
                     .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
                     .AutomationName(label))
-                .Background(active ? Theme.SubtleFill : "transparent").CornerRadius(6);
+                .Selected(active).CornerRadius(6);
         }
 
         var sidebar = FlexColumn(

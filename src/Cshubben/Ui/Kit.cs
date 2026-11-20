@@ -27,6 +27,14 @@ static class Kit
         _ => Theme.SystemNeutralBackground,
     };
 
+    /// <summary>Highlights an element as the selected one.</summary>
+    public static T Selected<T>(this T element, bool on) where T : Element =>
+        on ? element.Background(Theme.SubtleFill) : element;
+
+    /// <summary>An icon from the Segoe Fluent Icons font, as a plain text element.</summary>
+    public static TextBlockElement Glyph(string glyph, double size = 16) =>
+        TextBlock(glyph).FontFamily("Segoe Fluent Icons").FontSize(size);
+
     public static TextBlockElement Muted(string text) =>
         TextBlock(text).FontSize(12).Foreground(Theme.SecondaryText);
 

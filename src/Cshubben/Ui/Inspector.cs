@@ -89,7 +89,7 @@ static class Inspector
             changes,
             Kit.Muted($"+{pr.Additions}  −{pr.Deletions}  ·  {pr.ChangedFiles} files  ·  size {pr.SizeLabel}")));
 
-        var description = Card(VStack(6, BodyStrong("Description"), Markdown(pr.Description)));
+        var description = Card(VStack(6, BodyStrong("Description"), Microsoft.UI.Reactor.Advanced.Factories.Markdown(pr.Description)));
         return FlexColumn(facts, description) with { RowGap = 12 };
     }
 

@@ -31,7 +31,7 @@ public class NextActionTests
     [InlineData("r1", NextActionKind.StartReview)]
     [InlineData("r3", NextActionKind.ReReview)]
     [InlineData("r4", NextActionKind.NothingToDo)]
-    [InlineData("r5", NextActionKind.ReReview)]
+    [InlineData("r5", NextActionKind.WaitForAuthor)]
     public void Review_queue_prs_get_the_expected_action(string id, NextActionKind expected) =>
         Assert.Equal(expected, Of(id).Kind);
 

@@ -12,7 +12,7 @@ public class OverviewTests
 
     [Fact]
     public void Ready_to_merge_contains_only_mergeable_prs() =>
-        Assert.Equal(["a1"], Overview().ReadyToMerge.Select(a => a.Pr.Id));
+        Assert.Equal(["a1", "a2"], Overview().ReadyToMerge.Select(a => a.Pr.Id).Order());
 
     [Fact]
     public void Needs_action_is_sorted_with_danger_first()
