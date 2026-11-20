@@ -67,3 +67,9 @@ Where it should be better than the web:
 
 Layout rule: the review view needs the full window width. On narrow windows the inspector's Files tab becomes a full-page route (list -> file tree -> diff) instead of a squeezed side panel; on wide windows it is tree | diff | thread pane.
 Slice F (after D): Review view, in order: file tree + unified diff read-only -> viewed state -> inline threads read -> comment/reply/resolve -> pending review + submit -> split view, suggestions, since-last-review -> Claude assist.
+
+## Status log (2026-11-20, evening)
+- Done and green on CI (core tests, x64, ARM64): shell with responsive icon rail, Overview/Feed/My PRs/Review queue, inspector with NEXT STEP card (full-page with Back on windows < 900 px), Notes page + file store, GitHub GraphQL/REST client with write actions (not yet wired to UI), Claude runner + prompts, Linear client + reconciliation (not yet wired to UI).
+- Screenshots: sizes 1920x1080 (runner resolution now works), 1440x900, 1000x760, 640x900 are produced on every push; ui-guru agent reviews them.
+- Next: wire the real data (`GitHubHubData`) behind `--demo` off, settings page (tokens via credential store), Linear page, Drift/Stats, inspector tabs (Conversation, Files/diff, Pipeline), review flow (slice F), restructure into Features/* with architecture tests, quick actions (Ask Claude, Linear issue, Save to notes).
+- Polish seen in screenshots: quick-action row wraps "GitHub" onto a second line at 480 px inspector; status chips wrap 3+1.
