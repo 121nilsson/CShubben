@@ -224,7 +224,7 @@ sealed class SettingsPage : Component<PageContext>
 
         // ---- Notifications ----
         var notificationsCard = Kit.SettingsCard("Notifications",
-            "Choices are saved now; desktop toasts arrive with the tray and background sync work.",
+            "Which events raise a desktop notification.",
             ToggleSwitch(settings.Notifications, v => Save(settings with { Notifications = v }), "On", "Off", "Desktop notifications"),
             CheckBox((bool?)settings.NotifyReviewRequested, v => Save(settings with { NotifyReviewRequested = v }), "Someone requests my review")
                 .IsEnabled(settings.Notifications),
@@ -273,7 +273,12 @@ sealed class SettingsPage : Component<PageContext>
                 linearCard.Margin(0, 0, 0, 12),
                 claudeCard.Margin(0, 0, 0, 12),
                 reposCard.Margin(0, 0, 0, 12),
+                Kit.SettingsCard("GitHub writes",
+                    "Off by default: merging, reviewing, commenting and re-running jobs are only simulated (dry run) until you turn this on.",
+                    ToggleSwitch(settings.AllowGitHubWrites, v => Save(settings with { AllowGitHubWrites = v }), "On", "Off", "Allow writes to GitHub"))
+                    .Margin(0, 0, 0, 12),
                 notificationsCard.Margin(0, 0, 0, 12),
+                Component<NotificationsSettingsCard>().Margin(0, 0, 0, 12),
                 appearanceCard.Margin(0, 0, 0, 12),
                 dataCard)
             .FlexPadding(24, 16)));

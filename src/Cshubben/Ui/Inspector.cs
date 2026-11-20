@@ -1,6 +1,7 @@
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
 using Cshubben.Ui.Assist;
+using Cshubben.Ui.Pipeline;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -47,14 +48,17 @@ static class Inspector
             Chip("Merge", MergeText(pr.Merge), MergeTone(pr.Merge))) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 8 });
 
         var isReviewStep = action.Kind is NextActionKind.StartReview or NextActionKind.ReReview;
-        var nextStep = Border(VStack(10,
-                Kit.Muted("NEXT STEP"),
-                action.IsActionable
-                    ? Button(isReviewStep ? "▶ " + action.Label : action.Label, () => RunNextStep(pr, action))
-                        .AccentButton().HAlign(HorizontalAlignment.Stretch).AutomationName(action.Label)
-                    : TextBlock(action.Label).FontSize(16).SemiBold().Foreground(Kit.Fg(action.Tone)),
-                Kit.Muted(action.Reason).TextWrapping()))
-            .Background(Kit.Bg(action.Tone)).CornerRadius(8).Padding(16);
+        // Merge has its own two-step confirmation (method, head sha, checks, approvals); every other step is one button.
+        Element nextStep = action.Kind == NextActionKind.Merge
+            ? Component<MergeNextStep, MergeNextStepProps>(new MergeNextStepProps(pr, action)).WithKey("merge-" + pr.Id)
+            : Border(VStack(10,
+                    Kit.Muted("NEXT STEP"),
+                    action.IsActionable
+                        ? Button(isReviewStep ? "▶ " + action.Label : action.Label, () => RunNextStep(pr, action))
+                            .AccentButton().HAlign(HorizontalAlignment.Stretch).AutomationName(action.Label)
+                        : TextBlock(action.Label).FontSize(16).SemiBold().Foreground(Kit.Fg(action.Tone)),
+                    Kit.Muted(action.Reason).TextWrapping()))
+                .Background(Kit.Bg(action.Tone)).CornerRadius(8).Padding(16);
 
         // Approve, Request changes, Ask Claude, Linear issue, Save to notes and GitHub, with their panels. Keyed by PR so state resets.
         var quick = Component<QuickActions, QuickActionsProps>(new QuickActionsProps(pr)).WithKey("quick-" + pr.Id);
@@ -64,6 +68,8 @@ static class Inspector
         Element body = tab switch
         {
             0 => OverviewTab(pr, snap.At),
+            1 => Component<ConversationTab, ConversationTabProps>(new ConversationTabProps(pr)).WithKey("conversation-" + pr.Id),
+            3 => Component<PipelineTab, PipelineTabProps>(new PipelineTabProps(pr)).WithKey("pipeline-" + pr.Id),
             _ => Card(VStack(6, BodyStrong(Tabs[tab]), Kit.Muted("Coming soon.")))
         };
 

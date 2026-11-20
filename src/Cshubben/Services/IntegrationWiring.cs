@@ -16,6 +16,23 @@ namespace Cshubben.Services;
 /// </summary>
 static class IntegrationWiring
 {
+    private static bool? _attachedDryRun;
+
+    /// <summary>
+    /// Creates the live pipeline/merge adapters once the GitHub connection exists (it is created on the first load).
+    /// Writes stay a dry run unless the user turned on "Allow writes to GitHub" in Settings.
+    /// </summary>
+    public static void AttachGitHub(AppServices services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        if (services.IsDemo || services.GitHub is not { } hub) return;
+        var dryRun = !services.Settings.AllowGitHubWrites;
+        if (_attachedDryRun == dryRun) return;
+        _attachedDryRun = dryRun;
+        PipelineServices.Data = new GitHubPipelineData(hub.Rest, hub.GraphQl, hub.Writer) { DryRun = dryRun };
+        PipelineServices.Merge = new GitHubMergeActions(hub.Writer, dryRun);
+    }
+
     public static void Apply(AppServices services)
     {
         ArgumentNullException.ThrowIfNull(services);

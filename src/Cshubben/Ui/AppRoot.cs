@@ -3,6 +3,7 @@ using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
 using Cshubben.Core.Shared;
 using Cshubben.Services;
+using Cshubben.Ui.Palette;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -55,6 +56,8 @@ sealed class AppRoot : Component
                 var data = await services.GetHubDataAsync();
                 var loaded = await data.LoadAsync();
                 setSnapshot(loaded);
+                IntegrationWiring.AttachGitHub(services);
+                NotificationsHub.OnSnapshot(loaded, services.Settings, services.IsDemo);
                 setError(null);
                 setNotice(services.DemoReason is { } reason ? "Showing demo data. " + reason : null);
                 var warnings = services.GitHub?.LastWarnings;
@@ -149,6 +152,9 @@ sealed class AppRoot : Component
         }
 
         void Select(string id) { setSelected(id); setTab(0); }
+        NotificationsHub.RefreshRequested = Refresh;
+        NotificationsHub.SelectPr = id => { setPage(snap.Find(id)?.Role == PrRole.Authored ? Page.Mine : Page.Reviews); Select(id); };
+        PipelineServices.Merged = _ => Refresh();
 
         var ctx = new PageContext(snap, loadedOnce, selectedId, Select, services, settings, SaveSettings, Refresh);
 
@@ -245,7 +251,14 @@ sealed class AppRoot : Component
                 sidebar.Grid(column: 0), main.Grid(column: 1),
                 Inspector.Build(selected, snap, tab, SetInspectorTab, () => setSelected(null)).Grid(column: 2));
 
-        return FlexColumn(TitleBar("Cshubben").Flex(shrink: 0), grid.Flex(grow: 1, basis: 0))
+        var paletteCtx = new PaletteContext(snap, selectedId,
+            PageRegistry.All.Where(d => d.Id != Page.Review).Select(d => new PalettePage(d.Id.ToString(), d.Label, d.Glyph)).ToList(),
+            key => { if (Enum.TryParse<Page>(key, true, out var pg)) { setPage(pg); if (narrow) setSelected(null); } },
+            id => Select(id), Refresh, () => setPage(Page.Notes), () => setPage(Page.Settings));
+
+        return FlexColumn(TitleBar("Cshubben").Flex(shrink: 0),
+                CommandPalette.Host(paletteCtx, grid).Flex(grow: 1, basis: 0),
+                NotificationsHub.TrayElement().Flex(shrink: 0))
             .RequestedTheme(ThemeOf(settings.Theme))
             .Backdrop(BackdropKind.Mica);
     }

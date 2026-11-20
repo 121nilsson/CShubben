@@ -9,6 +9,7 @@ AppOptions.Parse(cmdArgs);
 var services = AppServices.Initialize(AppOptions.Demo);
 IntegrationWiring.Apply(services);
 NotesPage.OpenPath = path => Shell.OpenPath(path);
+NotificationsHub.Initialize(AppOptions.Demo, Cshubben.Core.Features.Notes.AppPaths.DataDirectory, cmdArgs);
 if (!AppOptions.Demo)
     NotesPage.Store = new Cshubben.Core.Features.Notes.FileNoteStore(services.NotesFolder);
 else if (AppOptions.StartPage == Page.Notes)
