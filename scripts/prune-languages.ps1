@@ -6,7 +6,11 @@
 #>
 param(
   [Parameter(Mandatory = $true)] [string] $Path,
-  [string[]] $Keep = @('en', 'sv')
+  [string[]] $Keep = @('en', 'sv'),
+  # x64 or ARM64: native runtimes of other architectures are removed. Empty keeps them all.
+  [string] $Arch = '',
+  # Removes the ONNX Runtime and DirectML libraries that the Windows App SDK brings for its AI features. Cshubben does not use them.
+  [switch] $DropAi
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,6 +31,20 @@ Get-ChildItem $Path -Recurse -Directory | Sort-Object { $_.FullName.Length } -De
   if ($Keep -contains $lang) { return }
   Remove-Item $_.FullName -Recurse -Force
   $removed++
+}
+
+if ($Arch) {
+  $rid = if ($Arch -ieq 'ARM64') { 'win-arm64' } else { 'win-x64' }
+  $runtimes = Join-Path $Path 'runtimes'
+  if (Test-Path $runtimes) {
+    Get-ChildItem $runtimes -Directory | Where-Object { $_.Name -ne $rid -and $_.Name -ne ($rid -replace '^win-', 'win10-') } |
+      ForEach-Object { Remove-Item $_.FullName -Recurse -Force; "Removed runtimes/$($_.Name)" }
+  }
+}
+
+if ($DropAi) {
+  Get-ChildItem $Path -Recurse -File | Where-Object { $_.Name -match '^(onnxruntime|DirectML)' } |
+    ForEach-Object { Remove-Item $_.FullName -Force; "Removed $($_.Name)" }
 }
 
 $after = SizeMb $Path

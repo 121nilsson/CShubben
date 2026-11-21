@@ -59,10 +59,10 @@ jobs:
       - name: Publish
         run: dotnet publish src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=${{ matrix.platform }} -o publish/${{ matrix.platform }}
 
-      # Keep English and Swedish only; other translations are about 100 MB of the folder.
+      # Keep English and Swedish, this architecture only, and no AI runtimes (together about 140 MB of the folder).
       - name: Prune languages
         shell: pwsh
-        run: ./scripts/prune-languages.ps1 -Path publish/${{ matrix.platform }}
+        run: ./scripts/prune-languages.ps1 -Path publish/${{ matrix.platform }} -Arch ${{ matrix.platform }} -DropAi
 
       - uses: actions/upload-artifact@v7
         with:
