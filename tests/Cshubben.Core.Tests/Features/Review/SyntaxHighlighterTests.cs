@@ -64,4 +64,29 @@ public class SyntaxHighlighterTests
     {
         Assert.Equal("Plain:  |String:\"ok\"|Plain:: |Keyword:true", Kinds("  \"ok\": true", "a.json"));
     }
+
+    [Fact]
+    public void CSharp_verbatim_raw_strings_and_preprocessor_lines()
+    {
+        Assert.Contains(SyntaxHighlighter.Tokenize("var p = @\"C:\\dir\\\" + x;", "a.cs"), t => t is { Kind: TokenKind.String, Text: "\"C:\\dir\\\"" });
+        Assert.Contains(SyntaxHighlighter.Tokenize("var q = \"\"\"raw \" text\"\"\";", "a.cs"), t => t.Kind == TokenKind.String && t.Text.Contains("raw", StringComparison.Ordinal));
+        var region = Assert.Single(SyntaxHighlighter.Tokenize("#region Helpers", "a.cs"));
+        Assert.Equal(TokenKind.Keyword, region.Kind);
+        Assert.Contains(SyntaxHighlighter.Tokenize("public required string Name { get; init; }", "a.cs"), t => t is { Kind: TokenKind.Keyword, Text: "required" });
+    }
+
+    [Fact]
+    public void Jsx_tags_are_highlighted_but_generics_are_not()
+    {
+        Assert.Contains(SyntaxHighlighter.Tokenize("return <Button onClick={go}>Go</Button>;", "a.tsx"), t => t is { Kind: TokenKind.Keyword, Text: "Button" });
+        Assert.DoesNotContain(SyntaxHighlighter.Tokenize("const [u, setU] = useState<User>(null);", "a.tsx"), t => t is { Kind: TokenKind.Keyword, Text: "User" });
+        Assert.Equal("x=<div>", string.Concat(SyntaxHighlighter.Tokenize("x=<div>", "a.jsx").Select(t => t.Text)));
+    }
+
+    [Fact]
+    public void Template_literals_and_typescript_keywords()
+    {
+        Assert.Contains(SyntaxHighlighter.Tokenize("const s = `hi ${name}`;", "a.ts"), t => t.Kind == TokenKind.String);
+        Assert.Contains(SyntaxHighlighter.Tokenize("if (x instanceof Foo) return undefined;", "a.ts"), t => t is { Kind: TokenKind.Keyword, Text: "instanceof" });
+    }
 }

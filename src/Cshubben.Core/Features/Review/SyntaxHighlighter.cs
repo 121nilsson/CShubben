@@ -37,6 +37,12 @@ public static class SyntaxHighlighter
         "mod", "mut", "namespace", "new", "nil", "null", "override", "package", "private", "protected", "pub", "public",
         "readonly", "record", "ref", "return", "sealed", "self", "static", "string", "struct", "super", "switch", "this",
         "throw", "trait", "true", "try", "type", "typeof", "use", "using", "var", "virtual", "void", "where", "while", "yield",
+        // C#
+        "base", "byte", "checked", "decimal", "dynamic", "event", "explicit", "extern", "fixed", "global", "goto", "implicit",
+        "init", "lock", "nameof", "object", "operator", "out", "params", "partial", "required", "sbyte", "short", "sizeof",
+        "stackalloc", "uint", "ulong", "unchecked", "unsafe", "ushort", "volatile", "when", "with",
+        // TypeScript / JavaScript
+        "declare", "delete", "implements", "instanceof", "keyof", "satisfies", "undefined",
     };
 
     private static readonly HashSet<string> HashKeywords = new(StringComparer.Ordinal)
@@ -55,6 +61,9 @@ public static class SyntaxHighlighter
         if (family == Family.None || text.Length == 0 || text.Length > MaxLineLength)
             return new[] { new CodeToken(text, TokenKind.Plain) };
 
+        var ext = path.Substring(path.LastIndexOf('.') + 1).ToLowerInvariant();
+        var isCSharp = ext == "cs";
+        var isJsx = ext is "jsx" or "tsx" or "js";
         var keywords = family == Family.CLike ? CLikeKeywords : family == Family.Hash ? HashKeywords : JsonKeywords;
         var tokens = new List<CodeToken>();
         var plain = new StringBuilder();
@@ -66,10 +75,53 @@ public static class SyntaxHighlighter
             plain.Clear();
         }
 
+        if (isCSharp && text.TrimStart().StartsWith('#'))
+            return new[] { new CodeToken(text, TokenKind.Keyword) };
+
         var i = 0;
         while (i < text.Length)
         {
             var c = text[i];
+
+            if (isJsx && c == '<' && i + 1 < text.Length && (i == 0 || !IsIdentifierChar(text[i - 1]))
+                && (char.IsLetter(text[i + 1]) || (text[i + 1] == '/' && i + 2 < text.Length && char.IsLetter(text[i + 2]))))
+            {
+                var j = i + (text[i + 1] == '/' ? 2 : 1);
+                while (j < text.Length && (IsIdentifierChar(text[j]) || text[j] == '.' || text[j] == '-')) j++;
+                plain.Append(text, i, text[i + 1] == '/' ? 2 : 1);
+                Flush();
+                Add(tokens, text.Substring(i + (text[i + 1] == '/' ? 2 : 1), j - i - (text[i + 1] == '/' ? 2 : 1)), TokenKind.Keyword);
+                i = j;
+                continue;
+            }
+
+            if (isCSharp && c == '"' && string.CompareOrdinal(text, i, "\"\"\"", 0, 3) == 0)
+            {
+                Flush();
+                var end = text.IndexOf("\"\"\"", i + 3, StringComparison.Ordinal);
+                var stop = end < 0 ? text.Length : end + 3;
+                Add(tokens, text.Substring(i, stop - i), TokenKind.String);
+                i = stop;
+                continue;
+            }
+
+            if (isCSharp && c == '"' && i > 0 && (text[i - 1] == '@' || (i > 1 && text[i - 1] == '$' && text[i - 2] == '@') || (i > 1 && text[i - 1] == '@' && text[i - 2] == '$')))
+            {
+                var j = i + 1;
+                while (j < text.Length)
+                {
+                    if (text[j] == '"') { if (j + 1 < text.Length && text[j + 1] == '"') { j += 2; continue; } break; }
+                    j++;
+                }
+
+                if (j < text.Length)
+                {
+                    Flush();
+                    Add(tokens, text.Substring(i, j - i + 1), TokenKind.String);
+                    i = j + 1;
+                    continue;
+                }
+            }
 
             if (family == Family.CLike && c == '/' && i + 1 < text.Length && (text[i + 1] == '/' || text[i + 1] == '*'))
             {
