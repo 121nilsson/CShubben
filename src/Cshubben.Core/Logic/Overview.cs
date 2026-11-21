@@ -25,7 +25,7 @@ public sealed record OverviewModel(
         var needs = authored
             .Where(a => a.Action.IsActionable && a.Action.Kind != NextActionKind.Merge)
             .OrderBy(a => Severity(a.Action.Tone))
-            .ThenBy(a => a.Pr.UpdatedAt)
+            .ThenByDescending(a => a.Pr.UpdatedAt)
             .ToList();
 
         var reviews = snapshot.Reviews
@@ -37,7 +37,7 @@ public sealed record OverviewModel(
             })
             .Where(a => a.Action.IsActionable)
             .OrderBy(a => a.Action.Kind == NextActionKind.ReReview ? 0 : 1)
-            .ThenBy(a => a.Pr.UpdatedAt)
+            .ThenByDescending(a => a.Pr.UpdatedAt)
             .ToList();
 
         var waiting = authored.Count(a => !a.Action.IsActionable) + snapshot.Reviews.Count(p => !p.IsDraft) - reviews.Count;

@@ -55,7 +55,7 @@ static class PrListPages
         var groups = Enum.GetValues<ReviewQueueState>()
             .OrderBy(ReviewQueue.Rank)
             .Select(s => Group(ReviewQueue.Label(s),
-                all.Where(x => x.State == s).Select(x => x.Item).OrderBy(a => a.Pr.UpdatedAt).ToList(),
+                all.Where(x => x.State == s).Select(x => x.Item).OrderByDescending(a => a.Pr.UpdatedAt).ToList(),
                 snap, selectedId, onSelect));
         return Page("Review queue", "Pull requests where you are a reviewer", groups);
     }
