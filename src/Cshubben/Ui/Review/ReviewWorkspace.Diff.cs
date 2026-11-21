@@ -218,6 +218,7 @@ sealed partial class ReviewWorkspace
     {
         // A text block drops trailing spaces when it is measured, so they travel to the start of the next token.
         var parts = new List<Element>();
+        text = text.Replace('\u00A0', ' ');
         var indent = text.Length - text.TrimStart(' ').Length;
         if (indent > 0)
         {
