@@ -308,8 +308,7 @@ static class StatsPage
 
     private static Element RightNow(HubSnapshot snap)
     {
-        var waiting = snap.Reviews.Count(p => ReviewQueue.StateOf(snap.ReviewInfos.GetValueOrDefault(p.Id)) is
-            ReviewQueueState.WaitingOnYou or ReviewQueueState.UpdatedSinceReview);
+        var waiting = OverviewModel.Compute(snap).ReviewsForYou.Count;
         var oldest = snap.Authored.Count == 0 ? null : snap.Authored.OrderBy(p => p.CreatedAt).First();
 
         Element Tile(string label, string value, string hint) =>

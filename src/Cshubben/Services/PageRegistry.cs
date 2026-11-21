@@ -116,7 +116,5 @@ static class PageRegistry
     }
 
     /// <summary>Review-queue entries that need the viewer: not reviewed yet, or updated since the review.</summary>
-    public static int WaitingOnYou(HubSnapshot snap) =>
-        snap.Reviews.Count(p => ReviewQueue.StateOf(snap.ReviewInfos.GetValueOrDefault(p.Id)) is
-            ReviewQueueState.WaitingOnYou or ReviewQueueState.UpdatedSinceReview);
+    public static int WaitingOnYou(HubSnapshot snap) => OverviewModel.Compute(snap).ReviewsForYou.Count;
 }

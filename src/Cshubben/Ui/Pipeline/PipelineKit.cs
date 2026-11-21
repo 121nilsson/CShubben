@@ -36,7 +36,7 @@ static class PipelineKit
     public static Tone ToneOf(RepoHealth health) => health switch
     {
         RepoHealth.Attention => Tone.Danger,
-        RepoHealth.Running => Tone.Warning,
+        RepoHealth.Running => Tone.Neutral,
         RepoHealth.Healthy => Tone.Success,
         _ => Tone.Neutral,
     };

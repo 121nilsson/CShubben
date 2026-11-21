@@ -26,7 +26,7 @@ static class DriftCards
 
         return FlexRow(
             Tile("Needs attention", report.NeedAttention, "red main or failed deploy", Tone.Danger),
-            Tile("Running now", report.Running, "runs or deploys in progress", Tone.Warning),
+            Tile("Running now", report.Running, "runs or deploys in progress", Tone.Neutral),
             Tile("Failing workflows", report.FailingWorkflows, "on default branches", Tone.Danger),
             Tile("Behind on deploys", report.ReposBehindDeploy, "repos with undeployed commits", Tone.Warning),
             Tile("Unreleased commits", report.UnreleasedCommits, "since the latest releases", Tone.Neutral))
@@ -40,13 +40,13 @@ static class DriftCards
     public static Element RepoCard(RepoRow row, DateTimeOffset now, bool busy, Action rerun, Action open)
     {
         var tone = PipelineKit.ToneOf(row.Health);
-        var loud = row.Health is RepoHealth.Attention or RepoHealth.Running;
+        var loud = row.Health is RepoHealth.Attention;
         var stripe = Border(Empty()).Width(4).CornerRadius(2).Background(loud ? Kit.Fg(tone) : Theme.SubtleFill);
 
         Element status = row.Health switch
         {
             RepoHealth.Attention => Kit.Pill("Needs attention", Tone.Danger),
-            RepoHealth.Running => Kit.Pill("Running", Tone.Warning),
+            RepoHealth.Running => Kit.Pill("Running", Tone.Neutral),
             RepoHealth.Unavailable => Kit.Pill("Unavailable", Tone.Neutral),
             RepoHealth.Quiet => Kit.Muted("Quiet"),
             _ => Kit.Muted("Healthy"),
