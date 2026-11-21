@@ -121,8 +121,8 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
         var files = showSince ? b.Since!.Files : b.Full.Files;
         var ordered = FileTreeBuilder.TreeOrder(files).Select(i => files[i]).ToList();
         string? start = null;
-        if (b.InitialFile is not null && files.Any(f => f.Path == b.InitialFile)) start = b.InitialFile;
-        else if (AppOptions.StartFile is { } wanted && files.FirstOrDefault(f => f.Path.Contains(wanted, StringComparison.OrdinalIgnoreCase)) is { } match) start = match.Path;
+        if (AppOptions.StartFile is { } wanted && files.FirstOrDefault(f => f.Path.Contains(wanted, StringComparison.OrdinalIgnoreCase)) is { } match) start = match.Path;
+        else if (b.InitialFile is not null && files.Any(f => f.Path == b.InitialFile)) start = b.InitialFile;
         else
         {
             var firstReadable = ordered.FirstOrDefault(f => !FileKinds.CollapsedByDefault(FileKinds.Classify(f.Path, f.IsBinary)));
