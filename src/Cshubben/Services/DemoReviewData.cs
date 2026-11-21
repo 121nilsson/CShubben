@@ -377,9 +377,13 @@ public sealed class DemoReviewData : IReviewData
         Patch(sb, Client, null, DiffFileStatus.Modified, new[]
         {
             Hunk(1, string.Empty,
+                " /* Payments API client.",
+                "  * Keys are generated once per user action,",
+                "  * never per network attempt. */",
                 " import { http } from \"./http\";",
                 "+import { newIdempotencyKey } from \"./idempotency\";",
                 " ",
+                " const base = `/payments/${apiVersion}`;",
                 " export interface ChargeInput {",
                 "   customerId: string;",
                 "   amountCents: number;",
