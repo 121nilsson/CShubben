@@ -410,19 +410,27 @@ sealed class LinearView : Component<LinearProps>
 
         var snapPr = pr is null ? null : snap.Authored.FirstOrDefault(p => p.Repo == pr.Repo && p.Number == pr.Number);
 
-        Element OpenPr() => FlexRow(
+        Element[] OpenPr() =>
+        [
             Button("Open PR", () =>
                 {
                     if (snapPr is not null) onSelectPr(snapPr.Id);
                     else if (pr is not null) ExternalActions.OpenUrl(pr.Url);
                 })
                 .SubtleButton().AutomationName("Open the pull request"),
-            CopyLinkButton.For(pr?.Url)) with { ColumnGap = 2 };
+            CopyLinkButton.For(pr?.Url),
+        ];
 
-        Element OpenIssue() => FlexRow(
+        Element[] OpenIssue() =>
+        [
             Button("Open issue", () => ExternalActions.OpenUrl(issue?.Url)).SubtleButton().AutomationName("Open the issue in Linear"),
             CopyLinkButton.For(issue?.Url),
-            CopyLinkButton.For(issue?.Url, "Copy Markdown", issue is null ? null : issue.Identifier + " " + issue.Title)) with { ColumnGap = 2, Wrap = FlexWrap.Wrap };
+            CopyLinkButton.For(issue?.Url, "Copy Markdown", issue is null ? null : issue.Identifier + " " + issue.Title),
+        ];
+
+        // One flat wrapping row so buttons share lines instead of each group claiming its own line.
+        static Element Row(params IEnumerable<Element>[] parts) =>
+            FlexRow(parts.SelectMany(g => g).ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 4 };
 
         Element Cancel() => Button("Cancel", () => setActiveKey("")).SubtleButton().IsEnabled(!busy);
 
@@ -438,19 +446,19 @@ sealed class LinearView : Component<LinearProps>
                             return "Marked " + issue.Identifier + " as done.";
                         })).AccentButton().IsEnabled(!busy),
                         Cancel(), busy)
-                    : FlexRow(
-                        Lead(Button("Mark done", () => setActiveKey(key))).AutomationName("Mark " + issue.Identifier + " done"),
-                        OpenPr(), OpenIssue()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
+                    : Row(
+                        [Lead(Button("Mark done", () => setActiveKey(key))).AutomationName("Mark " + issue.Identifier + " done")],
+                        OpenPr(), OpenIssue());
                 break;
 
             case ReconKind.IssueDoneButPrOpen:
-                actions = FlexRow(
-                    Lead(Button("Review the PR", () =>
+                actions = Row(
+                    [Lead(Button("Review the PR", () =>
                     {
                         if (snapPr is not null) onSelectPr(snapPr.Id);
                         else if (pr is not null) ExternalActions.OpenUrl(pr.Url);
-                    })).AutomationName("Review the open pull request"),
-                    OpenIssue()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
+                    })).AutomationName("Review the open pull request")],
+                    OpenIssue());
                 break;
 
             case ReconKind.PrWithoutIssue when pr is not null:
@@ -476,9 +484,9 @@ sealed class LinearView : Component<LinearProps>
                 }
                 else
                 {
-                    actions = FlexRow(
-                        Lead(Button("Create issue", () => { setPick(0); setActiveKey(key); })).AutomationName("Create a Linear issue for this pull request"),
-                        OpenPr()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
+                    actions = Row(
+                        [Lead(Button("Create issue", () => { setPick(0); setActiveKey(key); })).AutomationName("Create a Linear issue for this pull request")],
+                        OpenPr());
                 }
 
                 break;
@@ -504,15 +512,15 @@ sealed class LinearView : Component<LinearProps>
                 }
                 else
                 {
-                    actions = FlexRow(
-                        Lead(Button("Link a PR…", () => { setPick(0); setActiveKey(key); })).AutomationName("Link a pull request to " + issue.Identifier),
-                        OpenIssue()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
+                    actions = Row(
+                        [Lead(Button("Link a PR…", () => { setPick(0); setActiveKey(key); })).AutomationName("Link a pull request to " + issue.Identifier)],
+                        OpenIssue());
                 }
 
                 break;
 
             default:
-                actions = FlexRow(OpenPr(), OpenIssue()) with { ColumnGap = 6 };
+                actions = Row(OpenPr(), OpenIssue());
                 break;
         }
 
