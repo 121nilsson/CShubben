@@ -1,0 +1,88 @@
+name: Live smoke
+
+# Manual only. Runs the read-only diagnostics (`Cshubben.exe --smoke`) and a few raw GitHub probes against real accounts,
+# using repository secrets. Never runs for pull requests. Output is redacted and secrets are masked by GitHub.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      # GH_TOKEN is read by the app (GITHUB_TOKEN / GH_TOKEN). Empty when the secret is not set.
+      GH_TOKEN: ${{ secrets.SMOKE_GITHUB_TOKEN }}
+      LINEAR_API_KEY: ${{ secrets.SMOKE_LINEAR_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Which secrets are present
+        shell: pwsh
+        run: |
+          "SMOKE_GITHUB_TOKEN set: $([bool]$env:GH_TOKEN)"
+          "SMOKE_LINEAR_KEY set:   $([bool]$env:LINEAR_API_KEY)"
+
+      - name: GitHub probes (viewer, rate limit, merged PRs, reviewed PRs)
+        if: ${{ env.GH_TOKEN != '' }}
+        shell: pwsh
+        run: |
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'cshubben-live-smoke'; Accept = 'application/vnd.github+json' }
+          function Gql($query, $vars) {
+            $body = @{ query = $query; variables = $vars } | ConvertTo-Json -Depth 6
+            try { Invoke-RestMethod -Method Post -Uri https://api.github.com/graphql -Headers $h -Body $body -ContentType 'application/json' }
+            catch { "  HTTP error: $($_.Exception.Message)"; $null }
+          }
+          $since = (Get-Date).ToUniversalTime().AddDays(-84).ToString('yyyy-MM-dd')
+
+          $r = Gql 'query { viewer { login } rateLimit { remaining limit } }' @{}
+          if ($r.data) { "viewer: $($r.data.viewer.login), rate limit remaining $($r.data.rateLimit.remaining)/$($r.data.rateLimit.limit)" }
+          elseif ($r.errors) { "viewer query errors: $($r.errors.message -join '; ')" }
+
+          $q = 'query($q: String!) { search(query: $q, type: ISSUE, first: 50) { issueCount nodes { ... on PullRequest { number repository { nameWithOwner } reviews(first: 3) { totalCount } } } } }'
+          foreach ($s in @("is:pr is:merged author:@me archived:false merged:>=$since", "is:pr reviewed-by:@me -author:@me archived:false updated:>=$since", 'is:pr is:open author:@me archived:false')) {
+            $r = Gql $q @{ q = $s }
+            if ($r.data) { "search [$s]: $($r.data.search.issueCount) found, $($r.data.search.nodes.Count) read" }
+            elseif ($r.errors) { "search [$s] errors: $($r.errors.message -join '; ')" }
+          }
+
+          # Repositories the token can see: tells which repositories were selected for a fine-grained token.
+          try {
+            $repos = Invoke-RestMethod -Uri 'https://api.github.com/user/repos?per_page=100&sort=pushed' -Headers $h
+            "repositories visible to the token: $($repos.Count) (first: $((($repos | Select-Object -First 5).full_name) -join ', '))"
+          } catch { "repositories: $($_.Exception.Message)" }
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/*.csproj
+
+      - name: Publish app
+        run: |
+          dotnet restore src/Cshubben/Cshubben.csproj -p:Platform=x64
+          dotnet publish src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=x64 -o publish/x64
+
+      - name: Run --smoke
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath publish/x64/Cshubben.exe -ArgumentList '--smoke' -PassThru -Wait
+          "exit code: $($p.ExitCode)"
+          $report = Get-ChildItem -Path $env:LOCALAPPDATA, $env:APPDATA, $env:TEMP -Recurse -Filter smoke-report.txt -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($report) { Get-Content $report.FullName; Copy-Item $report.FullName smoke-report.txt }
+          else { "smoke-report.txt not found" }
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: smoke-report
+          path: smoke-report.txt
+          if-no-files-found: ignore
