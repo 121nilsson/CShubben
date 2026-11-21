@@ -78,7 +78,7 @@ public class SyntaxHighlighterTests
     [Fact]
     public void Jsx_tags_are_highlighted_but_generics_are_not()
     {
-        Assert.Contains(SyntaxHighlighter.TokenizeBasic("return <Button onClick={go}>Go</Button>;", "a.tsx"), t => t is { Kind: TokenKind.Keyword, Text: "Button" });
+        Assert.Contains(SyntaxHighlighter.TokenizeBasic("return <Button label=\"x\" onClick={go}>Go</Button>;", "a.tsx"), t => t is { Kind: TokenKind.Keyword, Text: "Button" });
         Assert.DoesNotContain(SyntaxHighlighter.TokenizeBasic("const [u, setU] = useState<User>(null);", "a.tsx"), t => t is { Kind: TokenKind.Keyword, Text: "User" });
         Assert.Equal("x=<div>", string.Concat(SyntaxHighlighter.TokenizeBasic("x=<div>", "a.jsx").Select(t => t.Text)));
     }
@@ -92,7 +92,7 @@ public class SyntaxHighlighterTests
 
     [Theory]
     [InlineData("public async Task<int> Run() { return 42; } // go", "A.cs")]
-    [InlineData("export const App = () => <Button onClick={go}>Go</Button>;", "a.tsx")]
+    [InlineData("export const App = () => <Button label=\"x\" onClick={go}>Go</Button>;", "a.tsx")]
     [InlineData("const s = `hi ${name}`; /* x */", "a.ts")]
     [InlineData("def f(x): return \"a\" # c", "a.py")]
     public void Full_tokenizer_reassembles_and_finds_keywords_and_strings_or_comments(string text, string path)
