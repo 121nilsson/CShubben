@@ -33,17 +33,24 @@ public sealed class StaleCache<T> where T : class
         ArgumentNullException.ThrowIfNull(load);
         if (_entries.TryGetValue(key, out var e) && _clock() - e.At < ttl) return e.Value;
 
-        var task = _loading.GetOrAdd(key, _ => RunAsync(key, load));
-        return await task.ConfigureAwait(false);
-    }
+        // The first caller for a key does the load; others wait for its result. The entry is removed only after it was added,
+        // so a load that finishes at once cannot leave a finished task behind.
+        var gate = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var existing = _loading.GetOrAdd(key, gate.Task);
+        if (!ReferenceEquals(existing, gate.Task)) return await existing.ConfigureAwait(false);
 
-    private async Task<T> RunAsync(string key, Func<Task<T>> load)
-    {
         try
         {
             var value = await load().ConfigureAwait(false);
             Set(key, value);
+            gate.SetResult(value);
             return value;
+        }
+        catch (Exception ex)
+        {
+            gate.SetException(ex);
+            _ = gate.Task.Exception; // observed here; waiting callers still see the error
+            throw;
         }
         finally
         {
