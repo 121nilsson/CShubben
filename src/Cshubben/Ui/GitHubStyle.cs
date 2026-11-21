@@ -1,5 +1,6 @@
 using Cshubben.Core.Features.Settings;
 using Cshubben.Core.Logic;
+using Cshubben.Core.Shared;
 using Cshubben.Services;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
@@ -99,31 +100,65 @@ static class GitHubStyle
             "M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z",
     };
 
-    private static readonly System.Text.RegularExpressions.Regex PathToken =
-        new(@"[A-Za-z]|-?(?:\d+\.\d*|\.\d+|\d+)", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    private static readonly Dictionary<GitIcon, IReadOnlyList<SvgFigure>> Parsed = new();
 
-    private static readonly Dictionary<GitIcon, string> Normalized = new();
-
-    /// <summary>
-    /// Octicons write numbers back to back ("9.573.677", ".75.75"). Reactor's path parser reads those wrongly,
-    /// so every command and number gets its own space.
-    /// </summary>
-    private static string Spaced(GitIcon icon)
+    private static IReadOnlyList<SvgFigure> Figures(GitIcon icon)
     {
-        lock (Normalized)
+        lock (Parsed)
         {
-            if (!Normalized.TryGetValue(icon, out var text))
-                Normalized[icon] = text = string.Join(" ", PathToken.Matches(Data(icon)).Select(m => m.Value));
-            return text;
+            if (!Parsed.TryGetValue(icon, out var figures)) Parsed[icon] = figures = SvgPath.Parse(Data(icon));
+            return figures;
         }
     }
 
-    /// <summary>A git icon in a GitHub colour. Decorative: the owning control must carry the AutomationName.</summary>
-    public static Element Icon(GitIcon icon, Tone tone, double size = 16)
+    private static Windows.Foundation.Point Pt(SvgPoint p) => new(p.X, p.Y);
+
+    /// <summary>Real WinUI geometry from the parsed figures (non-zero fill, like SVG).</summary>
+    private static PathGeometry Geometry(GitIcon icon)
     {
-        var path = Path2D() with { PathDataString = Spaced(icon), Fill = Fg(tone) };
-        return Border(path).Width(size).Height(size).VAlign(VerticalAlignment.Center);
+        var geometry = new PathGeometry { FillRule = FillRule.Nonzero };
+        foreach (var figure in Figures(icon))
+        {
+            var pf = new PathFigure { StartPoint = Pt(figure.Start), IsClosed = figure.Closed, IsFilled = true };
+            foreach (var seg in figure.Segments)
+            {
+                switch (seg.Kind)
+                {
+                    case SvgSegmentKind.Line:
+                        pf.Segments.Add(new LineSegment { Point = Pt(seg.To) });
+                        break;
+                    case SvgSegmentKind.Cubic:
+                        pf.Segments.Add(new BezierSegment { Point1 = Pt(seg.Control1), Point2 = Pt(seg.Control2), Point3 = Pt(seg.To) });
+                        break;
+                    default:
+                        pf.Segments.Add(new ArcSegment
+                        {
+                            Point = Pt(seg.To),
+                            Size = new Windows.Foundation.Size(seg.RadiusX, seg.RadiusY),
+                            RotationAngle = seg.Rotation,
+                            IsLargeArc = seg.LargeArc,
+                            SweepDirection = seg.Sweep ? SweepDirection.Clockwise : SweepDirection.Counterclockwise,
+                        });
+                        break;
+                }
+            }
+
+            geometry.Figures.Add(pf);
+        }
+
+        return geometry;
     }
+
+    /// <summary>A git icon in a GitHub colour. Decorative: the owning control must carry the AutomationName.</summary>
+    public static Element Icon(GitIcon icon, Tone tone, double size = 16) =>
+        (Path2D() with { Fill = Fg(tone) }).Set(p =>
+        {
+            p.Data = Geometry(icon);
+            p.Stretch = Stretch.Uniform;
+            p.Width = size;
+            p.Height = size;
+            p.VerticalAlignment = VerticalAlignment.Center;
+        });
 
     /// <summary>A text element in a GitHub colour (for "merged #12").</summary>
     public static TextBlockElement Text(string text, Tone tone, double size = 12) =>
