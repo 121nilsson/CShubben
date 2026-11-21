@@ -177,9 +177,11 @@ sealed class LinearIssuePanel : Component<LinearPanelProps>
                         with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 4 },
                     TextBlock(issue.Title).SemiBold().TextWrapping(),
                     Kit.Muted(string.Join(" · ", meta))).Grid(column: 0),
-                Button("Open", () => ExternalActions.OpenUrl(issue.Url))
-                    .SubtleButton().VAlign(VerticalAlignment.Top).AutomationName("Open " + issue.Identifier + " in Linear")
-                    .IsVisible(issue.Url.Length > 0).Grid(column: 1));
+                VStack(2,
+                    Button("Open", () => ExternalActions.OpenUrl(issue.Url))
+                        .SubtleButton().AutomationName("Open " + issue.Identifier + " in Linear"),
+                    CopyLinkButton.For(issue.Url, "Copy link", issue.Identifier + " " + issue.Title))
+                    .VAlign(VerticalAlignment.Top).IsVisible(issue.Url.Length > 0).Grid(column: 1));
         }
 
         return VStack(10,

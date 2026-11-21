@@ -410,15 +410,19 @@ sealed class LinearView : Component<LinearProps>
 
         var snapPr = pr is null ? null : snap.Authored.FirstOrDefault(p => p.Repo == pr.Repo && p.Number == pr.Number);
 
-        Element OpenPr() => Button("Open PR", () =>
-            {
-                if (snapPr is not null) onSelectPr(snapPr.Id);
-                else if (pr is not null) ExternalActions.OpenUrl(pr.Url);
-            })
-            .SubtleButton().AutomationName("Open the pull request");
+        Element OpenPr() => FlexRow(
+            Button("Open PR", () =>
+                {
+                    if (snapPr is not null) onSelectPr(snapPr.Id);
+                    else if (pr is not null) ExternalActions.OpenUrl(pr.Url);
+                })
+                .SubtleButton().AutomationName("Open the pull request"),
+            CopyLinkButton.For(pr?.Url)) with { ColumnGap = 2 };
 
-        Element OpenIssue() => Button("Open issue", () => ExternalActions.OpenUrl(issue?.Url))
-            .SubtleButton().AutomationName("Open the issue in Linear");
+        Element OpenIssue() => FlexRow(
+            Button("Open issue", () => ExternalActions.OpenUrl(issue?.Url)).SubtleButton().AutomationName("Open the issue in Linear"),
+            CopyLinkButton.For(issue?.Url),
+            CopyLinkButton.For(issue?.Url, "Copy Markdown", issue is null ? null : issue.Identifier + " " + issue.Title)) with { ColumnGap = 2, Wrap = FlexWrap.Wrap };
 
         Element Cancel() => Button("Cancel", () => setActiveKey("")).SubtleButton().IsEnabled(!busy);
 

@@ -85,7 +85,9 @@ sealed class QuickActions : Component<QuickActionsProps>
             Choice("✦ Ask Claude", open == QuickPanel.Claude, () => Toggle(QuickPanel.Claude), "Ask Claude about this pull request"),
             Choice("◇ " + (linearId ?? "Linear issue"), open == QuickPanel.Linear, () => Toggle(QuickPanel.Linear), "Linear issue"),
             Choice(savedNote ? "✓ Saved" : "✎ Save to notes", false, SaveToNotes, "Save a note about this pull request"),
-            Choice("↗ GitHub", false, OpenGitHub, "Open on GitHub"))
+            Choice("↗ GitHub", false, OpenGitHub, "Open on GitHub"),
+            CopyLinkButton.For(pr.Url),
+            CopyLinkButton.For(pr.Url, "Copy Markdown", pr.Repo + "#" + pr.Number + " " + pr.Title))
             with { Wrap = FlexWrap.Wrap, ColumnGap = 4, RowGap = 4 };
 
         Element? noticeLine = notice.Length > 0

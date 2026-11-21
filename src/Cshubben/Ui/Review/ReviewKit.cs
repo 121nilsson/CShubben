@@ -79,8 +79,9 @@ static class ReviewKit
     {
         var uri = SafeUri(url);
         if (uri is null) return Empty();
-        return HyperlinkButton(HStack(6, Kit.Glyph(GlyphLink, 12), TextBlock(label).FontSize(12)), uri)
-            .AutomationName(label);
+        return FlexRow(
+            HyperlinkButton(HStack(6, Kit.Glyph(GlyphLink, 12), TextBlock(label).FontSize(12)), uri).AutomationName(label),
+            Cshubben.Ui.Assist.CopyLinkButton.For(uri.AbsoluteUri)) with { ColumnGap = 2 };
     }
 
     public static Element Avatar(string author, double size = 24)

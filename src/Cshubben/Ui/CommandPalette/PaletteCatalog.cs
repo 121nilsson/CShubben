@@ -22,6 +22,14 @@ static class PaletteCatalog
             items.Add(new PaletteItem("action:open-github", PaletteKind.Action, "Open on GitHub",
                 selected.Repo + " #" + selected.Number + " " + selected.Title, "", "", "browser web link"));
 
+        if (ctx.Snapshot.Find(ctx.SelectedPrId) is { } copyable)
+        {
+            items.Add(new PaletteItem("action:copy-link", PaletteKind.Action, "Copy link to pull request",
+                copyable.Repo + " #" + copyable.Number, "", "", "clipboard url share"));
+            items.Add(new PaletteItem("action:copy-markdown", PaletteKind.Action, "Copy pull request as Markdown link",
+                "[" + copyable.Repo + "#" + copyable.Number + " " + copyable.Title + "](…)", "", "", "clipboard url share"));
+        }
+
         items.Add(new PaletteItem("action:help", PaletteKind.Action, "Keyboard shortcuts", "Show all shortcuts", "", "?", "help keys hotkeys"));
 
         foreach (var page in ctx.Pages)
@@ -64,6 +72,12 @@ static class PaletteCatalog
             case "action:help":
                 openHelp();
                 return true;
+            case "action:copy-link":
+            case "action:copy-markdown":
+                return ctx.Snapshot.Find(ctx.SelectedPrId) is { } target && !string.IsNullOrWhiteSpace(target.Url)
+                    && Cshubben.Ui.Assist.ExternalActions.Copy(item.Id == "action:copy-link"
+                        ? target.Url
+                        : "[" + (target.Repo + "#" + target.Number + " " + target.Title).Replace("[", "(", StringComparison.Ordinal).Replace("]", ")", StringComparison.Ordinal) + "](" + target.Url + ")");
             case "action:open-github":
                 return ctx.SelectedPrId is { } id && OpenPr(ctx, id);
             default:
