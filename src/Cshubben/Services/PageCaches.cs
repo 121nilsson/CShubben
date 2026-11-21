@@ -15,6 +15,7 @@ static class PageCaches
     public static readonly StaleCache<DriftReport> Drift = new();
     public static readonly StaleCache<StatsInput> Stats = new();
     public static readonly StaleCache<LinearIssue> Issues = new();
+    public static readonly StaleCache<TeamReport> Team = new();
 
     public static readonly TimeSpan LinearTtl = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan DriftTtl = TimeSpan.FromMinutes(5);

@@ -1,3 +1,4 @@
+using Cshubben.Core.Features.Digest;
 using Cshubben.Core.Features.GitHub;
 using Cshubben.Core.Features.Stats;
 using Cshubben.Core.Logic;
@@ -36,9 +37,33 @@ sealed class StatsPageHost : Component<PageContext>
             },
             new object[] { live, snap.Viewer, snap.At.ToUnixTimeSeconds() / 3600, tick });
 
+        // The team numbers are optional: a failure here must not hide the personal numbers.
+        var teamRepos = DigestPage.WatchedRepos(ctx.Services.RepoActivity, ctx.Settings, false);
+        var teamKey = "team|" + snap.Viewer + "|" + string.Join(",", teamRepos.OrderBy(r => r, StringComparer.OrdinalIgnoreCase)).GetHashCode();
+        var teamResource = UseResource<TeamReport?>(
+            async ct =>
+            {
+                if (!live || hub is null || teamRepos.Count == 0) return null;
+                try
+                {
+                    return await PageCaches.Team.GetAsync(teamKey, PageCaches.StatsTtl, async () =>
+                    {
+                        var input = await new GitHubDigestData(hub.GraphQl).LoadAsync(DigestPeriod.Month, teamRepos, DateTimeOffset.Now, ct);
+                        return TeamStats.Compute(input.Prs.Select(p => new TeamPr(p.Repo, p.Author, p.MergedAt, p.Size)));
+                    });
+                }
+                catch (Exception) when (!ct.IsCancellationRequested)
+                {
+                    return null;
+                }
+            },
+            new object[] { live, teamKey, snap.At.ToUnixTimeSeconds() / 3600, tick });
+        var team = Parts.Peek(teamResource) ?? PageCaches.Team.Peek(teamKey);
+
         void Retry()
         {
             PageCaches.Stats.Remove(statsKey);
+            PageCaches.Team.Remove(teamKey);
             setTick(tick + 1);
         }
 
@@ -54,7 +79,7 @@ sealed class StatsPageHost : Component<PageContext>
         if (input is not null)
         {
             var refreshing = resource is AsyncValue<StatsInput?>.Reloading;
-            return StatsPage.Build(snap, input, refreshing ? Kit.Muted("Updating…") : null);
+            return StatsPage.Build(snap, input, refreshing ? Kit.Muted("Updating…") : null, team);
         }
 
         if (Parts.IsLoading(resource) || resource is not AsyncValue<StatsInput?>.Error)

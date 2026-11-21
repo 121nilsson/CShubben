@@ -21,9 +21,11 @@ static class StatsPage
 
     private const double ChartHeight = 72;
 
-    public static Element Build(HubSnapshot snap, StatsInput? input = null, Element? notice = null)
+    public static Element Build(HubSnapshot snap, StatsInput? input = null, Element? notice = null, TeamReport? team = null)
     {
         var real = input ?? Input;
+        var extras = StatsExtrasCalculator.Compute(real ?? DemoStats.Build(snap.At, snap.Viewer), snap.At);
+        team ??= real is null ? TeamStats.Compute(DemoTeam(snap.At)) : null;
         var report = StatsCalculator.Compute(real ?? DemoStats.Build(snap.At, snap.Viewer), snap.At);
         var weeks = report.Weeks;
 
@@ -88,6 +90,44 @@ static class StatsPage
                 : FlexColumn(report.TopRepos.Select(r => RepoRow(r, report.TopRepos[0].Count)).ToArray()) with { RowGap = 6 }))
             .Flex(grow: 1, basis: 420);
 
+        var more = (FlexRow(
+            Tile("Lines changed", "+" + Compact(extras.LinesAdded) + " / -" + Compact(extras.LinesDeleted), "in your merged PRs"),
+            Tile("Merge streak", extras.StreakWeeks + (extras.StreakWeeks == 1 ? " week" : " weeks"), "in a row with a merged PR")) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 12 })
+            .Margin(0, 0, 0, 12);
+
+        var reviewedRepos = Card(VStack(10,
+            HeaderBlock("Where you review", "Pull requests you reviewed, by repository"),
+            extras.ReviewedRepos.Count == 0
+                ? Kit.EmptyNote("No reviews in this period.")
+                : FlexColumn(extras.ReviewedRepos.Select(r => RepoRow(r, extras.ReviewedRepos[0].Count)).ToArray()) with { RowGap = 6 }))
+            .Flex(grow: 1, basis: 420);
+
+        var weekdayMax = Math.Max(1, extras.Weekdays.Max(d => d.Count));
+        var weekdays = Card(VStack(10,
+            HeaderBlock("When you merge", "Merged pull requests by weekday (UTC)"),
+            FlexColumn(extras.Weekdays.Select(d => WeekdayRow(d, weekdayMax)).ToArray()) with { RowGap = 6 }))
+            .Flex(grow: 1, basis: 420);
+
+        var slowest = Card(VStack(10,
+            HeaderBlock("Slowest to merge", "Your three longest open-to-merge times"),
+            extras.Slowest.Count == 0
+                ? Kit.EmptyNote("Nothing merged in this period.")
+                : FlexColumn(extras.Slowest.Select(SlowRow).ToArray()) with { RowGap = 8 }))
+            .Flex(grow: 1, basis: 420);
+
+        var teamCards = new List<Element>();
+        if (team is not null && team.Merged > 0)
+        {
+            teamCards.Add(Card(VStack(10,
+                HeaderBlock("Most active people", "Merged pull requests, last 30 days, watched repositories"),
+                FlexColumn(team.TopPeople.Select(p => PersonRow(p, team.TopPeople[0].Merged)).ToArray()) with { RowGap = 6 }))
+                .Flex(grow: 1, basis: 420));
+            teamCards.Add(Card(VStack(10,
+                HeaderBlock("Most active repositories", "Merged pull requests by everyone, last 30 days (" + team.Merged + " in total, " + team.People + " people)"),
+                FlexColumn(team.TopRepos.Select(r => RepoRow(r, team.TopRepos[0].Count)).ToArray()) with { RowGap = 6 }))
+                .Flex(grow: 1, basis: 420));
+        }
+
         var now = RightNow(snap);
 
         return ScrollView(Kit.Capped(
@@ -97,11 +137,54 @@ static class StatsPage
                 tiles,
                 (FlexRow(throughput, trend, load, spread, sizes, repos) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 12 })
                     .Margin(0, 0, 0, 12),
+                more,
+                (FlexRow(new[] { reviewedRepos, weekdays, slowest }.Concat(teamCards).ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 12 })
+                    .Margin(0, 0, 0, 12),
                 now)
             .FlexPadding(24, 16)));
     }
 
     // ------------------------------------------------------------------ pieces
+
+    private static string Compact(long n) =>
+        n >= 1_000_000 ? (n / 1_000_000.0).ToString("0.#", CultureInfo.InvariantCulture) + "M"
+        : n >= 10_000 ? (n / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + "k"
+        : n.ToString(CultureInfo.InvariantCulture);
+
+    private static Element WeekdayRow(WeekdayCount d, int max) =>
+        Grid(
+            columns: [GridSize.Px(44), GridSize.Star(), GridSize.Px(28)],
+            rows: [GridSize.Auto],
+            TextBlock(d.Day.ToString().Substring(0, 3)).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            Track((double)d.Count / max).VAlign(VerticalAlignment.Center).Margin(8, 0, 8, 0).Grid(column: 1),
+            Kit.Muted(d.Count.ToString(CultureInfo.InvariantCulture)).HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center).Grid(column: 2))
+            .WithKey("day-" + d.Day);
+
+    private static Element SlowRow(MergedPrRecord pr) =>
+        VStack(2,
+            TextBlock(pr.Title).TextTrimming(TextTrimming.CharacterEllipsis),
+            Kit.Muted(pr.Repo + " #" + pr.Number + " · " + StatsFormat.Duration(pr.CycleTime.TotalHours) + " · " + pr.Lines + " lines"))
+            .WithKey("slow-" + pr.Repo + pr.Number);
+
+    private static Element PersonRow(PersonCount p, int max)
+    {
+        var f = max <= 0 ? 0 : (double)p.Merged / max;
+        return Grid(
+            columns: [GridSize.Star(2), GridSize.Star(3), GridSize.Px(28)],
+            rows: [GridSize.Auto],
+            TextBlock(p.Author).TextTrimming(TextTrimming.CharacterEllipsis).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            Track(f).VAlign(VerticalAlignment.Center).Margin(8, 0, 8, 0).Grid(column: 1),
+            Kit.Muted(p.Merged.ToString(CultureInfo.InvariantCulture)).HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center).Grid(column: 2))
+            .ToolTip(p.Merged + " merged, " + p.Lines + " lines changed")
+            .WithKey("person-" + p.Author);
+    }
+
+    private static IEnumerable<TeamPr> DemoTeam(DateTimeOffset now)
+    {
+        var people = new[] { "alex", "sam", "robin", "kim", "alex", "sam", "alex", "jo" };
+        var repos = new[] { "acme/api", "acme/web", "acme/api", "acme/infra", "acme/mobile", "acme/api" };
+        for (var i = 0; i < 40; i++) yield return new TeamPr(repos[i % repos.Length], people[i % people.Length], now.AddHours(-i * 15), 20 + i * 7);
+    }
 
     private static string Duration(Spread s) => s.Count == 0 ? "–" : StatsFormat.Duration(s.Median);
 

@@ -188,7 +188,7 @@ sealed class DigestPage : Component<PageContext>
     }
 
     /// <summary>Repositories seen in loaded data that are not muted (and, when asked, marked important).</summary>
-    private static IReadOnlyList<string> WatchedRepos(IReadOnlyDictionary<string, int> activity, AppSettings settings, bool onlyImportant) =>
+    internal static IReadOnlyList<string> WatchedRepos(IReadOnlyDictionary<string, int> activity, AppSettings settings, bool onlyImportant) =>
         RepoDirectory.Build(activity, settings).Orgs
             .SelectMany(o => o.Repos)
             .Where(r => r.Watched && (!onlyImportant || r.Important))

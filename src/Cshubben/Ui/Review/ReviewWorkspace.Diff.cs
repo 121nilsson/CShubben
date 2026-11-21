@@ -422,13 +422,13 @@ sealed partial class ReviewWorkspace
 
         var threadId = t.Id;
         var actions = FlexRow(
-            Button("Reply", () => Update(s => s with { ReplyThreadId = threadId, Composer = null, EditCommentId = null })).SubtleButton().AutomationName("Reply to thread"),
+            Button("Reply", () => Update(s => s with { ReplyThreadId = threadId, Composer = null, EditCommentId = null })).SubtleButton().AutomationName("Reply to thread").Flex(shrink: 0),
             t.IsResolved
-                ? Button("Unresolve", () => SetResolved(t, false)).SubtleButton().AutomationName("Unresolve conversation")
-                : Button("Resolve conversation", () => SetResolved(t, true)).SubtleButton().AutomationName("Resolve conversation"),
-            t.IsResolved ? Button("Hide", () => Update(s => s with { OpenResolved = s.OpenResolved.Where(x => x != threadId).ToList() })).SubtleButton().AutomationName("Hide resolved thread") : Empty(),
+                ? Button("Unresolve", () => SetResolved(t, false)).SubtleButton().AutomationName("Unresolve conversation").Flex(shrink: 0)
+                : Button("Resolve conversation", () => SetResolved(t, true)).SubtleButton().AutomationName("Resolve conversation").Flex(shrink: 0),
+            t.IsResolved ? Button("Hide", () => Update(s => s with { OpenResolved = s.OpenResolved.Where(x => x != threadId).ToList() })).SubtleButton().AutomationName("Hide resolved thread").Flex(shrink: 0) : Empty(),
             Empty().Flex(grow: 1),
-            ReviewKit.OpenOnGitHub(t.Url, "GitHub")) with { ColumnGap = 4 };
+            ReviewKit.OpenOnGitHub(t.Url, "GitHub").Flex(shrink: 0)) with { ColumnGap = 4, RowGap = 4, Wrap = FlexWrap.Wrap };
         parts.Add(actions);
 
         if (S.ReplyThreadId == t.Id)
