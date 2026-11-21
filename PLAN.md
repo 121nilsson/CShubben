@@ -116,3 +116,13 @@ Remaining:
 ## Status log (2026-11-21, afternoon)
 - Stats now reads real history: merged PRs authored by the viewer (first review by someone else, size) and reviews given, over 12 weeks, via GraphQL search (`StatsQueries`/`StatsMapper` in Core, `GitHubStatsData` + `StatsPageHost` in the app). Demo data only in `--demo` or without a GitHub connection (with a banner). Not verified against a real account.
 - Idea: a read-only `live-smoke` workflow (workflow_dispatch, Environment secrets `SMOKE_GITHUB_TOKEN`, `SMOKE_LINEAR_KEY`) that runs `--smoke` on the Windows runner.
+
+## Status log (2026-11-21, evening)
+- Speed: disk snapshot cache plus in-memory page caches (`SnapshotCache`, `StaleCache`, `PageCaches`); not timed against a real account yet.
+- Avatars everywhere, clickable own feed items, Linear card in the My PRs panel, Linear issue text in a side panel.
+- Publish size: only en and sv resources, current architecture only, no ONNX/DirectML (`scripts/prune-languages.ps1`, 267 MB to 131 MB for x64).
+- Overview and Review queue sort newest first (My PRs still oldest first).
+- Settings: repository list per owner with watch switch, Important toggle and activity count (`RepoDirectory`). Important repos are always checked on Drift and are the only ones that raise main-red, deploy-failed and new-PR notifications. Not seen in a screenshot yet.
+- GitHub look: Octicons (merge, PR, closed, commit, branch, comment, check, cross) built from parsed SVG (`SvgPath` in Core, `GitHubStyle` in the app) in GitHub colours (purple merged, green open, red failed). Reactor's own path-text parser failed on icon data, so do not pass path strings to `PathDataString`.
+- Notifications: new kinds Approved, NewInImportantRepo, MainRed, DeployFailed, LinearAssigned, LinearOutOfSync. `BackgroundWatch` checks Drift (important repos, every 5 min) and Linear (every 3 min) after each refresh; `WatchDiff` (Core) finds the changes and `WatchSources` (Core/Composition) maps Drift and Linear results to plain values. First check is a baseline. Not tried with real toasts.
+- Ideas not built: notification history/bell, Linear team board and cycle progress, Drift mismatch with My-hub (red main not flagged, waiting deployments counted as running), repo chips in the review queue.
