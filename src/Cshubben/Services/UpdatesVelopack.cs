@@ -61,7 +61,7 @@ sealed class VelopackUpdateService : IUpdateService
         if (_manager is null || _pending is null) return false;
         try
         {
-            await _manager.DownloadUpdatesAsync(_pending, progressPercent, false, ct).ConfigureAwait(false);
+            await _manager.DownloadUpdatesAsync(_pending, progressPercent, ct).ConfigureAwait(false);
             return true;
         }
         catch
