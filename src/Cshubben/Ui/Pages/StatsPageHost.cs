@@ -2,7 +2,7 @@ using Cshubben.Core.Features.GitHub;
 using Cshubben.Core.Features.Stats;
 using Cshubben.Core.Logic;
 using Cshubben.Services;
-using Cshubben.Ui.Claude;
+using Cshubben.Ui.Assist;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
