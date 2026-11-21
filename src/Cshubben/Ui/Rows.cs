@@ -22,7 +22,9 @@ static class Rows
             Avatars.Of(pr.Author, 28).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Center).Grid(column: 0),
             VStack(2,
                 TextBlock(pr.Title).TextTrimming(TextTrimming.CharacterEllipsis).SemiBold(),
-                Kit.Muted($"{pr.Repo} #{pr.Number} · {pr.Author}" + (pr.IsDraft ? " · draft" : "")).TextTrimming(TextTrimming.CharacterEllipsis),
+                HStack(6,
+                    GitHubStyle.Icon(GitIcon.PullRequest, pr.IsDraft ? Tone.Neutral : Tone.Success, 14),
+                    Kit.Muted($"{pr.Repo} #{pr.Number} · {pr.Author}" + (pr.IsDraft ? " · draft" : "")).TextTrimming(TextTrimming.CharacterEllipsis)),
                 HStack(8,
                     Kit.Muted(pr.SizeLabel),
                     Kit.Muted("+" + pr.Additions).Foreground(Kit.Fg(Tone.Success)),
@@ -64,11 +66,28 @@ static class Rows
     public static Tone KindTone(FeedKind kind) => kind switch
     {
         FeedKind.ReviewRequested => Tone.Accent,
-        FeedKind.ChangesRequested => Tone.Warning,
+        FeedKind.ChangesRequested => Tone.Danger,
         FeedKind.CiFailed => Tone.Danger,
-        FeedKind.Approved or FeedKind.CiPassed or FeedKind.Merged or FeedKind.Deployed => Tone.Success,
+        FeedKind.Merged => Tone.Merged,
+        FeedKind.Approved or FeedKind.CiPassed or FeedKind.Opened or FeedKind.Deployed => Tone.Success,
         _ => Tone.Neutral,
     };
+
+    /// <summary>The icon for a feed event: GitHub's git icons where one exists, otherwise a Segoe glyph.</summary>
+    public static Element KindIcon(FeedKind kind, double size = 14)
+    {
+        var tone = KindTone(kind);
+        return kind switch
+        {
+            FeedKind.Merged => GitHubStyle.Icon(GitIcon.Merge, tone, size),
+            FeedKind.Opened => GitHubStyle.Icon(GitIcon.PullRequest, tone, size),
+            FeedKind.Pushed => GitHubStyle.Icon(GitIcon.Commit, tone, size),
+            FeedKind.Commented => GitHubStyle.Icon(GitIcon.Comment, tone, size),
+            FeedKind.Approved or FeedKind.CiPassed => GitHubStyle.Icon(GitIcon.Check, tone, size),
+            FeedKind.CiFailed or FeedKind.ChangesRequested => GitHubStyle.Icon(GitIcon.Cross, tone, size),
+            _ => Kit.Glyph(KindGlyph(kind), size - 2).Foreground(GitHubStyle.Fg(tone)).VAlign(VerticalAlignment.Center),
+        };
+    }
 
     public static Element FeedRow(FeedItem item, DateTimeOffset now)
     {
@@ -77,7 +96,7 @@ static class Rows
         return Grid(
             columns: [GridSize.Px(32), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
             rows: [GridSize.Auto],
-            Kit.Glyph(KindGlyph(item.Kind), 12).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            KindIcon(item.Kind).HAlign(HorizontalAlignment.Left).Grid(column: 0),
             VStack(2,
                 TextBlock(item.Actor).SemiBold(),
                 TextBlock(what).TextTrimming(TextTrimming.CharacterEllipsis).Foreground(Theme.SecondaryText)).Grid(column: 1),
@@ -113,7 +132,7 @@ static class Rows
         var lines = new List<Element>
         {
             HStack(6,
-                Kit.Glyph(KindGlyph(group.Kind), 12).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center),
+                KindIcon(group.Kind),
                 TextBlock(group.ActorLabel).SemiBold(),
                 TextBlock(group.Action).Foreground(Theme.SecondaryText)),
             Kit.Muted(where).TextTrimming(TextTrimming.CharacterEllipsis),

@@ -52,8 +52,11 @@ static class Kit
         TextBlock(text).FontSize(12).Foreground(Theme.SecondaryText);
 
     public static Element Pill(string text, Tone tone) =>
-        Border(TextBlock(text).FontSize(12).SemiBold().Foreground(Fg(tone)))
-            .Background(Bg(tone)).CornerRadius(10).Padding(8, 2);
+        tone == Tone.Merged
+            ? Border(TextBlock(text).FontSize(12).SemiBold().Foreground(GitHubStyle.Fg(tone)))
+                .Background(GitHubStyle.Bg(tone)).CornerRadius(10).Padding(8, 2)
+            : Border(TextBlock(text).FontSize(12).SemiBold().Foreground(Fg(tone)))
+                .Background(Bg(tone)).CornerRadius(10).Padding(8, 2);
 
     public static Element SectionLabel(string text) =>
         TextBlock(text.ToUpperInvariant()).FontSize(11).SemiBold().Foreground(Theme.SecondaryText).Margin(12, 16, 0, 4);

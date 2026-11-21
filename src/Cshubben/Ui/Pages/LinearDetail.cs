@@ -56,10 +56,10 @@ static class LinearDetail
         foreach (var pr in openPrs ?? Array.Empty<PullRequest>())
         {
             var id = pr.Id;
-            var tone = pr.Ci == CiState.Failure ? Tone.Danger : pr.Merge == MergeState.Conflicting ? Tone.Warning : Tone.Neutral;
+            var tone = pr.Ci == CiState.Failure ? Tone.Danger : pr.Merge == MergeState.Conflicting ? Tone.Warning : Tone.Success;
             prButtons.Add(Button(
                     HStack(6,
-                        TextBlock("●").FontSize(9).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center),
+                        GitHubStyle.Icon(GitIcon.PullRequest, tone, 14),
                         TextBlock(pr.Repo + " #" + pr.Number).FontSize(12),
                         TextBlock(pr.Title).FontSize(12).Foreground(Theme.SecondaryText).TextTrimming(TextTrimming.CharacterEllipsis)),
                     () => onSelectPr(id))
@@ -72,7 +72,8 @@ static class LinearDetail
             var url = pr.Url;
             prButtons.Add(Button(
                     HStack(6,
-                        TextBlock("merged").FontSize(12).Foreground(Kit.Fg(Tone.Success)),
+                        GitHubStyle.Icon(GitIcon.Merge, Tone.Merged, 14),
+                        GitHubStyle.Text("merged", Tone.Merged),
                         TextBlock(pr.Repo + " #" + pr.Number).FontSize(12)),
                     () => ExternalActions.OpenUrl(url))
                 .SubtleButton().HAlign(HorizontalAlignment.Left).AutomationName("Open merged pull request " + pr.Number)

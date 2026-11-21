@@ -18,7 +18,7 @@ public enum NextActionKind
     NothingToDo,
 }
 
-public enum Tone { Neutral, Accent, Success, Warning, Danger }
+public enum Tone { Neutral, Accent, Success, Warning, Danger, Merged }
 
 /// <summary>
 /// The single most useful thing to do with a PR right now. Drives the primary button in the inspector so the

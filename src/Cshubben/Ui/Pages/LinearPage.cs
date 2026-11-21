@@ -354,10 +354,10 @@ sealed class LinearView : Component<LinearProps>
             foreach (var pr in open)
             {
                 var id = pr.Id;
-                var tone = pr.Ci == CiState.Failure ? Tone.Danger : pr.Merge == MergeState.Conflicting ? Tone.Warning : Tone.Neutral;
+                var tone = pr.Ci == CiState.Failure ? Tone.Danger : pr.Merge == MergeState.Conflicting ? Tone.Warning : Tone.Success;
                 chips.Add(Button(
                         HStack(4,
-                            TextBlock("●").FontSize(8).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center),
+                            GitHubStyle.Icon(GitIcon.PullRequest, tone, 14),
                             TextBlock("#" + pr.Number).FontSize(12)),
                         () => onSelectPr(id))
                     .SubtleButton().ToolTip(pr.Repo + " #" + pr.Number + ": " + pr.Title).AutomationName("Open pull request " + pr.Number)
@@ -371,7 +371,9 @@ sealed class LinearView : Component<LinearProps>
             {
                 var url = pr.Url;
                 chips.Add(Button(
-                        TextBlock("merged #" + pr.Number).FontSize(12).Foreground(Kit.Fg(Tone.Success)),
+                        HStack(4,
+                            GitHubStyle.Icon(GitIcon.Merge, Tone.Merged, 14),
+                            GitHubStyle.Text("#" + pr.Number, Tone.Merged)),
                         () => ExternalActions.OpenUrl(url))
                     .SubtleButton().ToolTip(pr.Repo + " #" + pr.Number + ": " + pr.Title).AutomationName("Open merged pull request " + pr.Number)
                     .WithKey("mpr-" + pr.Number));
