@@ -72,7 +72,7 @@ sealed class LinearView : Component<LinearProps>
         var (statusTone, setStatusTone) = UseState(Tone.Success, true);
         var (resolved, setResolved) = UseState<IReadOnlyList<string>>(Array.Empty<string>(), true);
         var (showAllDone, setShowAllDone) = UseState(false);
-        var (selectedIssue, setSelectedIssue) = UseState("");
+        var (selectedIssue, setSelectedIssue) = UseState(AppOptions.SelectedIssue ?? "");
         // Opening a pull request from here closes the issue panel, so two side panels never compete for the width.
         Action<string> onSelectPr = id => { setSelectedIssue(""); openPrInspector(id); };
 
@@ -146,7 +146,7 @@ sealed class LinearView : Component<LinearProps>
         var shown = selectedIssue.Length == 0 || !data.IsConnected
             ? null
             : (Parts.Peek(boardResource) ?? PageCaches.Linear.Peek(boardKey)) is { } shownBoard
-                ? shownBoard.Issues.Concat(shownBoard.RecentlyDone).FirstOrDefault(i => i.Id == selectedIssue)
+                ? shownBoard.Issues.Concat(shownBoard.RecentlyDone).FirstOrDefault(i => i.Id == selectedIssue || string.Equals(i.Identifier, selectedIssue, StringComparison.OrdinalIgnoreCase))
                 : null;
         if (shown is null) return left;
 
@@ -272,7 +272,7 @@ sealed class LinearView : Component<LinearProps>
                     Kit.Heading2(title, issues.Count).Margin(0, 0, 0, 8),
                     issues.Count == 0
                         ? Kit.EmptyNote(empty)
-                        : FlexColumn(issues.Select(i => IssueRow(i, openPrs, mergedPrs, snap.At, onSelectPr, quiet, i.Id == selectedIssue, onSelectIssue)).ToArray()),
+                        : FlexColumn(issues.Select(i => IssueRow(i, openPrs, mergedPrs, snap.At, onSelectPr, quiet, i.Id == selectedIssue || string.Equals(i.Identifier, selectedIssue, StringComparison.OrdinalIgnoreCase), onSelectIssue)).ToArray()),
                     footer))
                 .Margin(0, 0, 0, 12);
 
@@ -468,7 +468,6 @@ sealed class LinearView : Component<LinearProps>
         [
             Button("Open issue", () => ExternalActions.OpenUrl(issue?.Url)).SubtleButton().AutomationName("Open the issue in Linear"),
             CopyLinkButton.For(issue?.Url),
-            CopyLinkButton.For(issue?.Url, "Copy Markdown", issue is null ? null : issue.Identifier + " " + issue.Title),
         ];
 
         // One flat wrapping row so buttons share lines instead of each group claiming its own line.

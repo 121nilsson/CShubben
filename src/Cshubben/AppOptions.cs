@@ -16,6 +16,9 @@ public static class AppOptions
     public static string? SelectedPr { get; private set; }
     public static int StartTab { get; private set; }
 
+    /// <summary>Set by <c>--issue ENG-1</c>: opens that Linear issue in the side panel of the Linear page (screenshots).</summary>
+    public static string? SelectedIssue { get; private set; }
+
     /// <summary>Set by <c>--theme light|dark</c>: overrides the saved theme (used for screenshots).</summary>
     public static string? Theme { get; private set; }
 
@@ -58,6 +61,9 @@ public static class AppOptions
                     break;
                 case "--select" when next is not null:
                     SelectedPr = next;
+                    break;
+                case "--issue" when next is not null:
+                    SelectedIssue = next;
                     break;
                 case "--theme" when next is not null:
                     Theme = Cshubben.Core.Features.Settings.ThemeChoice.Normalize(next);
