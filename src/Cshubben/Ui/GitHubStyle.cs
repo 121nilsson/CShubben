@@ -99,10 +99,29 @@ static class GitHubStyle
             "M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z",
     };
 
+    private static readonly System.Text.RegularExpressions.Regex PathToken =
+        new(@"[A-Za-z]|-?(?:\d+\.\d*|\.\d+|\d+)", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static readonly Dictionary<GitIcon, string> Normalized = new();
+
+    /// <summary>
+    /// Octicons write numbers back to back ("9.573.677", ".75.75"). Reactor's path parser reads those wrongly,
+    /// so every command and number gets its own space.
+    /// </summary>
+    private static string Spaced(GitIcon icon)
+    {
+        lock (Normalized)
+        {
+            if (!Normalized.TryGetValue(icon, out var text))
+                Normalized[icon] = text = string.Join(" ", PathToken.Matches(Data(icon)).Select(m => m.Value));
+            return text;
+        }
+    }
+
     /// <summary>A git icon in a GitHub colour. Decorative: the owning control must carry the AutomationName.</summary>
     public static Element Icon(GitIcon icon, Tone tone, double size = 16)
     {
-        var path = Path2D() with { PathDataString = Data(icon), Fill = Fg(tone) };
+        var path = Path2D() with { PathDataString = Spaced(icon), Fill = Fg(tone) };
         return Border(path).Width(size).Height(size).VAlign(VerticalAlignment.Center);
     }
 
