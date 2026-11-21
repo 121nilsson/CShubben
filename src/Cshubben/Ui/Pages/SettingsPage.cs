@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cshubben.Core.Composition;
 using Cshubben.Core.Features.Claude;
 using Cshubben.Core.Features.Diagnostics;
 using Cshubben.Core.Features.GitHub;
@@ -159,6 +160,29 @@ sealed class SettingsPage : Component<PageContext>
                 Result(linearTest, linearTesting)));
 
         // ---- Claude ----
+        Element FeatureRow(ClaudeFeature feature)
+        {
+            var items = new[] { "Default" }.Concat(ClaudeOptions.Models).ToArray();
+            var efforts = new[] { "Default" }.Concat(ClaudeOptions.Efforts).ToArray();
+            settings.ClaudeProfiles.TryGetValue(feature.ToString(), out var chosen);
+            var model = chosen?.Model ?? "";
+            var effort = chosen?.Effort ?? "";
+            return Grid(
+                columns: [GridSize.Star(), GridSize.Auto, GridSize.Auto],
+                rows: [GridSize.Auto],
+                TextBlock(ClaudeFeatures.Label(feature)).VAlign(VerticalAlignment.Center).Grid(column: 0),
+                ComboBox(items, IndexOr(items, model), i =>
+                {
+                    var next = i <= 0 || i >= items.Length ? "" : items[i];
+                    if (next != model) Save(ClaudeSettings.With(settings, feature, next, effort));
+                }).MinWidth(120).Margin(0, 0, 8, 0).AutomationName("Model for " + ClaudeFeatures.Label(feature)).Grid(column: 1),
+                ComboBox(efforts, IndexOr(efforts, effort), i =>
+                {
+                    var next = i <= 0 || i >= efforts.Length ? "" : efforts[i];
+                    if (next != effort) Save(ClaudeSettings.With(settings, feature, model, next));
+                }).MinWidth(120).AutomationName("Effort for " + ClaudeFeatures.Label(feature)).Grid(column: 2));
+        }
+
         var modelItems = new[] { "Default" }.Concat(ClaudeOptions.Models).ToArray();
         var effortItems = new[] { "Default" }.Concat(ClaudeOptions.Efforts).ToArray();
         var claudeCard = Kit.SettingsCard("Claude",
@@ -176,6 +200,9 @@ sealed class SettingsPage : Component<PageContext>
                 var next = i <= 0 || i >= effortItems.Length ? "" : effortItems[i];
                 if (next != settings.ClaudeEffort) Save(settings with { ClaudeEffort = next });
             }).MinWidth(200)),
+            BodyStrong("Per function"),
+            Kit.Muted("Pick a cheaper model or lower effort for summaries. \"Default\" uses the built-in choice for that function (activity summaries default to haiku, low), then the general setting above.").TextWrapping(),
+            FlexColumn(ClaudeFeatures.All.Select(f => FeatureRow(f)).ToArray()) with { RowGap = 6 },
             Kit.Muted(ClaudeAuth.Hint).TextWrapping(),
             HStack(8,
                 PasswordBox(claudeTokenInput, setClaudeTokenInput, placeholderText: "Optional: token from `claude setup-token`").MinWidth(280),

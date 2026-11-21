@@ -232,6 +232,40 @@ public static class Prompts
         return Math.Max(0, (int)span.TotalMinutes).ToString(CultureInfo.InvariantCulture) + " min";
     }
 
+    // ---- Activity digest ------------------------------------------------------------------------------------
+
+    public const int MaxActivityChars = 30_000;
+
+    /// <summary>
+    /// A summary of what was merged in a period, or an answer to <paramref name="question"/> about it. <paramref name="digest"/> is the
+    /// text built from GitHub data (it contains untrusted pull request titles), <paramref name="question"/> is the app user's own, trusted request.
+    /// </summary>
+    public static PromptPair ActivityDigest(string periodLabel, string viewer, string digest, string? question = null)
+    {
+        var data = new DataSection();
+        data.Line("Period", periodLabel, 120);
+        data.Line("Viewer (GitHub login)", viewer, 80);
+        data.Block("Merged pull requests", digest, MaxActivityChars, "\n[... the data is truncated]");
+
+        var asking = !string.IsNullOrWhiteSpace(question);
+        var system = BuildSystem(
+            "You are the analysis engine in Cshubben, a hub over a developer's GitHub repositories. You get counts and a list of merged pull requests for a period and write for a busy engineer.",
+            asking
+                ? "- Answer the app user's question at the end of the user message, using only the data. If the data cannot answer it, say what is missing.\n" +
+                  "- Answer in Markdown, concise."
+                : "- Write a summary in broad strokes: one short opening paragraph with the big picture and the numbers, then bullets grouped by repository or theme with the notable changes, then one line on who did most of it if that is clear.\n" +
+                  "- Group related pull requests into themes instead of listing every one. Name a pull request as #number only when it matters.\n" +
+                  "- For a long period (month or year) describe how the work developed over time, not just totals.\n" +
+                  "- Answer in Markdown. Keep it under 300 words unless the period is a year (then at most 500).");
+
+        var task = asking
+            ? "Answer the question below about the merged pull requests in the data."
+            : "Summarize what was merged in the period described in the data.";
+        var user = data.Render(task, TrailerText);
+        if (asking) user += "\n\nUser question (from the app user, trusted): " + PromptText.OneLine(question, 1_000);
+        return new PromptPair(system, user);
+    }
+
     // ---- Pull request prompts -------------------------------------------------------------------------------
 
     private static void AddPrMetadata(DataSection data, PullRequest pr)

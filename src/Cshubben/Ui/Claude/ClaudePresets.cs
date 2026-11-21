@@ -39,9 +39,9 @@ static class ClaudePresets
         switch (preset)
         {
             case ClaudePreset.Summarize:
-                return ClaudeRequest.From(Prompts.PrSummary(pr, diff));
+                return ClaudeRequest.From(Prompts.PrSummary(pr, diff)) with { Feature = ClaudeFeature.PullRequest };
             case ClaudePreset.DraftReview:
-                return ClaudeRequest.From(Prompts.ReviewDraft(pr, diff)) with { Timeout = ClaudeRequest.ReviewTimeout };
+                return ClaudeRequest.From(Prompts.ReviewDraft(pr, diff)) with { Timeout = ClaudeRequest.ReviewTimeout, Feature = ClaudeFeature.Review };
             case ClaudePreset.Explain:
                 return WithQuestion(pr, diff, ExplainQuestion);
             default:
@@ -56,6 +56,6 @@ static class ClaudePresets
             + "\n- The app user's own request is at the end of the user message, after the data. Answer that request instead of writing a summary. "
             + "Keep every rule above, answer in Markdown and keep it concise.";
         var user = basePrompt.UserPrompt + "\n\n" + QuestionMarker + PromptText.OneLine(question, 1_000);
-        return ClaudeRequest.From(new PromptPair(system, user));
+        return ClaudeRequest.From(new PromptPair(system, user)) with { Feature = ClaudeFeature.PullRequest };
     }
 }

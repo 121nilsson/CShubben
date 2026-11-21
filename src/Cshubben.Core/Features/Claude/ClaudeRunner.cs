@@ -24,6 +24,9 @@ public sealed record ClaudeRequest(string SystemPrompt, string UserPrompt)
     /// <summary>low, medium, high, xhigh or max; null or invalid means Claude Code's own default.</summary>
     public string? Effort { get; init; }
 
+    /// <summary>What this request is for. When no model or effort is set, the assistant takes them from the settings of this feature.</summary>
+    public ClaudeFeature? Feature { get; init; }
+
     public TimeSpan Timeout { get; init; } = DefaultTimeout;
 
     /// <summary>When true (default) every link that is not https://github.com/ is removed from the answer.</summary>

@@ -66,7 +66,7 @@ sealed class LinearIssuePanel : Component<LinearPanelProps>
             setInfo("");
             try
             {
-                var result = await claude.RunAsync(ClaudeRequest.From(Prompts.LinearIssueDraft(pr)), CancellationToken.None);
+                var result = await claude.RunAsync(ClaudeRequest.From(Prompts.LinearIssueDraft(pr)) with { Feature = ClaudeFeature.Drafts }, CancellationToken.None);
                 if (!result.Success)
                 {
                     setError(result.Error == ClaudeErrorKind.AuthFailed ? ClaudeAuth.Hint : (result.ErrorMessage ?? "Claude could not draft the issue."));

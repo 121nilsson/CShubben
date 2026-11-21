@@ -38,6 +38,12 @@ public sealed class DemoClaudeData : IClaudeAssistant
                    "## Suggestions\n- Add a test for two requests with the same key.\n- Log the key with the request id, not the payload.\n\n" +
                    "## Questions for the author\n- Is the 24 hour key lifetime documented anywhere?";
         }
+        else if (user.Contains("Summarize what was merged", StringComparison.Ordinal))
+        {
+            text = "Demo summary: the team merged a steady stream of small changes, mostly in **acme/api** and **acme/web**.\n\n" +
+                   "- **acme/api**: payment retries and idempotency keys landed.\n- **acme/web**: the settings page was reworked.\n\n" +
+                   "Nothing was sent to Claude in demo mode.";
+        }
         else if (user.Contains("User question (from the app user", StringComparison.Ordinal))
         {
             var question = FieldAfter(user, "User question (from the app user, trusted): ") ?? "your question";

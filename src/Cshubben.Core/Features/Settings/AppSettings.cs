@@ -17,6 +17,9 @@ public static class ThemeChoice
     }
 }
 
+/// <summary>A model and effort chosen for one Claude function. Empty means "use the default for that function".</summary>
+public sealed record ClaudeProfile(string Model = "", string Effort = "");
+
 /// <summary>
 /// Everything the user can configure, saved as one small JSON file. Secrets (tokens, API keys) are never part of it.
 /// </summary>
@@ -49,6 +52,9 @@ public sealed record AppSettings
     /// <summary>Claude effort. Empty means the Claude CLI default.</summary>
     public string ClaudeEffort { get; init; } = "";
 
+    /// <summary>Model and effort per Claude function, keyed by the function name (for example "Activity"). Missing means default.</summary>
+    public IReadOnlyDictionary<string, ClaudeProfile> ClaudeProfiles { get; init; } = new Dictionary<string, ClaudeProfile>();
+
     /// <summary>"system", "light" or "dark".</summary>
     public string Theme { get; init; } = ThemeChoice.FollowSystem;
 
@@ -77,6 +83,9 @@ public sealed record AppSettings
         ImportantRepos = RepoList.Clean(ImportantRepos),
         MutedRepos = RepoList.Clean(MutedRepos),
         MutedOrgs = RepoList.Clean(MutedOrgs),
+        ClaudeProfiles = (ClaudeProfiles ?? new Dictionary<string, ClaudeProfile>())
+            .Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && kv.Value is not null)
+            .ToDictionary(kv => kv.Key.Trim(), kv => new ClaudeProfile(kv.Value.Model?.Trim() ?? "", kv.Value.Effort?.Trim() ?? ""), StringComparer.OrdinalIgnoreCase),
         ClaudeModel = ClaudeModel?.Trim() ?? "",
         ClaudeEffort = ClaudeEffort?.Trim() ?? "",
         Theme = ThemeChoice.Normalize(Theme),

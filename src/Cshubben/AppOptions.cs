@@ -4,7 +4,7 @@ using Cshubben.Core.Model;
 namespace Cshubben;
 
 /// <summary>The pages in the sidebar.</summary>
-public enum Page { Overview, Feed, Mine, Reviews, Review, Drift, Linear, Notes, Stats, Settings }
+public enum Page { Overview, Feed, Mine, Reviews, Review, Drift, Linear, Notes, Stats, Claude, Settings }
 
 /// <summary>
 /// Startup options. Used by CI to take screenshots of a specific page:

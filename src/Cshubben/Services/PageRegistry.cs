@@ -82,6 +82,9 @@ static class PageRegistry
         new(Page.Stats, "Workspace", "", "Stats",
             ctx => Component<StatsPageHost, PageContext>(ctx)),
 
+        new(Page.Claude, "Workspace", "\uE8BD", "Claude",
+            c => Component<DigestPage, PageContext>(c)),
+
         new(Page.Settings, "", "", "Settings",
             c => Component<SettingsPage, PageContext>(c), Pinned: true),
     };

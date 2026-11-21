@@ -53,7 +53,7 @@ sealed class BriefingCard : Component<BriefingProps>
                 }
                 else
                 {
-                    var result = await claude.RunAsync(ClaudeRequest.From(Prompts.Briefing(snap)), CancellationToken.None);
+                    var result = await claude.RunAsync(ClaudeRequest.From(Prompts.Briefing(snap)) with { Feature = ClaudeFeature.Briefing }, CancellationToken.None);
                     if (!result.Success)
                     {
                         setError(result.Error == ClaudeErrorKind.AuthFailed ? ClaudeAuth.Hint : (result.ErrorMessage ?? "Claude could not write the briefing."));

@@ -38,7 +38,7 @@ static class IntegrationWiring
         ArgumentNullException.ThrowIfNull(services);
         if (services.ForcedDemo) return;
 
-        IntegrationServices.Claude = RealClaudeAssistant.CreateDefault(services.Secrets);
+        IntegrationServices.Claude = RealClaudeAssistant.CreateDefault(services.Secrets, () => services.Settings);
         IntegrationServices.Linear = new RealLinearData(services.Secrets, services.Http, () => services.GitHub?.GraphQl);
         IntegrationServices.Actions = new SettingsGatedActions(services);
     }
