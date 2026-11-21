@@ -12,10 +12,11 @@ namespace Cshubben.Ui;
 /// </summary>
 static class Avatars
 {
-    public static Element Of(string login, double size = 28)
+    /// <param name="imageUrl">A picture link that is already known and checked (for example from Linear); otherwise a GitHub one is derived from the login.</param>
+    public static Element Of(string login, double size = 28, string? imageUrl = null)
     {
         var picture = PersonPicture().DisplayName(login).Width(size).Height(size);
-        var url = AppServices.Current.ForcedDemo ? null : AvatarUrl.ForGitHub(login, size);
+        var url = AppServices.Current.ForcedDemo ? null : imageUrl ?? AvatarUrl.ForGitHub(login, size);
         return (url is null ? picture : picture.ProfilePicture(url)).AutomationName(login);
     }
 }

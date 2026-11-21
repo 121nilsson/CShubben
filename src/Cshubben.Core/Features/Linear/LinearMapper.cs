@@ -81,8 +81,10 @@ public static class LinearMapper
         }
 
         string? assignee = null;
+        string? assigneeAvatar = null;
         if (JsonRead.Obj(node, "assignee") is JsonElement who)
         {
+            assigneeAvatar = SafeImageUrl(JsonRead.Str(who, "avatarUrl"));
             assignee = JsonRead.Str(who, "displayName");
             if (string.IsNullOrWhiteSpace(assignee)) assignee = JsonRead.Str(who, "name");
         }
@@ -119,7 +121,26 @@ public static class LinearMapper
             labels,
             JsonRead.Str(node, "url") ?? "",
             ParseDate(JsonRead.Str(node, "updatedAt")) ?? DateTimeOffset.UnixEpoch,
-            ParseDate(JsonRead.Str(node, "completedAt")));
+            ParseDate(JsonRead.Str(node, "completedAt")),
+            Clip(JsonRead.Str(node, "description")),
+            assigneeAvatar);
+    }
+
+    /// <summary>The issue text, capped so one huge description cannot bloat a board of a hundred issues.</summary>
+    public const int MaxDescription = 6000;
+
+    private static string Clip(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        return text.Length <= MaxDescription ? text : text[..MaxDescription] + "\n\n…";
+    }
+
+    /// <summary>Only plain https picture links without credentials; anything else is dropped and the UI shows initials.</summary>
+    public static string? SafeImageUrl(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
+        if (uri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(uri.UserInfo)) return null;
+        return uri.AbsoluteUri;
     }
 
     /// <summary>Maps a connection object ({ nodes, pageInfo }) of issues.</summary>

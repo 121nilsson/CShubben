@@ -7,8 +7,8 @@ namespace Cshubben.Core.Features.Linear;
 public static class LinearQueries
 {
     public const string IssueFields =
-        "id identifier title url priority updatedAt completedAt " +
-        "state { name type } assignee { name displayName } team { key } project { name } labels { nodes { name } }";
+        "id identifier title description url priority updatedAt completedAt " +
+        "state { name type } assignee { name displayName avatarUrl } team { key } project { name } labels { nodes { name } }";
 
     public static LinearRequest Viewer() => new("query { viewer { id name email } }", Vars());
 

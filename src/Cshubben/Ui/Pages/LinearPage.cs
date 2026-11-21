@@ -62,7 +62,9 @@ sealed class LinearView : Component<LinearProps>
     {
         var snap = Props.Snap;
         var data = Props.Data;
-        var onSelectPr = Props.OnSelectPr;
+        var openPrInspector = Props.OnSelectPr;
+        // Opening a pull request from here closes the issue panel, so two side panels never compete for the width.
+        Action<string> onSelectPr = id => { setSelectedIssue(""); openPrInspector(id); };
 
         var (tick, setTick) = UseState(0, true);
         var (activeKey, setActiveKey) = UseState("");
@@ -72,6 +74,7 @@ sealed class LinearView : Component<LinearProps>
         var (statusTone, setStatusTone) = UseState(Tone.Success, true);
         var (resolved, setResolved) = UseState<IReadOnlyList<string>>(Array.Empty<string>(), true);
         var (showAllDone, setShowAllDone) = UseState(false);
+        var (selectedIssue, setSelectedIssue) = UseState("");
 
         var wantTeams = activeKey.StartsWith(ReconKind.PrWithoutIssue + "|", StringComparison.Ordinal);
 
@@ -132,12 +135,28 @@ sealed class LinearView : Component<LinearProps>
                 content = BoardView(
                     board, snap, data, onSelectPr, status, statusTone, resolved, activeKey, setActiveKey, pick, setPick, busyKey,
                     Parts.Peek(teamsResource) ?? Array.Empty<LinearTeam>(), showAllDone, setShowAllDone,
-                    Run, Parts.IsLoading(boardResource) || boardResource is AsyncValue<LinearBoard>.Reloading);
+                    Run, Parts.IsLoading(boardResource) || boardResource is AsyncValue<LinearBoard>.Reloading,
+                    selectedIssue, id => setSelectedIssue(id == selectedIssue ? "" : id));
             }
         }
 
-        return ScrollView(Kit.Capped(
+        var left = ScrollView(Kit.Capped(
             FlexColumn(header, content).FlexPadding(24, 16)));
+
+        var shown = selectedIssue.Length == 0 || !data.IsConnected
+            ? null
+            : (Parts.Peek(boardResource) ?? PageCaches.Linear.Peek(boardKey)) is { } shownBoard
+                ? shownBoard.Issues.Concat(shownBoard.RecentlyDone).FirstOrDefault(i => i.Id == selectedIssue)
+                : null;
+        if (shown is null) return left;
+
+        var linked = LinkedPullRequests(Parts.Peek(boardResource) ?? PageCaches.Linear.Peek(boardKey)!, snap, data);
+        return Grid(
+            columns: [GridSize.Star(), GridSize.Px(460)],
+            rows: [GridSize.Star()],
+            left.Grid(column: 0),
+            LinearDetail.Build(shown, linked.Open.GetValueOrDefault(shown.Identifier), linked.Merged.GetValueOrDefault(shown.Identifier),
+                snap.At, onSelectPr, () => setSelectedIssue("")).Grid(column: 1));
 
         async Task Run(string key, Func<Task<string>> work)
         {
@@ -203,7 +222,9 @@ sealed class LinearView : Component<LinearProps>
         bool showAllDone,
         Action<bool> setShowAllDone,
         Func<string, Func<Task<string>>, Task> run,
-        bool reloading)
+        bool reloading,
+        string selectedIssue,
+        Action<string> onSelectIssue)
     {
         var groups = LinearGrouping.Group(board);
         var all = board.Issues.Concat(board.RecentlyDone).ToList();
@@ -211,24 +232,7 @@ sealed class LinearView : Component<LinearProps>
             .Where(i => !resolved.Contains(KeyOf(i)))
             .ToList();
 
-        // Pull requests by issue identifier, for the chips on each row.
-        var openPrs = new Dictionary<string, List<PullRequest>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pr in snap.Authored)
-        {
-            var id = data.IdentifierFor(pr);
-            if (id is null) continue;
-            if (!openPrs.TryGetValue(id, out var list)) openPrs[id] = list = new List<PullRequest>();
-            list.Add(pr);
-        }
-
-        var mergedPrs = new Dictionary<string, List<ReconPr>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pr in board.Prs.Where(p => p.Merged))
-        {
-            var id = LinearLinks.FindIdentifier(pr.Title, pr.Branch);
-            if (id is null) continue;
-            if (!mergedPrs.TryGetValue(id, out var list)) mergedPrs[id] = list = new List<ReconPr>();
-            list.Add(pr);
-        }
+        var (openPrs, mergedPrs) = LinkedPullRequests(board, snap, data);
 
         Element Tile(string label, int value, Tone tone, string hint) =>
             Card(VStack(2,
@@ -268,7 +272,7 @@ sealed class LinearView : Component<LinearProps>
                     Kit.Heading2(title, issues.Count).Margin(0, 0, 0, 8),
                     issues.Count == 0
                         ? Kit.EmptyNote(empty)
-                        : FlexColumn(issues.Select(i => IssueRow(i, openPrs, mergedPrs, snap.At, onSelectPr, quiet)).ToArray()),
+                        : FlexColumn(issues.Select(i => IssueRow(i, openPrs, mergedPrs, snap.At, onSelectPr, quiet, i.Id == selectedIssue, onSelectIssue)).ToArray()),
                     footer))
                 .Margin(0, 0, 0, 12);
 
@@ -288,6 +292,31 @@ sealed class LinearView : Component<LinearProps>
                     Group("Done recently", "Nothing finished lately.", doneItems, true, moreDone)));
     }
 
+    /// <summary>My open pull requests and the merged ones, by Linear issue identifier, for the chips on rows and in the panel.</summary>
+    internal static (Dictionary<string, List<PullRequest>> Open, Dictionary<string, List<ReconPr>> Merged) LinkedPullRequests(
+        LinearBoard board, HubSnapshot snap, ILinearData data)
+    {
+        var openPrs = new Dictionary<string, List<PullRequest>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pr in snap.Authored)
+        {
+            var id = data.IdentifierFor(pr);
+            if (id is null) continue;
+            if (!openPrs.TryGetValue(id, out var list)) openPrs[id] = list = new List<PullRequest>();
+            list.Add(pr);
+        }
+
+        var mergedPrs = new Dictionary<string, List<ReconPr>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pr in board.Prs.Where(p => p.Merged))
+        {
+            var id = LinearLinks.FindIdentifier(pr.Title, pr.Branch);
+            if (id is null) continue;
+            if (!mergedPrs.TryGetValue(id, out var list)) mergedPrs[id] = list = new List<ReconPr>();
+            list.Add(pr);
+        }
+
+        return (openPrs, mergedPrs);
+    }
+
     // ------------------------------------------------------------------ issue rows
 
     private static Element IssueRow(
@@ -296,22 +325,28 @@ sealed class LinearView : Component<LinearProps>
         Dictionary<string, List<ReconPr>> mergedPrs,
         DateTimeOffset now,
         Action<string> onSelectPr,
-        bool quiet)
+        bool quiet,
+        bool selected,
+        Action<string> onSelectIssue)
     {
-        var meta = new List<string> { issue.Identifier, issue.StateName, issue.TeamKey };
-        if (issue.Labels.Count > 0) meta.Add(string.Join(", ", issue.Labels.Take(2)));
-        meta.Add(Age.Format(issue.CompletedAt ?? issue.UpdatedAt, now));
-
-        var title = TextBlock(issue.Title).TextTrimming(TextTrimming.CharacterEllipsis);
+        var title = TextBlock(issue.Title).TextTrimming(TextTrimming.CharacterEllipsis).VAlign(VerticalAlignment.Center);
         if (quiet) title = title.Foreground(Theme.SecondaryText);
 
+        // One calm line, like a board: priority, identifier, title, up to two labels, who, how old.
+        var labelPills = issue.Labels.Take(2).Select(l => (Element)Kit.Pill(l, Tone.Neutral)).ToArray();
+        var assignee = string.IsNullOrEmpty(issue.Assignee)
+            ? (Element)Empty()
+            : Avatars.Of(issue.Assignee!, 22, issue.AssigneeAvatarUrl).ToolTip(issue.Assignee!);
+
         var left = Grid(
-            columns: [GridSize.Px(28), GridSize.Star()],
+            columns: [GridSize.Px(28), GridSize.Px(76), GridSize.Star(), GridSize.Auto, GridSize.Px(30), GridSize.Px(44)],
             rows: [GridSize.Auto],
             PriorityIcon(issue.Priority).VAlign(VerticalAlignment.Center).Grid(column: 0),
-            VStack(2,
-                title,
-                Kit.Muted(string.Join("  ·  ", meta)).TextTrimming(TextTrimming.CharacterEllipsis)).Grid(column: 1));
+            Kit.Muted(issue.Identifier).VAlign(VerticalAlignment.Center).Grid(column: 1),
+            title.Grid(column: 2),
+            (FlexRow(labelPills) with { ColumnGap = 6 }).VAlign(VerticalAlignment.Center).Margin(8, 0, 4, 0).Grid(column: 3),
+            assignee.VAlign(VerticalAlignment.Center).HAlign(HorizontalAlignment.Center).Grid(column: 4),
+            Kit.Muted(Age.Format(issue.CompletedAt ?? issue.UpdatedAt, now)).HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center).Grid(column: 5));
 
         var chips = new List<Element>();
         if (openPrs.TryGetValue(issue.Identifier, out var open))
@@ -343,7 +378,7 @@ sealed class LinearView : Component<LinearProps>
             }
         }
 
-        var button = Button(left, () => ExternalActions.OpenUrl(issue.Url))
+        var button = Button(left, () => onSelectIssue(issue.Id))
             .SubtleButton()
             .HAlign(HorizontalAlignment.Stretch)
             .HorizontalContentAlignment(HorizontalAlignment.Stretch)
@@ -354,6 +389,7 @@ sealed class LinearView : Component<LinearProps>
                 rows: [GridSize.Auto],
                 button.Grid(column: 0),
                 (FlexRow(chips.ToArray()) with { ColumnGap = 2 }).VAlign(VerticalAlignment.Center).Margin(4, 0, 4, 0).Grid(column: 1)))
+            .Selected(selected)
             .CornerRadius(6)
             .WithKey(issue.Id);
     }

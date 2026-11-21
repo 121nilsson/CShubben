@@ -114,7 +114,8 @@ static class Inspector
             Kit.Muted($"+{pr.Additions}  −{pr.Deletions}  ·  {pr.ChangedFiles} files  ·  size {pr.SizeLabel}")));
 
         var description = Card(VStack(6, BodyStrong("Description"), Kit.Md(pr.Description)));
-        return FlexColumn(facts, NotesRow(pr), description) with { RowGap = 12 };
+        var linear = Component<LinearPrCard, PullRequest>(pr).WithKey("linear-" + pr.Id);
+        return FlexColumn(facts, linear, NotesRow(pr), description) with { RowGap = 12 };
     }
 
     /// <summary>"Notes (n)": notes that mention this PR by link or in their text. Nothing when there are none or the store fails.</summary>

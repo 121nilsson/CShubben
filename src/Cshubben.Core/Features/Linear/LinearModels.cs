@@ -26,7 +26,9 @@ public sealed record LinearIssue(
     IReadOnlyList<string> Labels,
     string Url,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? CompletedAt)
+    DateTimeOffset? CompletedAt,
+    string Description = "",
+    string? AssigneeAvatarUrl = null)
 {
     /// <summary>Completed or canceled.</summary>
     public bool IsDone => StateType is LinearStateType.Completed or LinearStateType.Canceled;
