@@ -11,7 +11,7 @@ namespace Cshubben.Ui.Pipeline;
 /// <summary>The overview strip and the per-repository cards of the Drift page. Pure functions from data to elements.</summary>
 static class DriftCards
 {
-    private const int MaxRunChips = 6;
+    private const int MaxRunChips = 3;
     private const int MaxEnvironmentRows = 4;
 
     /// <summary>The overview strip: how many repositories need attention, run, fail or lag behind.</summary>
@@ -29,6 +29,7 @@ static class DriftCards
             Tile("Running now", report.Running, "runs or deploys in progress", Tone.Neutral),
             Tile("Failing workflows", report.FailingWorkflows, "on default branches", Tone.Danger),
             Tile("Behind on deploys", report.ReposBehindDeploy, "repos with undeployed commits", Tone.Warning),
+            Tile("Environments differ", report.Rows.Count(r => EnvironmentSync.Describe(r.Environments)?.Differs == true), "test and prod run different commits", Tone.Warning),
             Tile("Unreleased commits", report.UnreleasedCommits, "since the latest releases", Tone.Neutral))
             with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 12 };
     }
@@ -74,14 +75,18 @@ static class DriftCards
             {
                 var chips = row.MainRuns.Take(MaxRunChips).Select(r => RunChip(r, now)).ToList();
                 if (row.MainRuns.Count > MaxRunChips)
-                    chips.Add(Kit.Muted("+" + (row.MainRuns.Count - MaxRunChips)).VAlign(VerticalAlignment.Center));
+                    chips.Add(Kit.Muted("+" + (row.MainRuns.Count - MaxRunChips)).VAlign(VerticalAlignment.Center)
+                        .ToolTip(string.Join("\n", row.MainRuns.Skip(MaxRunChips).Select(r => r.Name + " · " + PipelineKit.Label(r.State)))));
                 children.Add(VStack(6, Caption("Default branch"), FlexRow(chips.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 }));
             }
 
             if (row.Environments.Count > 0)
             {
                 var envs = row.Environments.Take(MaxEnvironmentRows).Select(d => EnvironmentRow(d, now)).ToArray();
-                children.Add(VStack(4, Caption("Environments"), FlexColumn(envs) with { RowGap = 2 }));
+                var sync = EnvironmentSync.Describe(row.Environments);
+                children.Add(VStack(4, Caption("Environments"), FlexColumn(envs) with { RowGap = 2 },
+                    sync is null ? null : TextBlock(sync.Text).FontSize(12)
+                        .Foreground(sync.Differs ? Kit.Fg(Tone.Warning) : Theme.SecondaryText).TextWrapping()));
             }
 
             var behind = row.UndeployedCommits is > 0;
@@ -132,7 +137,8 @@ static class DriftCards
         var row = Grid(
             columns: [GridSize.Px(24), GridSize.Auto, GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
-            PipelineKit.StateIcon(PipelineKit.AsRunState(deployment.State)).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            PipelineKit.StateIcon(PipelineKit.AsRunState(deployment.State)).VAlign(VerticalAlignment.Center)
+                .ToolTip(PipelineKit.Label(PipelineKit.AsRunState(deployment.State))).Grid(column: 0),
             Kit.Pill(deployment.Environment, Tone.Neutral).VAlign(VerticalAlignment.Center).Grid(column: 1),
             TextBlock(detail).FontSize(12).Foreground(Theme.SecondaryText).TextTrimming(TextTrimming.CharacterEllipsis)
                 .VAlign(VerticalAlignment.Center).Margin(8, 0, 0, 0).Grid(column: 2),

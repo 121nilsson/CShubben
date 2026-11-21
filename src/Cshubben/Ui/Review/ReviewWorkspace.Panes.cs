@@ -1,3 +1,4 @@
+using Cshubben.Core.Shared;
 using Cshubben.Core.Features.Review;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
@@ -248,7 +249,7 @@ sealed partial class ReviewWorkspace
         var description = Props.Pr?.Description ?? Props.Context.Description;
         if (description.Trim().Length > 0)
             parts.Add(Collapsible("Description", S.ShowDescription, v => Update(s => s with { ShowDescription = v }),
-                Border(Kit.Md(description)).Padding(4, 4)));
+                Border(Kit.Md(MarkdownTidy.Tidy(description))).Padding(4, 4)));
 
         return ScrollView(FlexColumn(parts.ToArray()).FlexPadding(12, 12) with { RowGap = 12 });
     }

@@ -192,7 +192,7 @@ public sealed record DriftReport(
             case RepoHealth.Running:
             {
                 var busy = runs.Where(r => r.State is RunState.Running or RunState.Queued).Select(r => r.Name).ToList();
-                if (busy.Count > 0) return "Running: " + Names(busy);
+                if (busy.Count > 0) return busy.Count == 1 ? "1 run in progress" : busy.Count + " runs in progress";
                 var deploying = envs.Where(d => d.State == DeployState.InProgress).Select(d => d.Environment).ToList();
                 return "Deploying to " + Names(deploying);
             }

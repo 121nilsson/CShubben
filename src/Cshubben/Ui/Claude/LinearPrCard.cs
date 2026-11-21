@@ -1,3 +1,4 @@
+using Cshubben.Core.Shared;
 using Cshubben.Core.Features.Linear;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
@@ -56,9 +57,9 @@ sealed class LinearPrCard : Component<PullRequest>
         if (!string.IsNullOrEmpty(issue.Assignee)) meta.Add(issue.Assignee!);
         if (!string.IsNullOrEmpty(issue.Project)) meta.Add(issue.Project!);
 
-        var text = issue.Description.Trim();
-        var long_ = text.Length > PreviewChars;
-        var shown = long_ && !expanded ? text[..PreviewChars].TrimEnd() + "…" : text;
+        var text = MarkdownTidy.Tidy(issue.Description);
+        var (preview, long_) = MarkdownTidy.Preview(issue.Description, PreviewChars);
+        var shown = long_ && !expanded ? preview : text;
 
         return Card(VStack(8,
             Parts.Label("Linear"),

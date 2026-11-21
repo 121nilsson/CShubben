@@ -33,6 +33,7 @@ sealed class FeedView : Component<FeedProps>
 
         var (scope, setScope) = UseState(FeedScope.All);
         var (showBots, setShowBots) = UseState(false);
+        var (showOwn, setShowOwn) = UseState(false);
         var (expanded, setExpanded) = UseState<IReadOnlyList<string>>(Array.Empty<string>());
         var (seenTick, setSeenTick) = UseState(0);
         _ = seenTick; // changing it re-renders the page after "Mark all seen"
@@ -41,6 +42,8 @@ sealed class FeedView : Component<FeedProps>
         {
             Scope = scope,
             ShowBots = showBots,
+            ShowOwn = showOwn,
+            Viewer = snap.Viewer,
             FollowedRepos = settings.FollowedRepos,
             MutedRepos = settings.MutedRepos,
             MutedOrgs = settings.MutedOrgs,
@@ -62,13 +65,14 @@ sealed class FeedView : Component<FeedProps>
         {
             setScope(FeedScope.All);
             setShowBots(true);
+            setShowOwn(true);
         }
 
         var subtitle = layout.HasNew
             ? layout.NewEvents + (layout.NewEvents == 1 ? " new event" : " new events") + " since you last looked"
             : "You are all caught up";
 
-        var bar = FilterBar(scope, setScope, showBots, setShowBots, counts, layout.HasNew, MarkAllSeen);
+        var bar = FilterBar(scope, setScope, showBots, setShowBots, showOwn, setShowOwn, counts, layout.HasNew, MarkAllSeen);
 
         Element body = layout.IsEmpty
             ? EmptyState(snap.Feed.Count == 0, ShowEverything)
@@ -133,6 +137,8 @@ sealed class FeedView : Component<FeedProps>
         Action<FeedScope> setScope,
         bool showBots,
         Action<bool> setShowBots,
+        bool showOwn,
+        Action<bool> setShowOwn,
         FeedCounts counts,
         bool hasNew,
         Action markAllSeen)
@@ -144,6 +150,7 @@ sealed class FeedView : Component<FeedProps>
             Chip("All", counts.All, scope == FeedScope.All, _ => setScope(FeedScope.All)).WithKey("all"),
             Chip("Personal", counts.Personal, scope == FeedScope.Personal, on => setScope(on ? FeedScope.Personal : FeedScope.All)).WithKey("personal"),
             Chip("Team", counts.Team, scope == FeedScope.Team, on => setScope(on ? FeedScope.Team : FeedScope.All)).WithKey("team"),
+            Chip("My own", counts.Own, showOwn, setShowOwn).WithKey("own"),
             Chip("Bots", counts.Bots, showBots, setShowBots).WithKey("bots")) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
 
         var mark = (hasNew
@@ -169,7 +176,7 @@ sealed class FeedView : Component<FeedProps>
 
         return VStack(8,
             BodyStrong("Nothing matches these filters"),
-            Kit.Muted("Bots are hidden by default, and muted or unfollowed repos never show here.").TextWrapping(),
+            Kit.Muted("Bots and your own events are hidden by default, and muted or unfollowed repos never show here.").TextWrapping(),
             Button("Show everything", showEverything).HAlign(HorizontalAlignment.Left))
             .Margin(4, 24);
     }

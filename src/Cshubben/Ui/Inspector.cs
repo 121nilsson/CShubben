@@ -1,3 +1,4 @@
+using Cshubben.Core.Shared;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
 using Cshubben.Ui.Assist;
@@ -113,7 +114,7 @@ static class Inspector
             changes,
             Kit.Muted($"+{pr.Additions}  −{pr.Deletions}  ·  {pr.ChangedFiles} files  ·  size {pr.SizeLabel}")));
 
-        var description = Card(VStack(6, BodyStrong("Description"), Kit.Md(pr.Description)));
+        var description = Card(VStack(6, BodyStrong("Description"), Kit.Md(MarkdownTidy.Tidy(pr.Description))));
         var linear = Component<LinearPrCard, PullRequest>(pr).WithKey("linear-" + pr.Id);
         return FlexColumn(facts, linear, NotesRow(pr), description) with { RowGap = 12 };
     }

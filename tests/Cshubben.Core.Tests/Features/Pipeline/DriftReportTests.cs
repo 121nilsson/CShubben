@@ -59,7 +59,7 @@ public class DriftReportTests
     {
         var row = DriftReport.Interpret(Repo("acme/mobile", new[] { Run("Mobile CI", RunState.Running, 0.2) }), Now);
         Assert.Equal(RepoHealth.Running, row.Health);
-        Assert.Equal("Running: Mobile CI", row.Headline);
+        Assert.Equal("1 run in progress", row.Headline);
     }
 
     [Fact]
