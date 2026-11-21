@@ -17,11 +17,28 @@ public sealed class StaleCache<T> where T : class
 
     public StaleCache(Func<DateTimeOffset>? clock = null) => _clock = clock ?? (() => DateTimeOffset.UtcNow);
 
+    private string? _latestKey;
+
+    /// <summary>The entry that was set last, with its time. Null when the cache is empty.</summary>
+    public (string Key, T Value, DateTimeOffset At)? Latest() =>
+        _latestKey is not null && _entries.TryGetValue(_latestKey, out var e) ? (_latestKey, e.Value, e.At) : null;
+
+    /// <summary>Puts a value read from disk in the cache with the time it was originally loaded, so it counts as old and is shown at once while a fresh load runs.</summary>
+    public void Seed(string key, T value, DateTimeOffset at)
+    {
+        _entries[key] = new Entry(at, value);
+        _latestKey = key;
+    }
+
     public T? Peek(string key) => _entries.TryGetValue(key, out var e) ? e.Value : null;
 
     public bool IsFresh(string key, TimeSpan ttl) => _entries.TryGetValue(key, out var e) && _clock() - e.At < ttl;
 
-    public void Set(string key, T value) => _entries[key] = new Entry(_clock(), value);
+    public void Set(string key, T value)
+    {
+        _entries[key] = new Entry(_clock(), value);
+        _latestKey = key;
+    }
 
     public void Remove(string key) => _entries.TryRemove(key, out _);
 

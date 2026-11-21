@@ -78,7 +78,7 @@ sealed class LinearView : Component<LinearProps>
 
         var wantTeams = activeKey.StartsWith(ReconKind.PrWithoutIssue + "|", StringComparison.Ordinal);
 
-        var boardKey = "linear|" + snap.Viewer + "|" + (data.IsDemo ? "demo" : "live");
+        var boardKey = PageKeys.Linear(snap.Viewer, data.IsDemo);
 
         var boardResource = UseResource<LinearBoard>(
             async ct =>

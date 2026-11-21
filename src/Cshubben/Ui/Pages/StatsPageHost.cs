@@ -26,7 +26,7 @@ sealed class StatsPageHost : Component<PageContext>
         var live = !ctx.Services.ForcedDemo && hub is not null && ctx.Loaded && snap.Viewer.Length > 0;
         var (tick, setTick) = UseState(0, true);
 
-        var statsKey = "stats|" + snap.Viewer;
+        var statsKey = PageKeys.Stats(snap.Viewer);
 
         var resource = UseResource<StatsInput?>(
             async ct =>
@@ -39,7 +39,7 @@ sealed class StatsPageHost : Component<PageContext>
 
         // The team numbers are optional: a failure here must not hide the personal numbers.
         var teamRepos = DigestPage.WatchedRepos(ctx.Services.RepoActivity, ctx.Settings, false);
-        var teamKey = "team|" + snap.Viewer + "|" + string.Join(",", teamRepos.OrderBy(r => r, StringComparer.OrdinalIgnoreCase)).GetHashCode();
+        var teamKey = PageKeys.Team(snap.Viewer, teamRepos);
         var teamResource = UseResource<TeamReport?>(
             async ct =>
             {

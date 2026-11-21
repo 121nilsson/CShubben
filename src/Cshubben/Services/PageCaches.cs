@@ -1,3 +1,4 @@
+using Cshubben.Core.Features.Cache;
 using Cshubben.Core.Features.Linear;
 using Cshubben.Core.Features.Pipeline;
 using Cshubben.Core.Features.Stats;
@@ -16,6 +17,59 @@ static class PageCaches
     public static readonly StaleCache<StatsInput> Stats = new();
     public static readonly StaleCache<LinearIssue> Issues = new();
     public static readonly StaleCache<TeamReport> Team = new();
+
+    private static readonly Dictionary<string, DateTimeOffset> Saved = new();
+
+    /// <summary>Fills the caches from the files of the last run (as old entries), so every page paints at once after a restart.</summary>
+    public static void Restore(string directory, string viewer)
+    {
+        try
+        {
+            RestoreOne(Linear, "linear");
+            RestoreOne(Drift, "drift");
+            RestoreOne(Stats, "stats");
+            RestoreOne(Team, "team");
+        }
+        catch (Exception)
+        {
+            // A convenience; the pages load normally without it.
+        }
+
+        void RestoreOne<T>(StaleCache<T> cache, string name) where T : class
+        {
+            if (PageDiskCache.TryLoad<T>(directory, name, viewer) is not { } hit) return;
+            cache.Seed(hit.Key, hit.Value, hit.At);
+            lock (Saved) Saved[name] = hit.At;
+        }
+    }
+
+    /// <summary>Writes the entries that changed since they were last written. Runs on the caller's thread; call it from the pool.</summary>
+    public static void Persist(string directory, string viewer)
+    {
+        try
+        {
+            PersistOne(Linear, "linear");
+            PersistOne(Drift, "drift");
+            PersistOne(Stats, "stats");
+            PersistOne(Team, "team");
+        }
+        catch (Exception)
+        {
+            // Never break the app over a cache file.
+        }
+
+        void PersistOne<T>(StaleCache<T> cache, string name) where T : class
+        {
+            if (cache.Latest() is not { } latest) return;
+            lock (Saved)
+            {
+                if (Saved.TryGetValue(name, out var at) && at >= latest.At) return;
+                Saved[name] = latest.At;
+            }
+
+            PageDiskCache.TrySave(directory, name, viewer, latest.Key, latest.At, latest.Value);
+        }
+    }
 
     public static readonly TimeSpan LinearTtl = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan DriftTtl = TimeSpan.FromMinutes(5);

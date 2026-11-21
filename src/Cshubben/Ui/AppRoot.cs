@@ -42,6 +42,8 @@ sealed class AppRoot : Component
         var (now, setNow) = UseState(MinuteOf(DateTimeOffset.UtcNow), true);
         var (settings, setSettings) = UseState(services.Settings);
 
+        UseEffect(() => PagePrefetch.RecordVisit(page), page);
+
         var inFlight = UseRef(false);
         var pausedUntil = UseRef<DateTimeOffset?>(null);
         var windowActive = UseRef(true);
@@ -64,6 +66,7 @@ sealed class AppRoot : Component
                 IntegrationWiring.AttachGitHub(services);
                 NotificationsHub.OnSnapshot(loaded, services.Settings, services.IsDemo);
                 BackgroundWatch.Tick(loaded, services.Settings, services.IsDemo);
+                PagePrefetch.Tick(loaded, services);
                 setError(null);
                 pausedUntil.Current = null;
                 setNotice(services.DemoReason is { } reason ? "Showing demo data. " + reason : null);

@@ -119,6 +119,7 @@ sealed class AppServices
                     if (cached is not null)
                     {
                         ObserveRepos(cached);
+                        PageCaches.Restore(AppPaths.DataDirectory, cached.Viewer);
                         _initialSnapshot = SnapshotFilter.Apply(cached, Settings);
                     }
                 }

@@ -96,7 +96,7 @@ static class BackgroundWatch
             if (!data.IsConnected || data.IsDemo) return;
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
             var board = await data.LoadAsync(snapshot, timeout.Token).ConfigureAwait(false);
-            PageCaches.Linear.Set("linear|" + snapshot.Viewer + "|live", board);
+            PageCaches.Linear.Set(PageKeys.Linear(snapshot.Viewer, false), board);
             var state = WatchSources.FromLinear(board.Issues, board.RecentlyDone, board.Prs);
             var events = WatchDiff.Linear(_linearBefore, state);
             _linearBefore = state;

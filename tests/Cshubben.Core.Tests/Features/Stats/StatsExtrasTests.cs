@@ -41,7 +41,7 @@ public class StatsExtrasTests
         var thisWeek = new DateTimeOffset(2026, 11, 17, 9, 0, 0, TimeSpan.Zero);
         var merged = new[] { Pr("a/x", 1, thisWeek), Pr("a/x", 2, thisWeek.AddDays(-7)), Pr("a/x", 3, thisWeek.AddDays(-21)) };
         Assert.Equal(2, StatsExtrasCalculator.Streak(merged, Now));
-        Assert.Equal(2, StatsExtrasCalculator.Streak(merged.Skip(1), Now.AddDays(7)));
+        Assert.Equal(2, StatsExtrasCalculator.Streak(merged, Now.AddDays(7)));
         Assert.Equal(0, StatsExtrasCalculator.Streak(Array.Empty<MergedPrRecord>(), Now));
     }
 

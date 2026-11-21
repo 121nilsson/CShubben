@@ -31,17 +31,13 @@ sealed class DriftPage : Component<PageContext>
         var (statusTone, setStatusTone) = UseState(Tone.Success, true);
         var inFlight = UseRef(false);
 
-        var repos = RepoSelection.Pick(
-            snap.All.Select(p => p.Repo).Concat(snap.Feed.Select(f => f.Repo)),
-            ctx.Settings.FollowedRepos,
-            ctx.Settings.MutedRepos.Concat(ctx.Settings.MutedOrgs));
-        repos = RepoSelection.WithImportant(repos, ctx.Settings.ImportantRepos, ctx.Settings.MutedRepos.Concat(ctx.Settings.MutedOrgs));
+        var repos = PageKeys.DriftRepos(snap, ctx.Settings);
         var reposKey = string.Join("|", repos);
 
         // Live mode without a GitHub connection: do not show invented data next to real pull requests.
         var needsConnection = !ctx.Services.ForcedDemo && ctx.Services.GitHub is null && data.IsDemo;
 
-        var driftKey = "drift|" + (data.IsDemo ? "demo|" : "live|") + reposKey;
+        var driftKey = PageKeys.Drift(data.IsDemo, repos);
 
         var resource = UseResource<DriftReport>(
             async ct =>
