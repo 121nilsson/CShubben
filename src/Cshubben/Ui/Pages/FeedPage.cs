@@ -1,4 +1,4 @@
-using Cshubben.Ui.Claude;
+using Cshubben.Ui.Assist;
 using Cshubben.Core.Features.Feed;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
