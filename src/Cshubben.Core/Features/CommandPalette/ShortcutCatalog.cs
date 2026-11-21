@@ -28,6 +28,8 @@ public static class ShortcutCatalog
         list.Add(new ShortcutEntry("Code review", "n / p", "Next / previous file"));
         list.Add(new ShortcutEntry("Code review", "] / [", "Next / previous open thread"));
         list.Add(new ShortcutEntry("Code review", "c", "Comment on the selected line, or reply to the selected thread"));
+        list.Add(new ShortcutEntry("Code review", "m", "Mark the start of a range of lines (move with j / k, then press a)"));
+        list.Add(new ShortcutEntry("Code review", "a", "Ask Claude about the marked lines, or the selected line"));
         list.Add(new ShortcutEntry("Code review", "v", "Mark the file as viewed"));
         list.Add(new ShortcutEntry("Code review", "s", "Toggle split view"));
         list.Add(new ShortcutEntry("Code review", "/", "Focus the file filter"));
