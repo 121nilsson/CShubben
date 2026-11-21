@@ -104,7 +104,7 @@ static class DriftCards
                 rows: [GridSize.Auto],
                 stripe.Grid(column: 0),
                 VStack(10, children.ToArray()).Margin(12, 0, 0, 0).Grid(column: 1)))
-            .Flex(grow: 1, basis: 440)
+            .Flex(grow: 1, basis: 400)
             .WithKey(row.Repo);
     }
 

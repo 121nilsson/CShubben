@@ -77,7 +77,7 @@ sealed class FeedView : Component<FeedProps>
             Kit.PageHeader("Feed", subtitle).Margin(0, 0, 0, 0),
             bar,
             ScrollView(body).Flex(grow: 1, basis: 0)) with { RowGap = 12 };
-        return column.FlexPadding(24, 16, 16, 16);
+        return Kit.Capped(column.FlexPadding(24, 16));
     }
 
     private Element Entry(FeedEntry entry, HubSnapshot snap, IReadOnlyList<string> expanded, Action<string> toggle)
@@ -135,21 +135,23 @@ sealed class FeedView : Component<FeedProps>
         Action markAllSeen)
     {
         Element Chip(string label, int count, bool active, Action<bool> onChange) =>
-            ToggleButton(TextBlock(label + " " + count).FontSize(12), active, onChange).Padding(10, 3).MinHeight(28);
+            ToggleButton(TextBlock(label + " " + count).FontSize(12), active, onChange).Padding(10, 3).MinHeight(32);
 
-        var items = new List<Element>
-        {
+        var chips = FlexRow(
             Chip("All", counts.All, scope == FeedScope.All, _ => setScope(FeedScope.All)).WithKey("all"),
             Chip("Personal", counts.Personal, scope == FeedScope.Personal, on => setScope(on ? FeedScope.Personal : FeedScope.All)).WithKey("personal"),
             Chip("Team", counts.Team, scope == FeedScope.Team, on => setScope(on ? FeedScope.Team : FeedScope.All)).WithKey("team"),
-            Chip("Bots", counts.Bots, showBots, setShowBots).WithKey("bots"),
-            Empty().Flex(grow: 1),
-            (hasNew
-                ? Button("Mark all seen", markAllSeen).AccentButton()
-                : Button("Mark all seen", markAllSeen).IsEnabled(false)).MinHeight(28).WithKey("mark"),
-        };
+            Chip("Bots", counts.Bots, showBots, setShowBots).WithKey("bots")) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
 
-        return FlexRow(items.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
+        var mark = (hasNew
+            ? Button("Mark all seen", markAllSeen).AccentButton()
+            : Button("Mark all seen", markAllSeen).IsEnabled(false)).MinHeight(32).VAlign(VerticalAlignment.Top);
+
+        return Grid(
+            columns: [GridSize.Star(), GridSize.Auto],
+            rows: [GridSize.Auto],
+            chips.Grid(column: 0),
+            mark.Margin(12, 0, 0, 0).Grid(column: 1));
     }
 
     private static Element EmptyState(bool feedIsEmpty, Action showEverything)

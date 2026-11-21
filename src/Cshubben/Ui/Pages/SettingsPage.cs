@@ -281,7 +281,7 @@ sealed class SettingsPage : Component<PageContext>
                 Component<NotificationsSettingsCard>().Margin(0, 0, 0, 12),
                 appearanceCard.Margin(0, 0, 0, 12),
                 dataCard)
-            .FlexPadding(24, 16)));
+            .FlexPadding(24, 16), 800));
     }
 
     private static Element Row(string label, Element value) =>

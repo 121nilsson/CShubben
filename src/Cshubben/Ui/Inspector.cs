@@ -17,7 +17,7 @@ namespace Cshubben.Ui;
 /// </summary>
 static class Inspector
 {
-    public static readonly string[] Tabs = ["Overview", "Conversation", "Files", "Pipeline"];
+    public static readonly string[] Tabs = ["Overview", "Comments", "Files", "Pipeline"];
 
     /// <summary>
     /// Called with the PR id when the user presses "Start review" or "Re-review". The app assigns this to open the review page;

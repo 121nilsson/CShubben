@@ -42,17 +42,17 @@ static class Rows
 
     public static string KindGlyph(FeedKind kind) => kind switch
     {
-        FeedKind.ReviewRequested => "👀",
-        FeedKind.Approved => "✔",
-        FeedKind.ChangesRequested => "✎",
-        FeedKind.Commented => "💬",
-        FeedKind.CiFailed => "✖",
-        FeedKind.CiPassed => "✔",
-        FeedKind.Merged => "⮌",
-        FeedKind.Opened => "＋",
-        FeedKind.Pushed => "↑",
-        FeedKind.Deployed => "🚀",
-        _ => "•",
+        FeedKind.ReviewRequested => "\uE7B3",
+        FeedKind.Approved => "\uE73E",
+        FeedKind.ChangesRequested => "\uE70F",
+        FeedKind.Commented => "\uE8BD",
+        FeedKind.CiFailed => "\uE711",
+        FeedKind.CiPassed => "\uE73E",
+        FeedKind.Merged => "\uE73A",
+        FeedKind.Opened => "\uE710",
+        FeedKind.Pushed => "\uE74A",
+        FeedKind.Deployed => "\uE724",
+        _ => "\uE7C1",
     };
 
     public static Tone KindTone(FeedKind kind) => kind switch
@@ -71,7 +71,7 @@ static class Rows
         return Grid(
             columns: [GridSize.Px(32), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
             rows: [GridSize.Auto],
-            TextBlock(KindGlyph(item.Kind)).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            Kit.Glyph(KindGlyph(item.Kind), 12).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center).Grid(column: 0),
             VStack(2,
                 TextBlock(item.Actor).SemiBold(),
                 TextBlock(what).TextTrimming(TextTrimming.CharacterEllipsis).Foreground(Theme.SecondaryText)).Grid(column: 1),
@@ -113,7 +113,7 @@ static class Rows
         var lines = new List<Element>
         {
             HStack(6,
-                TextBlock(KindGlyph(group.Kind)).FontSize(12).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center),
+                Kit.Glyph(KindGlyph(group.Kind), 12).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center),
                 TextBlock(group.ActorLabel).SemiBold(),
                 TextBlock(group.Action).Foreground(Theme.SecondaryText)),
             Kit.Muted(where).TextTrimming(TextTrimming.CharacterEllipsis),
@@ -155,7 +155,7 @@ static class Rows
         var content = Grid(
             columns: [GridSize.Px(20), GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
-            TextBlock(KindGlyph(item.Kind)).FontSize(12).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            Kit.Glyph(KindGlyph(item.Kind), 12).Foreground(Kit.Fg(tone)).VAlign(VerticalAlignment.Center).Grid(column: 0),
             TextBlock(text).FontSize(12).TextTrimming(TextTrimming.CharacterEllipsis)
                 .Foreground(isNew ? Theme.PrimaryText : Theme.SecondaryText).VAlign(VerticalAlignment.Center).Grid(column: 1),
             Kit.Muted(Age.Format(item.At, now)).VAlign(VerticalAlignment.Center).Margin(8, 0, 0, 0).Grid(column: 2));

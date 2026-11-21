@@ -60,7 +60,7 @@ sealed partial class ReviewWorkspace
             facts.Add(Kit.Pill(CiText(pr.Ci), CiTone(pr.Ci)));
             facts.Add(Kit.Pill(ReviewText(pr.Review), ReviewTone(pr.Review)));
         }
-        facts.Add(Kit.Pill((pr?.SizeLabel ?? SizeOf(Props.Full.Files)) + " · " + ReviewTimeEstimate.Label(Props.Full.Files) + " to review", Tone.Neutral));
+        facts.Add(Kit.Pill((pr?.SizeLabel ?? SizeOf(Props.Full.Files)) + " · " + ReviewTimeEstimate.Label(Props.Full.Files), Tone.Neutral));
         facts.Add(BuildProgress());
         var range = BuildRangeToggle();
         if (range is not null) facts.Add(range);
@@ -69,16 +69,16 @@ sealed partial class ReviewWorkspace
             facts.Add(ToggleButton("Split view", S.Split, v => Update(s => s with { Split = v })).AutomationName("Split view"));
         }
 
-        var factRow = FlexRow(facts.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 8, AlignItems = FlexAlign.Center };
-        return Border(FlexColumn(titleRow.Flex(shrink: 0), factRow.Flex(shrink: 0)) with { RowGap = 10 })
-            .Padding(16, 12).BorderThickness(0, 0, 0, 1).BorderBrush(Theme.DividerStroke);
+        var factRow = FlexRow(facts.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 10, RowGap = 6, AlignItems = FlexAlign.Center };
+        return Border(FlexColumn(titleRow.Flex(shrink: 0), factRow.Flex(shrink: 0)) with { RowGap = 6 })
+            .Padding(16, 8).BorderThickness(0, 0, 0, 1).BorderBrush(Theme.DividerStroke);
     }
 
     private Element BuildProgress()
     {
         var parts = new List<Element>
         {
-            ReviewKit.ProgressBar(Progress.Fraction).Width(120).VAlign(VerticalAlignment.Center),
+            ReviewKit.ProgressBar(Progress.Fraction).Width(80).VAlign(VerticalAlignment.Center),
             TextBlock(Progress.ViewedLabel).SemiBold().VAlign(VerticalAlignment.Center),
         };
         if (Progress.UnresolvedThreads > 0) parts.Add(Kit.Pill(Progress.ThreadsLabel, Tone.Warning));

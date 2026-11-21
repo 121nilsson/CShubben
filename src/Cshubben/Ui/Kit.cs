@@ -65,9 +65,12 @@ static class Kit
             BodyStrong(text),
             count is null ? null : Pill(count.Value.ToString(), Tone.Neutral));
 
-    /// <summary>Caps page content width on large windows so it never floats in space (centered when capped).</summary>
+    /// <summary>Caps page content width on large windows. Left-aligned, so every page title sits at the same x.</summary>
     public static Element Capped(Element content, double max = 1100) =>
-        Border(content).MaxWidth(max).HAlign(HorizontalAlignment.Stretch);
+        Grid(
+            columns: [GridSize.Star().MaxSize(max), GridSize.Star()],
+            rows: [GridSize.Star()],
+            content.Grid(column: 0));
 
     public static Element EmptyNote(string text) =>
         Muted(text).Margin(4, 8);
