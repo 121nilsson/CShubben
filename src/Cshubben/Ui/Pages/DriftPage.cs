@@ -35,6 +35,7 @@ sealed class DriftPage : Component<PageContext>
             snap.All.Select(p => p.Repo).Concat(snap.Feed.Select(f => f.Repo)),
             ctx.Settings.FollowedRepos,
             ctx.Settings.MutedRepos.Concat(ctx.Settings.MutedOrgs));
+        repos = RepoSelection.WithImportant(repos, ctx.Settings.ImportantRepos, ctx.Settings.MutedRepos.Concat(ctx.Settings.MutedOrgs));
         var reposKey = string.Join("|", repos);
 
         // Live mode without a GitHub connection: do not show invented data next to real pull requests.

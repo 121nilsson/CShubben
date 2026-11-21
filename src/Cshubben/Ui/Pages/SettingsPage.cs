@@ -45,10 +45,7 @@ sealed class SettingsPage : Component<PageContext>
         var (claudeChecking, setClaudeChecking) = UseState(false, true);
         var (claudeHasToken, setClaudeHasToken) = UseState(false, true);
         var (claudeTokenInput, setClaudeTokenInput) = UseState("");
-        var (followedInput, setFollowedInput) = UseState("");
-        var (mutedInput, setMutedInput) = UseState("");
-        var (mutedOrgInput, setMutedOrgInput) = UseState("");
-        var (repoError, setRepoError) = UseState("");
+        var (repoFilter, setRepoFilter) = UseState("");
         var (notesDirInput, setNotesDirInput) = UseState(settings.NotesDirectory);
         var (diagReport, setDiagReport) = UseState<DiagnosticReport?>(null, true);
         var (diagRunning, setDiagRunning) = UseState(false, true);
@@ -202,50 +199,50 @@ sealed class SettingsPage : Component<PageContext>
                 claudeChecking ? Kit.Muted("Checking...") : Empty()));
 
         // ---- Repositories ----
-        void AddTo(string input, Action<string> clearInput, Func<AppSettings, IReadOnlyList<string>> get, Func<AppSettings, IReadOnlyList<string>, AppSettings> set, string what)
-        {
-            var name = RepoList.Normalize(input);
-            if (name is null)
-            {
-                setRepoError("Enter " + what + ", for example acme/web.");
-                return;
-            }
+        var directory = RepoDirectory.Build(services.RepoActivity, settings, repoFilter);
 
-            setRepoError("");
-            clearInput("");
-            Save(set(settings, RepoList.Add(get(settings), name)));
-        }
+        Element RepoRow(RepoEntry r, bool ownerWatched) =>
+            Grid(
+                columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto, GridSize.Auto],
+                rows: [GridSize.Auto],
+                ToggleSwitch(r.Watched, v => Save(RepoDirectory.SetRepoWatched(settings, r.Repo, v)), "", "", "Watch " + r.Repo)
+                    .IsEnabled(ownerWatched).MinWidth(0).Grid(column: 0),
+                VStack(0, Body(r.Name), Kit.Muted(r.Repo)).VAlign(VerticalAlignment.Center).Margin(12, 0, 0, 0).Grid(column: 1),
+                ToggleButton(TextBlock("Important").FontSize(12), r.Important, v => Save(RepoDirectory.SetImportant(settings, r.Repo, v)))
+                    .Padding(10, 3).VAlign(VerticalAlignment.Center).AutomationName("Important " + r.Repo).Grid(column: 2),
+                Kit.Pill(r.Activity.ToString(CultureInfo.InvariantCulture), Tone.Neutral)
+                    .VAlign(VerticalAlignment.Center).Margin(12, 0, 0, 0).MinWidth(40).Grid(column: 3))
+            .Margin(28, 6, 0, 6).Opacity(r.Watched ? 1 : 0.55);
 
-        Element Editor(string title, IReadOnlyList<string> list, string input, Action<string> setInput, Action add, Action<string> remove, string empty) =>
-            VStack(6,
-                BodyStrong(title),
-                list.Count == 0
-                    ? (Element)Kit.Muted(empty)
-                    : VStack(2, list.Select(name => (Element)Grid(
-                            columns: [GridSize.Star(), GridSize.Auto],
-                            rows: [GridSize.Auto],
-                            Body(name).VAlign(VerticalAlignment.Center).Grid(column: 0),
-                            Button("Remove", () => remove(name)).SubtleButton().AutomationName("Remove " + name).Grid(column: 1))
-                        .WithKey(name)).ToArray()),
-                HStack(8,
-                    TextBox(input, setInput, placeholderText: "owner/name").MinWidth(240),
-                    Button("Add", add).IsEnabled(input.Trim().Length > 0)));
+        Element OwnerBlock(OrgEntry o) =>
+            VStack(0,
+                Grid(
+                    columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto],
+                    rows: [GridSize.Auto],
+                    ToggleSwitch(o.Watched, v => Save(RepoDirectory.SetOwnerWatched(settings, o.Owner, v)), "", "", "Watch everything from " + o.Owner)
+                        .MinWidth(0).Grid(column: 0),
+                    VStack(0,
+                        BodyStrong(o.Owner),
+                        Kit.Muted(o.WatchedRepos.ToString(CultureInfo.InvariantCulture) + " of " + o.Repos.Count.ToString(CultureInfo.InvariantCulture) + " repos watched"))
+                        .VAlign(VerticalAlignment.Center).Margin(12, 0, 0, 0).Grid(column: 1),
+                    Kit.Pill(o.Activity.ToString(CultureInfo.InvariantCulture), Tone.Neutral)
+                        .VAlign(VerticalAlignment.Center).MinWidth(40).Grid(column: 2)).Margin(0, 10, 0, 4),
+                VStack(0, o.Repos.Select(r => RepoRow(r, o.Watched).WithKey(r.Repo)).ToArray()))
+            .WithKey(o.Owner);
 
         var reposCard = Kit.SettingsCard("Repositories",
-            "Followed repos are what you care about. Muted repos and whole organisations are hidden everywhere.",
-            Editor("Followed repositories", settings.FollowedRepos, followedInput, setFollowedInput,
-                () => AddTo(followedInput, setFollowedInput, s => s.FollowedRepos, (s, l) => s with { FollowedRepos = l }, "owner/name"),
-                name => Save(settings with { FollowedRepos = RepoList.Remove(settings.FollowedRepos, name) }),
-                "None. Everything that shows up is followed."),
-            Editor("Muted repositories", settings.MutedRepos, mutedInput, setMutedInput,
-                () => AddTo(mutedInput, setMutedInput, s => s.MutedRepos, (s, l) => s with { MutedRepos = l }, "owner/name"),
-                name => Save(settings with { MutedRepos = RepoList.Remove(settings.MutedRepos, name) }),
-                "None."),
-            Editor("Muted organisations", settings.MutedOrgs, mutedOrgInput, setMutedOrgInput,
-                () => AddTo(mutedOrgInput, setMutedOrgInput, s => s.MutedOrgs, (s, l) => s with { MutedOrgs = l }, "an organisation name"),
-                name => Save(settings with { MutedOrgs = RepoList.Remove(settings.MutedOrgs, name) }),
-                "None."),
-            repoError.Length > 0 ? TextBlock(repoError).Foreground(Kit.Fg(Tone.Danger)).FontSize(12) : Empty());
+            directory.WatchedRepos.ToString(CultureInfo.InvariantCulture) + " of " + directory.TotalRepos.ToString(CultureInfo.InvariantCulture)
+                + " repos watched. Muted repos and organisations are hidden everywhere and send no notifications. "
+                + "Important repos are always checked on the Drift page. The number is recent activity (pull requests and feed events).",
+            TextBox(repoFilter, setRepoFilter, placeholderText: "Filter repositories").MaxWidth(360),
+            directory.Orgs.Count == 0
+                ? (Element)Kit.Muted("No repositories seen yet. They appear here after the first load.")
+                : VStack(0, directory.Orgs.Select(OwnerBlock).ToArray()),
+            settings.FollowedRepos.Count > 0
+                ? HStack(8,
+                    Kit.Muted("An older setting limits the feed and Drift to " + string.Join(", ", settings.FollowedRepos) + "."),
+                    Button("Clear", () => Save(settings with { FollowedRepos = Array.Empty<string>() })).SubtleButton())
+                : Empty());
 
         // ---- Notifications ----
         var notificationsCard = Kit.SettingsCard("Notifications",

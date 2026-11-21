@@ -16,11 +16,12 @@ static class SnapshotFilter
 }
 
 /// <summary>Wraps a data source so every loaded snapshot is filtered with the current settings. Settings are read on each load.</summary>
-sealed class FilteringHubData(IHubData inner, Func<AppSettings> settings) : IHubData
+sealed class FilteringHubData(IHubData inner, Func<AppSettings> settings, Action<HubSnapshot>? observe = null) : IHubData
 {
     public async Task<HubSnapshot> LoadAsync(CancellationToken cancellationToken = default)
     {
         var snapshot = await inner.LoadAsync(cancellationToken).ConfigureAwait(false);
+        observe?.Invoke(snapshot); // sees the unfiltered data, so muted repos stay in the settings list
         return SnapshotFilter.Apply(snapshot, settings());
     }
 }

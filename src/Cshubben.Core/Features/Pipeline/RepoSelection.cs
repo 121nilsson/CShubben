@@ -37,6 +37,23 @@ public static class RepoSelection
             .ToList();
     }
 
+    /// <summary>
+    /// Puts important repos (owner/name) first and keeps them even when <paramref name="picked"/> was capped.
+    /// Muted ones stay out. The rest keep their order.
+    /// </summary>
+    public static IReadOnlyList<string> WithImportant(IReadOnlyList<string> picked, IEnumerable<string> important, IEnumerable<string> muted)
+    {
+        var mutedList = muted.Where(m => !string.IsNullOrWhiteSpace(m)).Select(m => m.Trim()).ToList();
+        var first = important
+            .Where(LooksLikeRepo)
+            .Select(r => r.Trim())
+            .Where(r => !Matches(mutedList, r))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return first.Concat(picked.Where(r => !first.Contains(r, StringComparer.OrdinalIgnoreCase))).ToList();
+    }
+
     private static bool Matches(List<string> entries, string repo)
     {
         var owner = repo.Substring(0, repo.IndexOf('/'));

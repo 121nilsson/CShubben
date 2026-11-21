@@ -97,6 +97,14 @@ sealed class AppServices
     /// <summary>Demo snapshot for --demo (shown immediately, no loading state); null for live mode.</summary>
     private bool _cacheRead;
 
+    private volatile IReadOnlyDictionary<string, int> _repoActivity = new Dictionary<string, int>();
+
+    /// <summary>Repos seen in loaded data (before muting) with their activity count. Feeds the repository list in settings.</summary>
+    public IReadOnlyDictionary<string, int> RepoActivity => _repoActivity;
+
+    private void ObserveRepos(HubSnapshot snapshot) =>
+        _repoActivity = RepoDirectory.Merge(_repoActivity, RepoDirectory.CountActivity(snapshot));
+
     public HubSnapshot? InitialSnapshot
     {
         get
@@ -124,18 +132,18 @@ sealed class AppServices
     /// </summary>
     public async Task<IHubData> GetHubDataAsync(CancellationToken cancellationToken = default)
     {
-        if (ForcedDemo) return new FilteringHubData(_demo, () => Settings);
-        if (GitHub is not null) return new FilteringHubData(GitHub, () => Settings);
+        if (ForcedDemo) return new FilteringHubData(_demo, () => Settings, ObserveRepos);
+        if (GitHub is not null) return new FilteringHubData(GitHub, () => Settings, ObserveRepos);
         try
         {
             GitHub = await GitHubHubData.CreateAsync(Http, null, null, cancellationToken);
             DemoReason = null;
-            return new FilteringHubData(GitHub, () => Settings);
+            return new FilteringHubData(GitHub, () => Settings, ObserveRepos);
         }
         catch (GitHubAuthException ex)
         {
             DemoReason = ex.Message;
-            return new FilteringHubData(_demo, () => Settings);
+            return new FilteringHubData(_demo, () => Settings, ObserveRepos);
         }
     }
 

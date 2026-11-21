@@ -25,6 +25,9 @@ public sealed record AppSettings
     /// <summary>Repos the user follows (owner/name). Empty means "everything that shows up".</summary>
     public IReadOnlyList<string> FollowedRepos { get; init; } = Array.Empty<string>();
 
+    /// <summary>Repos marked important (owner/name): always watched by Drift and shown first there.</summary>
+    public IReadOnlyList<string> ImportantRepos { get; init; } = Array.Empty<string>();
+
     /// <summary>Repos hidden everywhere (owner/name).</summary>
     public IReadOnlyList<string> MutedRepos { get; init; } = Array.Empty<string>();
 
@@ -71,6 +74,7 @@ public sealed record AppSettings
     public AppSettings Sanitized() => this with
     {
         FollowedRepos = RepoList.Clean(FollowedRepos),
+        ImportantRepos = RepoList.Clean(ImportantRepos),
         MutedRepos = RepoList.Clean(MutedRepos),
         MutedOrgs = RepoList.Clean(MutedOrgs),
         ClaudeModel = ClaudeModel?.Trim() ?? "",
