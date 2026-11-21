@@ -200,7 +200,7 @@ sealed class PaletteHost : Component<PaletteHostProps>
                 },
                 results,
                 current,
-                Math.Clamp((windowHeight - 270) / 48, 3, VisibleRows),
+                Math.Clamp((int)((windowHeight - 270) / 48), 3, VisibleRows),
                 Run,
                 delta => setSelected(PaletteNavigation.Move(current, delta, results.Count)),
                 Close).Grid(row: 0, column: 0));
