@@ -152,7 +152,8 @@ public static class NoteReferences
         if (hash <= 0 || hash == t.Length - 1) return false;
         var name = t.Substring(0, hash);
         if (!IsRepoName(name)) return false;
-        if (!TryNumber(t, hash + 1, out number, out var end) || end != t.Length) return false;
+        if (!TryNumber(t, hash + 1, out var parsed, out var end) || end != t.Length) return false;
+        number = parsed;
         repo = name;
         return true;
     }
