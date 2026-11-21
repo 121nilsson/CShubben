@@ -37,7 +37,7 @@ public class PageCacheTests
     public void Team_report_round_trips()
     {
         var team = TeamStats.Compute(new[] { new TeamPr("a/x", "anna", At, 10) });
-        var back = PageDiskCache.Deserialize<TeamReport>(PageDiskCache.Serialize("p", "k", At, team), "p")!;
+        var back = PageDiskCache.Deserialize<TeamReport>(PageDiskCache.Serialize("p", "k", At, team), "p")!.Value;
         Assert.Equal("anna", back.Value.TopPeople[0].Author);
     }
 
