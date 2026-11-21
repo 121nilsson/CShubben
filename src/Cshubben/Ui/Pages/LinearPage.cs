@@ -63,8 +63,6 @@ sealed class LinearView : Component<LinearProps>
         var snap = Props.Snap;
         var data = Props.Data;
         var openPrInspector = Props.OnSelectPr;
-        // Opening a pull request from here closes the issue panel, so two side panels never compete for the width.
-        Action<string> onSelectPr = id => { setSelectedIssue(""); openPrInspector(id); };
 
         var (tick, setTick) = UseState(0, true);
         var (activeKey, setActiveKey) = UseState("");
@@ -75,6 +73,8 @@ sealed class LinearView : Component<LinearProps>
         var (resolved, setResolved) = UseState<IReadOnlyList<string>>(Array.Empty<string>(), true);
         var (showAllDone, setShowAllDone) = UseState(false);
         var (selectedIssue, setSelectedIssue) = UseState("");
+        // Opening a pull request from here closes the issue panel, so two side panels never compete for the width.
+        Action<string> onSelectPr = id => { setSelectedIssue(""); openPrInspector(id); };
 
         var wantTeams = activeKey.StartsWith(ReconKind.PrWithoutIssue + "|", StringComparison.Ordinal);
 
