@@ -92,3 +92,9 @@ Slice F (after D): Review view, in order: file tree + unified diff read-only -> 
 - In the app: `IUpdateService` (Core, `Features/Updates`), Velopack implementation in `Services/UpdatesVelopack.cs`, About card in Settings.
   Off in `--demo`/`--smoke`/screenshots and in unpackaged dev builds; checks only on a button click, errors become a status line.
 - Needs a public repo (or a token) for the GitHub feed. Not verified without a toolchain: first tag should be tried as `v0.1.0`.
+
+## Status log (2026-11-21, day)
+- Done and green on CI: syntax highlighting in diffs (TextMateSharp grammars with a built-in fallback, grammar state carried across hunk lines), command palette polish (Tab trap, row count follows window height, opaque card that follows the window theme), copy link / copy Markdown for GitHub PRs and Linear issues (buttons plus palette actions), failure classifier with calm error and empty states, Diagnostics card and `--smoke` (read-only report to `smoke-report.txt`), review flow additions (apply suggestion in dry run, key map j/k/n/p/]/[ /s/v//, Ctrl+F search in the diff), Velopack release workflow and About card, wrapping of long diff lines by default.
+- Screenshots: new flags `--palette [query]`, `--file <part of path>`, `--theme light|dark`; shard 4 shoots the dark theme. ui-guru passes 4 and 5 fixed the review header at 640 px and the Linear action rows.
+- Still not verified with a real account: GitHub/Linear/Claude live behaviour, writes, tray and toasts, and the Velopack release flow (first tag should be `v0.1.0`). First thing to try on the owner's machine: `Cshubben.exe --smoke`.
+- Open polish: copy buttons are plain subtle buttons (no menu), dark Settings/Notes not yet reviewed, content is capped and left-aligned at 1920, in-app screenshot mode not built (CI run is about 4 minutes), diff lines changed inside a line and revealed gap lines are highlighted without grammar state.
