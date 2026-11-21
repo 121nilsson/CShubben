@@ -18,6 +18,8 @@ public static class NotificationText
             NotificationKind.ReviewRequested => "Review requested: " + what,
             NotificationKind.Mention => "You were mentioned: " + what,
             NotificationKind.ReadyToMerge => "Ready to merge: " + what,
+            NotificationKind.Approved => "Approved: " + what,
+            NotificationKind.NewInImportantRepo => "New pull request: " + what,
             NotificationKind.Comment => "New comment: " + what,
             NotificationKind.Merged => "Merged: " + what,
             _ => what,
@@ -32,7 +34,7 @@ public static class NotificationText
             NotificationKind.ReviewRequested or NotificationKind.ReReviewRequested =>
                 detail.Length > 0 ? detail + " - " + e.Title : e.Title,
             NotificationKind.Mention => detail.Length > 0 ? detail + " mentioned you - " + e.Title : e.Title,
-            NotificationKind.Comment => detail.Length > 0 ? detail + " - " + e.Title : e.Title,
+            NotificationKind.Comment or NotificationKind.NewInImportantRepo => detail.Length > 0 ? detail + " - " + e.Title : e.Title,
             _ => e.Title,
         };
     }
@@ -47,7 +49,7 @@ public static class NotificationText
         var lines = events.Take(MaxDigestLines).Select(Headline).ToList();
         if (n > MaxDigestLines) lines.Add("and " + (n - MaxDigestLines).ToString(CultureInfo.InvariantCulture) + " more");
         return new ToastMessage(
-            n.ToString(CultureInfo.InvariantCulture) + " updates on your pull requests",
+            n.ToString(CultureInfo.InvariantCulture) + " pull request updates",
             string.Join("\n", lines),
             null,
             true,

@@ -48,6 +48,8 @@ sealed class NotificationsSettingsCard : Component
             + prefs.MaxIndividual + " changes at once become a single summary toast.",
             Check("Someone asks me to review again", prefs.ReReviewRequested, (p, v) => p with { ReReviewRequested = v }),
             Check("Ready to merge (approved, green, no conflicts)", prefs.ReadyToMerge, (p, v) => p with { ReadyToMerge = v }),
+            Check("My pull request was approved", prefs.Approved, (p, v) => p with { Approved = v }),
+            Check("Someone opens a pull request in an important repo (set under Repositories)", prefs.NewInImportantRepo, (p, v) => p with { NewInImportantRepo = v }),
             Check("New comments on my pull requests", prefs.Comment, (p, v) => p with { Comment = v }),
             Check("I am @mentioned", prefs.Mention, (p, v) => p with { Mention = v }),
             Check("My pull request was merged", prefs.Merged, (p, v) => p with { Merged = v }),

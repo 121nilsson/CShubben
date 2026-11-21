@@ -144,6 +144,7 @@ static class NotificationsHub
         ChangesRequested = settings.NotifyChangesRequested && prefs.ChangesRequested,
         MutedRepos = settings.MutedRepos,
         MutedOrgs = settings.MutedOrgs,
+        ImportantRepos = settings.ImportantRepos,
     };
 
     /// <summary>Saves new preferences and applies close-to-tray immediately.</summary>

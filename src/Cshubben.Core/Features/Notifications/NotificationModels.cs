@@ -12,6 +12,8 @@ public enum NotificationKind
     ReviewRequested,
     Mention,
     ReadyToMerge,
+    Approved,
+    NewInImportantRepo,
     Comment,
     Merged,
 }
@@ -84,6 +86,15 @@ public sealed record NotificationPrefs
 
     public bool Mention { get; init; } = true;
 
+    /// <summary>My pull request was approved (but is not ready to merge yet; that has its own message).</summary>
+    public bool Approved { get; init; } = true;
+
+    /// <summary>Someone else opened a pull request in a repo marked important.</summary>
+    public bool NewInImportantRepo { get; init; } = true;
+
+    /// <summary>Repos (owner/name) marked important. Only these produce <see cref="NotificationKind.NewInImportantRepo"/>.</summary>
+    public IReadOnlyList<string> ImportantRepos { get; init; } = Array.Empty<string>();
+
     /// <summary>Off by default: silence means fine.</summary>
     public bool Merged { get; init; }
 
@@ -115,10 +126,22 @@ public sealed record NotificationPrefs
         NotificationKind.ReviewRequested => ReviewRequested,
         NotificationKind.Mention => Mention,
         NotificationKind.ReadyToMerge => ReadyToMerge,
+        NotificationKind.Approved => Approved,
+        NotificationKind.NewInImportantRepo => NewInImportantRepo,
         NotificationKind.Comment => Comment,
         NotificationKind.Merged => Merged,
         _ => false,
     };
+
+    /// <summary>True when the repo is marked important. Names compare case-insensitively.</summary>
+    public bool IsImportant(string repo)
+    {
+        if (string.IsNullOrWhiteSpace(repo)) return false;
+        var name = repo.Trim();
+        foreach (var r in ImportantRepos ?? Array.Empty<string>())
+            if (string.Equals(r?.Trim(), name, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
 
     /// <summary>True when the repo, or its owner, is muted. Names compare case-insensitively.</summary>
     public bool IsMuted(string repo)
@@ -142,6 +165,7 @@ public sealed record NotificationPrefs
         MaxIndividual = MaxIndividual < 1 || MaxIndividual > 20 ? DefaultMaxIndividual : MaxIndividual,
         MutedRepos = MutedRepos ?? Array.Empty<string>(),
         MutedOrgs = MutedOrgs ?? Array.Empty<string>(),
+        ImportantRepos = ImportantRepos ?? Array.Empty<string>(),
     };
 
     private static int Clamp(int value, int min, int max, int fallback) => value < min || value > max ? fallback : value;

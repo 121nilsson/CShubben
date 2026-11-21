@@ -50,7 +50,11 @@ public sealed class NotificationEngine
         var dropped = 0;
         foreach (var e in candidates)
         {
-            if (!p.IsKindEnabled(e.Kind) || p.IsMuted(e.Repo) || _seen.Contains(e.Key) || !batchKeys.Add(e.Key))
+            if (!p.IsKindEnabled(e.Kind)
+                || p.IsMuted(e.Repo)
+                || (e.Kind == NotificationKind.NewInImportantRepo && !p.IsImportant(e.Repo))
+                || _seen.Contains(e.Key)
+                || !batchKeys.Add(e.Key))
             {
                 dropped++;
                 continue;

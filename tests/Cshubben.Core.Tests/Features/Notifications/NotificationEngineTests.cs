@@ -117,7 +117,7 @@ public class NotificationEngineTests
         var digest = Assert.Single(plan.Messages);
         Assert.True(digest.IsDigest);
         Assert.Equal(7, digest.Count);
-        Assert.Equal("7 updates on your pull requests", digest.Title);
+        Assert.Equal("7 pull request updates", digest.Title);
         Assert.Null(digest.Url);
         Assert.Contains("and 3 more", digest.Body);
         Assert.Equal(7, plan.Delivered.Count);

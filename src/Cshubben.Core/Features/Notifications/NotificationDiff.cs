@@ -23,6 +23,7 @@ public static class NotificationDiff
         var mentioned = Mentions(current, newFeed, events);
         AuthoredChanges(current, oldAuthored, mentioned, events);
         Merges(current, oldAuthored, newFeed, events);
+        OpenedPullRequests(current, newFeed, events);
         ReviewChanges(previous, current, oldAuthored, oldReviews, events);
 
         // Stable sort: priority first, snapshot order kept inside a kind.
@@ -50,8 +51,13 @@ public static class NotificationDiff
             if (old.Review != ReviewDecision.ChangesRequested && pr.Review == ReviewDecision.ChangesRequested)
                 events.Add(Make("changes:" + pr.Id + ":" + stamp, NotificationKind.ChangesRequested, pr));
 
-            if (IsReadyToMerge(pr) && !IsReadyToMerge(old))
+            var becameReady = IsReadyToMerge(pr) && !IsReadyToMerge(old);
+            if (becameReady)
                 events.Add(Make("ready:" + pr.Id + ":" + stamp, NotificationKind.ReadyToMerge, pr));
+
+            // "Ready to merge" already says it is approved; only tell about the approval on its own when it is not ready yet.
+            if (old.Review != ReviewDecision.Approved && pr.Review == ReviewDecision.Approved && !becameReady)
+                events.Add(Make("approved:" + pr.Id + ":" + stamp, NotificationKind.Approved, pr));
 
             if (pr.Comments > old.Comments && !mentioned.Contains(RepoKey(pr.Repo, pr.Number)))
             {
@@ -60,6 +66,26 @@ public static class NotificationDiff
                 events.Add(Make("comment:" + pr.Id + ":" + pr.Comments.ToString(CultureInfo.InvariantCulture),
                     NotificationKind.Comment, pr, detail));
             }
+        }
+    }
+
+    /// <summary>
+    /// Pull requests other people opened since the previous snapshot. Every repo is reported here; the engine keeps only
+    /// the ones in repos marked important (the diff does not know the settings).
+    /// </summary>
+    private static void OpenedPullRequests(HubSnapshot current, List<FeedItem> newFeed, List<NotificationEvent> events)
+    {
+        foreach (var item in newFeed)
+        {
+            if (item.Kind != FeedKind.Opened || item.Number is not { } number || item.IsBot) continue;
+            if (string.Equals(item.Actor, current.Viewer, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var pr = current.All.FirstOrDefault(p => p.Number == number
+                                                     && string.Equals(p.Repo, item.Repo, StringComparison.OrdinalIgnoreCase));
+            var title = pr?.Title ?? item.Title ?? "";
+            var url = pr?.Url ?? "https://github.com/" + item.Repo + "/pull/" + number.ToString(CultureInfo.InvariantCulture);
+            var id = pr?.Id ?? item.Repo + "#" + number.ToString(CultureInfo.InvariantCulture);
+            events.Add(new NotificationEvent("opened:" + RepoKey(item.Repo, number), NotificationKind.NewInImportantRepo, id, item.Repo, number, title, url, item.Actor));
         }
     }
 
