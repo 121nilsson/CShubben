@@ -73,12 +73,18 @@ static class PaletteView
                 more,
                 Kit.Muted("Enter open  ·  Ctrl+Enter on a pull request opens GitHub  ·  > commands  ·  #123 by number  ·  Esc close")
                     .TextWrapping().Margin(8, 4, 0, 0)))
-            .Background(Theme.CardBackground).WithBorder(Theme.ControlStroke).CornerRadius(8).Padding(12)
+            .Background(Theme.CardBackground).Set(b => b.Background = SolidSurface() ?? b.Background)
+            .WithBorder(Theme.ControlStroke).CornerRadius(8).Padding(12)
             .MaxWidth(640).HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Top).Margin(24, 88, 24, 24)
             .OnTapped((s, e) => e.Handled = true);
 
         return Border(card).Background(Theme.SmokeFill).OnTapped((s, e) => close());
     }
+
+    /// <summary>An opaque surface brush, so the page behind the scrim cannot show through the card.</summary>
+    private static Microsoft.UI.Xaml.Media.Brush? SolidSurface() =>
+        Application.Current.Resources.TryGetValue("SolidBackgroundFillColorSecondaryBrush", out var brush)
+        && brush is Microsoft.UI.Xaml.Media.Brush b ? b : null;
 
     private static Element Row(PaletteResult result, bool selected, Action click)
     {

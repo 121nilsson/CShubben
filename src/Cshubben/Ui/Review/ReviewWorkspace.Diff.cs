@@ -213,42 +213,45 @@ sealed partial class ReviewWorkspace
         _ => Theme.PrimaryText,
     };
 
-    /// <summary>One line of code with syntax colours; plain text for languages the highlighter does not know.</summary>
-    private static Element Highlighted(string text, string path, bool wrap)
+    /// <summary>One element per token. Spaces become non-breaking so they survive being the edge of a text block.</summary>
+    private static List<Element> TokenParts(string text, string path)
     {
-        if (!SyntaxHighlighter.IsHighlighted(path))
-            return TextBlock(text).FontFamily(ReviewKit.Mono).FontSize(12);
-
         var parts = new List<Element>();
         foreach (var token in SyntaxHighlighter.Tokenize(text, path))
         {
-            var block = TextBlock(token.Text).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(TokenColor(token.Kind));
+            var block = TextBlock(token.Text.Replace(' ', '\u00A0')).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(TokenColor(token.Kind));
             parts.Add(block.Flex(shrink: 0));
         }
 
-        return FlexRow(parts.ToArray()) with { Wrap = wrap ? FlexWrap.Wrap : FlexWrap.NoWrap };
+        return parts;
     }
+
+    /// <summary>One line of code with syntax colours.</summary>
+    private static Element Highlighted(string text, string path, bool wrap) =>
+        FlexRow(TokenParts(text, path).ToArray()) with { Wrap = wrap ? FlexWrap.Wrap : FlexWrap.NoWrap };
 
     private static Element Segments(IReadOnlyList<DiffSpan> spans, bool wrap, string path, ThemeRef strong)
     {
         var parts = new List<Element>();
         foreach (var span in spans)
         {
-            var piece = Highlighted(ReviewKit.PieceText(span.Text), path, wrap: false);
-            if (span.Changed)
+            var text = ReviewKit.PieceText(span.Text);
+            var pieces = SyntaxHighlighter.IsHighlighted(path)
+                ? TokenParts(text, path)
+                : new List<Element> { TextBlock(text.Replace(' ', '\u00A0')).FontFamily(ReviewKit.Mono).FontSize(12).Flex(shrink: 0) };
+            foreach (var piece in pieces)
             {
-                parts.Add(Grid(
-                        columns: [GridSize.Star()],
-                        rows: [GridSize.Auto],
-                        Border(Empty()).Background(strong).Opacity(0.35).Grid(row: 0, column: 0),
-                        piece.Grid(row: 0, column: 0))
-                    .Flex(shrink: 0));
-            }
-            else
-            {
-                parts.Add(piece.Flex(shrink: 0));
+                parts.Add(span.Changed
+                    ? Grid(
+                            columns: [GridSize.Auto],
+                            rows: [GridSize.Auto],
+                            Border(Empty()).Background(strong).Opacity(0.35).Grid(row: 0, column: 0),
+                            piece.Grid(row: 0, column: 0))
+                        .Flex(shrink: 0)
+                    : piece);
             }
         }
+
         return FlexRow(parts.ToArray()) with { Wrap = wrap ? FlexWrap.Wrap : FlexWrap.NoWrap };
     }
 
