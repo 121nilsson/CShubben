@@ -72,28 +72,39 @@ foreach ($shot in ($Shots -split ';')) {
     $log.Add("${name}: app exited early with code $($proc.ExitCode)")
     continue
   }
-  Start-Sleep -Seconds $WaitSeconds
   $proc.Refresh()
   $h = $proc.MainWindowHandle
   [Win]::MoveWindow($h, 0, 0, [Math]::Min($sw, $screen.Width), [Math]::Min($sh, $screen.Height), $true) | Out-Null
   [Win]::SetForegroundWindow($h) | Out-Null
-  Start-Sleep -Milliseconds 800
 
-  $r = New-Object Win+RECT
-  [Win]::GetWindowRect($h, [ref]$r) | Out-Null
-  $w = [Math]::Max(1, $r.Right - $r.Left); $hh = [Math]::Max(1, $r.Bottom - $r.Top)
-
-  # 1) PrintWindow of the window itself (works even if it is partly off-screen).
-  $bmp = New-Object System.Drawing.Bitmap $w, $hh
-  $g = [System.Drawing.Graphics]::FromImage($bmp)
-  $hdc = $g.GetHdc()
-  $ok = [Win]::PrintWindow($h, $hdc, 2)
-  $g.ReleaseHdc($hdc); $g.Dispose()
+  # Instead of a fixed sleep, capture until two consecutive frames are identical (the UI has settled).
+  $sha = [System.Security.Cryptography.SHA1]::Create()
+  $prevHash = ''; $stable = 0; $bmp = $null
+  $started = Get-Date
+  $limit = $started.AddSeconds([Math]::Max(4, $WaitSeconds * 2))
+  while ($true) {
+    Start-Sleep -Milliseconds 350
+    $r = New-Object Win+RECT
+    [Win]::GetWindowRect($h, [ref]$r) | Out-Null
+    $w = [Math]::Max(1, $r.Right - $r.Left); $hh = [Math]::Max(1, $r.Bottom - $r.Top)
+    if ($bmp) { $bmp.Dispose() }
+    $bmp = New-Object System.Drawing.Bitmap $w, $hh
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $hdc = $g.GetHdc()
+    $ok = [Win]::PrintWindow($h, $hdc, 2)
+    $g.ReleaseHdc($hdc); $g.Dispose()
+    $ms = New-Object System.IO.MemoryStream
+    $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $hash = [Convert]::ToBase64String($sha.ComputeHash($ms.ToArray())); $ms.Dispose()
+    if ($hash -eq $prevHash) { $stable++ } else { $stable = 0 }
+    $prevHash = $hash
+    $elapsed = ((Get-Date) - $started).TotalSeconds
+    if (($stable -ge 2 -and $elapsed -ge 1.4) -or (Get-Date) -gt $limit) { break }
+  }
   $bmp.Save((Join-Path $OutDir "$name.png"), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
 
-  $log.Add("${name}: ${w}x${hh} printwindow=$ok")
+  $log.Add("${name}: ${w}x${hh} printwindow=$ok settled=$([Math]::Round($elapsed,1))s")
   Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-  Start-Sleep -Milliseconds 300
 }
 
 $log | Tee-Object -FilePath (Join-Path $OutDir "log.txt")
