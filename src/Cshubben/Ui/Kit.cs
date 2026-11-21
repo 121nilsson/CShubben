@@ -68,7 +68,7 @@ static class Kit
     /// <summary>Caps page content width on large windows. Left-aligned, so every page title sits at the same x.</summary>
     public static Element Capped(Element content, double max = 1100) =>
         Grid(
-            columns: [GridSize.Star().MaxSize(max), GridSize.Star()],
+            columns: [GridSize.Star(1000).MaxSize(max), GridSize.Star(0.001)],
             rows: [GridSize.Star()],
             content.Grid(column: 0));
 
