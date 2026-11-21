@@ -129,14 +129,12 @@ public class DigestTests
         var summary = Prompts.ActivityDigest("Yesterday", "peter", digest);
         Assert.Contains("Summarize what was merged", summary.UserPrompt);
         Assert.DoesNotContain("User question", summary.UserPrompt);
-        Assert.Equal(1, CountOf(summary.UserPrompt, Prompts.EndMarker));
+        Assert.Equal(1, summary.UserPrompt.Split('\n').Count(l => l == Prompts.EndMarker));
 
         var asked = Prompts.ActivityDigest("Yesterday", "peter", digest, "Which repo changed most?");
         Assert.EndsWith("Which repo changed most?", asked.UserPrompt);
         Assert.Contains("User question (from the app user, trusted)", asked.UserPrompt);
     }
-
-    private static int CountOf(string text, string part) => text.Split(part).Length - 1;
 
     [Fact]
     public void Activity_defaults_to_a_cheap_profile_and_other_functions_follow_the_general_setting()

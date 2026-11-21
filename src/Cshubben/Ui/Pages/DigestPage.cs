@@ -5,6 +5,7 @@ using Cshubben.Core.Features.Digest;
 using Cshubben.Core.Features.Notes;
 using Cshubben.Core.Features.Settings;
 using Cshubben.Core.Model;
+using Cshubben.Core.Logic;
 using Cshubben.Services;
 using Cshubben.Ui.Assist;
 using Microsoft.UI.Reactor;
@@ -152,7 +153,6 @@ sealed class DigestPage : Component<PageContext>
             cost,
             Kit.Muted(scopeNote + " " + defaults).TextWrapping(),
             Button(running ? "Working…" : "Summarize", () => Start(false)).AccentButton().IsEnabled(canRun).AutomationName("Summarize the period"),
-            Separator(),
             TextBox(question, setQuestion, placeholderText: "Or ask a question about the period, for example: which repository changed the most?")
                 .AcceptsReturn().TextWrapping(TextWrapping.Wrap).MinHeight(64),
             Button("Ask Claude", () => Start(true)).IsEnabled(canRun && question.Trim().Length > 0)));
