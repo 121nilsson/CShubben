@@ -16,9 +16,11 @@ jobs:
   smoke:
     runs-on: windows-latest
     timeout-minutes: 20
+    # Secrets live in the live-smoke Environment (can be limited to main and to required reviewers).
+    environment: live-smoke
     env:
       # GH_TOKEN is read by the app (GITHUB_TOKEN / GH_TOKEN). Empty when the secret is not set.
-      GH_TOKEN: ${{ secrets.SMOKE_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.SMOKE_GITHUB_TOKEN || secrets.GH_TOKEN || secrets.GITHUB_PAT }}
       LINEAR_API_KEY: ${{ secrets.SMOKE_LINEAR_KEY }}
     steps:
       - uses: actions/checkout@v7
