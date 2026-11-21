@@ -73,7 +73,7 @@ static class PaletteView
                 more,
                 Kit.Muted("Enter open  ·  Ctrl+Enter on a pull request opens GitHub  ·  > commands  ·  #123 by number  ·  Esc close")
                     .TextWrapping().Margin(8, 4, 0, 0)))
-            .Background(Theme.CardBackground).Set(b => b.Background = SolidSurface() ?? b.Background)
+            .Set(SolidSurface)
             .WithBorder(Theme.ControlStroke).CornerRadius(8).Padding(12)
             .MaxWidth(640).HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Top).Margin(24, 88, 24, 24)
             .OnTapped((s, e) => e.Handled = true);
@@ -81,10 +81,23 @@ static class PaletteView
         return Border(card).Background(Theme.SmokeFill).OnTapped((s, e) => close());
     }
 
-    /// <summary>An opaque surface brush, so the page behind the scrim cannot show through the card.</summary>
-    private static Microsoft.UI.Xaml.Media.Brush? SolidSurface() =>
-        Application.Current.Resources.TryGetValue("SolidBackgroundFillColorSecondaryBrush", out var brush)
-        && brush is Microsoft.UI.Xaml.Media.Brush b ? b : null;
+    /// <summary>
+    /// Gives the card an opaque background that follows the window's actual theme, so the page behind the scrim
+    /// cannot show through. Theme tokens are translucent and a looked-up app resource ignores the window's theme.
+    /// </summary>
+    private static void SolidSurface(Border card)
+    {
+        if (card.Tag is "solid-surface") return;
+        card.Tag = "solid-surface";
+
+        void Apply() => card.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(card.ActualTheme == ElementTheme.Dark
+            ? Windows.UI.Color.FromArgb(255, 44, 44, 44)
+            : Windows.UI.Color.FromArgb(255, 251, 251, 251));
+
+        Apply();
+        card.Loaded += (_, _) => Apply();
+        card.ActualThemeChanged += (_, _) => Apply();
+    }
 
     private static Element Row(PaletteResult result, bool selected, Action click)
     {
