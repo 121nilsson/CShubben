@@ -1,9 +1,11 @@
 name: Release
 
 # Tag v1.2.3 -> Velopack installer + update packages for x64 and ARM64, attached to a GitHub Release.
+# A manual run builds and packs everything as version 0.0.0-test but does not create a release (a dry run of the pipeline).
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -33,7 +35,7 @@ jobs:
       - name: Version from tag
         shell: pwsh
         run: |
-          $v = "${{ github.ref_name }}".TrimStart('v')
+          $v = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}".TrimStart('v') } else { "0.0.0-test" }
           "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $rid = if ("${{ matrix.platform }}" -eq "ARM64") { "win-arm64" } else { "win-x64" }
           "RID=$rid" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -59,6 +61,7 @@ jobs:
 
   release:
     needs: package
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write
