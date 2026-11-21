@@ -55,7 +55,15 @@ public static class SyntaxHighlighter
 
     private static readonly HashSet<string> JsonKeywords = new(StringComparer.Ordinal) { "true", "false", "null" };
 
+    /// <summary>TextMate grammars when they are available for the file, otherwise the basic tokenizer.</summary>
     public static IReadOnlyList<CodeToken> Tokenize(string text, string path)
+    {
+        if (text.Length > 0 && text.Length <= MaxLineLength && TextMateTokenizer.Tokenize(text, path) is { } tokens) return tokens;
+        return TokenizeBasic(text, path);
+    }
+
+    /// <summary>The built-in tokenizer for C-like, hash-comment and JSON files.</summary>
+    public static IReadOnlyList<CodeToken> TokenizeBasic(string text, string path)
     {
         var family = FamilyOf(path);
         if (family == Family.None || text.Length == 0 || text.Length > MaxLineLength)
@@ -189,7 +197,7 @@ public static class SyntaxHighlighter
         return tokens;
     }
 
-    public static bool IsHighlighted(string path) => FamilyOf(path) != Family.None;
+    public static bool IsHighlighted(string path) => FamilyOf(path) != Family.None || TextMateTokenizer.Supports(path);
 
     private static void Add(List<CodeToken> tokens, string text, TokenKind kind)
     {

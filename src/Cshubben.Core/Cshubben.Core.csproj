@@ -4,4 +4,7 @@
     <RootNamespace>Cshubben.Core</RootNamespace>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TextMateSharp.Grammars" />
+  </ItemGroup>
 </Project>
