@@ -196,7 +196,13 @@ sealed partial class ReviewWorkspace
         }
 
         if (SyntaxHighlighter.IsHighlighted(file.Path))
-            return Highlighted(ReviewKit.CodeText(line.Text), file.Path, S.Wrap);
+        {
+            // Lines revealed from a gap are not part of any hunk, so they are highlighted on their own.
+            if (row.LineIndex < 0 || row.HunkIndex < 0 || row.HunkIndex >= file.Hunks.Count)
+                return Highlighted(ReviewKit.CodeText(line.Text), file.Path, S.Wrap);
+            var tokens = HunkHighlighter.TokensFor(file.Hunks[row.HunkIndex], row.LineIndex, file.Path);
+            return FlexRow(TokenParts(tokens).ToArray()) with { Wrap = S.Wrap ? FlexWrap.Wrap : FlexWrap.NoWrap };
+        }
 
         var plain = TextBlock(ReviewKit.CodeText(line.Text)).FontFamily(ReviewKit.Mono).FontSize(12);
         return S.Wrap
@@ -214,15 +220,17 @@ sealed partial class ReviewWorkspace
     };
 
     /// <summary>One element per token. Spaces become non-breaking so they survive being the edge of a text block.</summary>
-    private static List<Element> TokenParts(string text, string path)
+    private static List<Element> TokenParts(string text, string path) =>
+        TokenParts(SyntaxHighlighter.Tokenize(text.Replace('\u00A0', ' '), path));
+
+    private static List<Element> TokenParts(IReadOnlyList<CodeToken> tokens)
     {
         // A text block drops trailing spaces when it is measured, so they travel to the start of the next token.
         var parts = new List<Element>();
-        text = text.Replace('\u00A0', ' ');
         var carry = "";
-        foreach (var token in SyntaxHighlighter.Tokenize(text, path))
+        foreach (var token in tokens)
         {
-            var full = carry + token.Text;
+            var full = carry + token.Text.Replace('\u00A0', ' ').Replace("\t", "    ", StringComparison.Ordinal);
             var body = full.TrimEnd(' ');
             carry = full.Substring(body.Length);
             if (body.Length == 0) continue;

@@ -22,6 +22,13 @@ static class TextMateTokenizer
     /// <summary>Tokens for the line, or null when there is no grammar or the engine is unavailable.</summary>
     public static IReadOnlyList<CodeToken>? Tokenize(string text, string path)
     {
+        IStateStack? state = null;
+        return Tokenize(text, path, ref state);
+    }
+
+    /// <summary>Like the stateless overload, but starts from <paramref name="state"/> and leaves the state after the line in it.</summary>
+    public static IReadOnlyList<CodeToken>? Tokenize(string text, string path, ref IStateStack? state)
+    {
         lock (Gate)
         {
             try
@@ -29,7 +36,8 @@ static class TextMateTokenizer
                 var grammar = GrammarFor(path);
                 if (grammar is null) return null;
 
-                var result = grammar.TokenizeLine(text, null, TimeSpan.FromSeconds(2));
+                var result = grammar.TokenizeLine(text, state, TimeSpan.FromSeconds(2));
+                state = result.RuleStack;
                 var tokens = new List<CodeToken>();
                 var pos = 0;
                 foreach (var token in result.Tokens)
