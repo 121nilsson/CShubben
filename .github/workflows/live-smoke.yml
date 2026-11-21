@@ -26,8 +26,15 @@ jobs:
       - name: Which secrets are present
         shell: pwsh
         run: |
-          "SMOKE_GITHUB_TOKEN set: $([bool]$env:GH_TOKEN)"
-          "SMOKE_LINEAR_KEY set:   $([bool]$env:LINEAR_API_KEY)"
+          # Shape only, never the value: length, the type prefix before the first underscore or dash, and stray characters.
+          function Shape($name, $v) {
+            if (-not $v) { return "$name set: False" }
+            $prefix = if ($v -match '^([A-Za-z]+)[_-]') { $Matches[1] } else { '(no prefix)' }
+            $stray = @(); if ($v -match '\s') { $stray += 'whitespace' }; if ($v -match '["'']') { $stray += 'quotes' }; if ($v -match '^(?i)bearer') { $stray += 'Bearer word' }
+            "$name set: True, length $($v.Length), type prefix $prefix, stray: $(if ($stray) { $stray -join ', ' } else { 'none' })"
+          }
+          Shape 'SMOKE_GITHUB_TOKEN' $env:GH_TOKEN
+          Shape 'SMOKE_LINEAR_KEY  ' $env:LINEAR_API_KEY
 
       - name: GitHub probes (viewer, rate limit, merged PRs, reviewed PRs)
         if: ${{ env.GH_TOKEN != '' }}
