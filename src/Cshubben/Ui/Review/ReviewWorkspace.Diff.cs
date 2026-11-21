@@ -216,10 +216,16 @@ sealed partial class ReviewWorkspace
     /// <summary>One element per token. Spaces become non-breaking so they survive being the edge of a text block.</summary>
     private static List<Element> TokenParts(string text, string path)
     {
+        // A text block drops trailing spaces when it is measured, so they travel to the start of the next token.
         var parts = new List<Element>();
+        var carry = "";
         foreach (var token in SyntaxHighlighter.Tokenize(text, path))
         {
-            var block = TextBlock(token.Text.Replace(' ', '\u00A0')).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(TokenColor(token.Kind));
+            var full = carry + token.Text;
+            var body = full.TrimEnd(' ');
+            carry = full.Substring(body.Length);
+            if (body.Length == 0) continue;
+            var block = TextBlock(body.Replace(' ', '\u00A0')).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(TokenColor(token.Kind));
             parts.Add(block.Flex(shrink: 0));
         }
 
