@@ -35,6 +35,10 @@ static class PaletteView
                         move(-1);
                         e.Handled = true;
                         break;
+                    case VirtualKey.Tab:
+                        move(KeyInput.IsDown(VirtualKey.Shift) ? -1 : 1);
+                        e.Handled = true;
+                        break;
                     case VirtualKey.Escape:
                         close();
                         e.Handled = true;
@@ -97,9 +101,17 @@ static class PaletteView
             text.VAlign(VerticalAlignment.Center).Grid(column: 1),
             shortcut.Grid(column: 2));
 
-        return Border(Button(row, click)
-                .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
-                .AutomationName(item.Title))
+        var button = Button(row, click)
+            .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
+            .AutomationName(item.Title);
+        var bar = Border(Empty()).Width(3).CornerRadius(2).Margin(0, 6, 0, 6);
+        if (selected) bar = bar.Background(Theme.Accent);
+
+        return Border(Grid(
+                columns: [GridSize.Px(5), GridSize.Star()],
+                rows: [GridSize.Auto],
+                bar.Grid(column: 0),
+                button.Grid(column: 1)))
             .Selected(selected).CornerRadius(6);
     }
 

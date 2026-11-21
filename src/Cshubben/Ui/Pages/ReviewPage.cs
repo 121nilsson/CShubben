@@ -46,7 +46,7 @@ sealed class ReviewPage : Component
         // Hooks run unconditionally; the fetcher returns null when there is nothing to review.
         var resource = UseResource<ReviewBundle?>(
             async ct => target is null ? null : await ReviewBundle.LoadAsync(data, drafts, target, pr, initial, ct),
-            new object?[] { data, drafts, target?.Id, initial },
+            new object[] { data, drafts, target?.Id!, initial },
             new ResourceOptions(CacheTime: TimeSpan.Zero));
 
         if (target is null)

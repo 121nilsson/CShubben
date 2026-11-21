@@ -56,6 +56,7 @@ sealed class PaletteHost : Component<PaletteHostProps>
     public override Element Render()
     {
         var ctx = Props.Ctx;
+        var (_, windowHeight) = UseWindowSize();
         var (open, setOpen) = UseState(false, true);
         var (help, setHelp) = UseState(false, true);
         var (query, setQuery) = UseState("");
@@ -199,7 +200,7 @@ sealed class PaletteHost : Component<PaletteHostProps>
                 },
                 results,
                 current,
-                VisibleRows,
+                Math.Clamp((windowHeight - 270) / 48, 3, VisibleRows),
                 Run,
                 delta => setSelected(PaletteNavigation.Move(current, delta, results.Count)),
                 Close).Grid(row: 0, column: 0));
