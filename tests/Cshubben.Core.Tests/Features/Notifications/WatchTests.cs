@@ -143,16 +143,16 @@ public class WatchTests
     [Fact]
     public void Linear_state_keeps_only_the_out_of_sync_kinds_worth_a_toast()
     {
-        var open = new[] { Issue("A-1", LinearStateType.Started, "In Progress") };
+        var open = new[] { Issue("ABC-1", LinearStateType.Started, "In Progress") };
         var prs = new[]
         {
-            new ReconPr("acme/api", 5, "A-1: ship it", "https://github.com/acme/api/pull/5", "feat/a-1", true),
+            new ReconPr("acme/api", 5, "ABC-1: ship it", "https://github.com/acme/api/pull/5", "feat/abc-1", true),
             new ReconPr("acme/web", 6, "No identifier here", "https://github.com/acme/web/pull/6", "feat/x", false),
         };
         var state = WatchSources.FromLinear(open, Array.Empty<LinearIssue>(), prs);
         Assert.Single(state.Issues);
         var sync = Assert.Single(state.OutOfSync);
-        Assert.Equal("A-1", sync.Identifier);
-        Assert.StartsWith("MergedButIssueOpen|A-1|acme/api#5", sync.Key);
+        Assert.Equal("ABC-1", sync.Identifier);
+        Assert.StartsWith("MergedButIssueOpen|ABC-1|acme/api#5", sync.Key);
     }
 }

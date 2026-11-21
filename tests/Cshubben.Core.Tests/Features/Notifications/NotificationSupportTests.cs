@@ -223,7 +223,10 @@ public class PlatformContractTests
         foreach (var kind in Enum.GetValues<NotificationKind>())
         {
             var e = new NotificationEvent("k", kind, "id", "acme/api", 7, "Fix it", "https://x/y", "alice");
-            Assert.Contains("acme/api #7", NotificationText.Headline(e));
+            var aboutAPullRequest = kind is not (NotificationKind.MainRed or NotificationKind.DeployFailed
+                or NotificationKind.LinearAssigned or NotificationKind.LinearOutOfSync);
+            if (aboutAPullRequest) Assert.Contains("acme/api #7", NotificationText.Headline(e));
+            else Assert.False(string.IsNullOrWhiteSpace(NotificationText.Headline(e)));
             Assert.False(string.IsNullOrWhiteSpace(NotificationText.Body(e)));
         }
     }
