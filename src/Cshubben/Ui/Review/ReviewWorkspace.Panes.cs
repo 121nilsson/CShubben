@@ -44,7 +44,7 @@ sealed partial class ReviewWorkspace
             ThreeColumns ? Empty() : Button("Conversation" + (conversationCount > 0 ? " (" + conversationCount + ")" : ""),
                     () => Update(s => s with { Screen = s.Screen == 2 ? 1 : 2 })).SubtleButton().AutomationName("Show conversation"),
             help,
-            primary) with { ColumnGap = 8 };
+            primary) with { ColumnGap = 8, RowGap = 4, Wrap = FlexWrap.Wrap, AlignItems = FlexAlign.Center };
 
         var titleRow = Narrow
             ? (Element)(FlexColumn(titleBlock, actions) with { RowGap = 8 })
