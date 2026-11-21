@@ -116,11 +116,21 @@ sealed class AppServices
                 {
                     _cacheRead = true;
                     var cached = SnapshotCache.TryLoad(AppPaths.DataDirectory);
-                    if (cached is not null) _initialSnapshot = SnapshotFilter.Apply(cached, Settings);
+                    if (cached is not null)
+                    {
+                        ObserveRepos(cached);
+                        _initialSnapshot = SnapshotFilter.Apply(cached, Settings);
+                    }
                 }
                 return _initialSnapshot;
             }
-            _initialSnapshot ??= SnapshotFilter.Apply(_demo.Build(), Settings);
+            if (_initialSnapshot is null)
+            {
+                var demo = _demo.Build();
+                ObserveRepos(demo);
+                _initialSnapshot = SnapshotFilter.Apply(demo, Settings);
+            }
+
             return _initialSnapshot;
         }
     }
