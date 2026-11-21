@@ -7,15 +7,35 @@ namespace Cshubben.Core.Features.Notifications;
 public enum NotificationKind
 {
     CiFailed,
+
+    /// <summary>The default branch of an important repo turned red (found by the background Drift check).</summary>
+    MainRed,
+
+    /// <summary>A deployment in an important repo failed (background Drift check).</summary>
+    DeployFailed,
     ChangesRequested,
     ReReviewRequested,
     ReviewRequested,
     Mention,
     ReadyToMerge,
+
+    /// <summary>A pull request and its Linear issue disagree (merged but issue open, or issue done but PR open).</summary>
+    LinearOutOfSync,
+
+    /// <summary>A Linear issue was assigned to me.</summary>
+    LinearAssigned,
     Approved,
     NewInImportantRepo,
     Comment,
     Merged,
+}
+
+/// <summary>Facts about kinds that the engine needs.</summary>
+public static class NotificationKinds
+{
+    /// <summary>Kinds that only apply to repos marked important (they come from every repo otherwise and would be noise).</summary>
+    public static bool NeedsImportantRepo(NotificationKind kind) =>
+        kind is NotificationKind.NewInImportantRepo or NotificationKind.MainRed or NotificationKind.DeployFailed;
 }
 
 /// <summary>One thing worth telling the user about, found by diffing two snapshots.</summary>
@@ -92,6 +112,18 @@ public sealed record NotificationPrefs
     /// <summary>Someone else opened a pull request in a repo marked important.</summary>
     public bool NewInImportantRepo { get; init; } = true;
 
+    /// <summary>The default branch of an important repo turned red.</summary>
+    public bool MainRed { get; init; } = true;
+
+    /// <summary>A deployment in an important repo failed.</summary>
+    public bool DeployFailed { get; init; } = true;
+
+    /// <summary>A Linear issue was assigned to me.</summary>
+    public bool LinearAssigned { get; init; } = true;
+
+    /// <summary>A pull request and its Linear issue disagree.</summary>
+    public bool LinearOutOfSync { get; init; } = true;
+
     /// <summary>Repos (owner/name) marked important. Only these produce <see cref="NotificationKind.NewInImportantRepo"/>.</summary>
     public IReadOnlyList<string> ImportantRepos { get; init; } = Array.Empty<string>();
 
@@ -128,6 +160,10 @@ public sealed record NotificationPrefs
         NotificationKind.ReadyToMerge => ReadyToMerge,
         NotificationKind.Approved => Approved,
         NotificationKind.NewInImportantRepo => NewInImportantRepo,
+        NotificationKind.MainRed => MainRed,
+        NotificationKind.DeployFailed => DeployFailed,
+        NotificationKind.LinearAssigned => LinearAssigned,
+        NotificationKind.LinearOutOfSync => LinearOutOfSync,
         NotificationKind.Comment => Comment,
         NotificationKind.Merged => Merged,
         _ => false,

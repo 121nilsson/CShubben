@@ -12,6 +12,10 @@ public static class NotificationText
         var what = e.Repo + " #" + e.Number.ToString(CultureInfo.InvariantCulture);
         return e.Kind switch
         {
+            NotificationKind.MainRed => "Main is red: " + e.Repo,
+            NotificationKind.DeployFailed => "Deploy failed: " + e.Repo + (e.Detail.Length > 0 ? " (" + e.Detail + ")" : ""),
+            NotificationKind.LinearAssigned => "Assigned to you: " + e.Detail,
+            NotificationKind.LinearOutOfSync => "Linear out of sync: " + e.Detail,
             NotificationKind.CiFailed => "CI failed: " + what,
             NotificationKind.ChangesRequested => "Changes requested: " + what,
             NotificationKind.ReReviewRequested => "Re-review requested: " + what,
@@ -34,6 +38,7 @@ public static class NotificationText
             NotificationKind.ReviewRequested or NotificationKind.ReReviewRequested =>
                 detail.Length > 0 ? detail + " - " + e.Title : e.Title,
             NotificationKind.Mention => detail.Length > 0 ? detail + " mentioned you - " + e.Title : e.Title,
+            NotificationKind.LinearAssigned => e.Title,
             NotificationKind.Comment or NotificationKind.NewInImportantRepo => detail.Length > 0 ? detail + " - " + e.Title : e.Title,
             _ => e.Title,
         };
@@ -49,7 +54,7 @@ public static class NotificationText
         var lines = events.Take(MaxDigestLines).Select(Headline).ToList();
         if (n > MaxDigestLines) lines.Add("and " + (n - MaxDigestLines).ToString(CultureInfo.InvariantCulture) + " more");
         return new ToastMessage(
-            n.ToString(CultureInfo.InvariantCulture) + " pull request updates",
+            n.ToString(CultureInfo.InvariantCulture) + " updates",
             string.Join("\n", lines),
             null,
             true,

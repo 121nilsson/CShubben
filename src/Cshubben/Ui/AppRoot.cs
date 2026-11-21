@@ -63,6 +63,7 @@ sealed class AppRoot : Component
                 if (!services.IsDemo) _ = Task.Run(() => SnapshotCache.TrySave(AppPaths.DataDirectory, loaded));
                 IntegrationWiring.AttachGitHub(services);
                 NotificationsHub.OnSnapshot(loaded, services.Settings, services.IsDemo);
+                BackgroundWatch.Tick(loaded, services.Settings, services.IsDemo);
                 setError(null);
                 pausedUntil.Current = null;
                 setNotice(services.DemoReason is { } reason ? "Showing demo data. " + reason : null);

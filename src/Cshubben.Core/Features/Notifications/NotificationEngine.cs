@@ -36,11 +36,28 @@ public sealed class NotificationEngine
     {
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(prefs);
-        var p = prefs.Sanitized();
-
         var candidates = new List<NotificationEvent>(_deferred);
         _deferred.Clear();
         candidates.AddRange(NotificationDiff.Compute(previous, current));
+        return Decide(candidates, prefs.Sanitized(), now);
+    }
+
+    /// <summary>
+    /// Plans toasts for events found elsewhere (the background Drift and Linear checks). Same rules as <see cref="Plan"/>:
+    /// toggles, mute list, important repos, seen-set, quiet hours and digest.
+    /// </summary>
+    public NotificationPlan PlanEvents(IEnumerable<NotificationEvent> events, NotificationPrefs prefs, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        ArgumentNullException.ThrowIfNull(prefs);
+        var candidates = new List<NotificationEvent>(_deferred);
+        _deferred.Clear();
+        candidates.AddRange(events);
+        return Decide(candidates, prefs.Sanitized(), now);
+    }
+
+    private NotificationPlan Decide(List<NotificationEvent> candidates, NotificationPrefs p, DateTimeOffset now)
+    {
         if (candidates.Count == 0) return NotificationPlan.Empty;
 
         if (!p.Enabled) return new NotificationPlan(Array.Empty<ToastMessage>(), Array.Empty<NotificationEvent>(), 0, candidates.Count);
@@ -52,7 +69,7 @@ public sealed class NotificationEngine
         {
             if (!p.IsKindEnabled(e.Kind)
                 || p.IsMuted(e.Repo)
-                || (e.Kind == NotificationKind.NewInImportantRepo && !p.IsImportant(e.Repo))
+                || (NotificationKinds.NeedsImportantRepo(e.Kind) && !p.IsImportant(e.Repo))
                 || _seen.Contains(e.Key)
                 || !batchKeys.Add(e.Key))
             {

@@ -134,6 +134,28 @@ static class NotificationsHub
         }
     }
 
+    /// <summary>
+    /// Events found by the background Drift and Linear checks. Goes through the same rules as pull request events
+    /// (toggles, mute list, important repos, quiet hours, digest). Never throws.
+    /// </summary>
+    public static void OnExtra(IReadOnlyList<NotificationEvent> events, AppSettings settings)
+    {
+        if (events.Count == 0) return;
+        try
+        {
+            lock (Gate)
+            {
+                if (_engine is null || !Toasts.IsAvailable) return;
+                var plan = _engine.PlanEvents(events, Effective(settings, Prefs), DateTimeOffset.Now);
+                foreach (var message in plan.Messages) Toasts.Show(message);
+            }
+        }
+        catch (Exception)
+        {
+            // Notifications are a convenience.
+        }
+    }
+
     /// <summary>The preferences the engine uses: the app settings win for the master switch, the three classic toggles and the mute lists.</summary>
     public static NotificationPrefs Effective(AppSettings settings, NotificationPrefs prefs) => prefs with
     {
