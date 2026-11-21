@@ -266,6 +266,31 @@ public static class Prompts
         return new PromptPair(system, user);
     }
 
+    // ---- Question about code lines ---------------------------------------------------------------------------
+
+    public const int MaxCodeChars = 20_000;
+
+    /// <summary>A question about the picked lines of a diff. The code and the pull request title are untrusted data; the question is the app user's own.</summary>
+    public static PromptPair CodeQuestion(string repo, int number, string title, string path, string label, string code, string question)
+    {
+        var data = new DataSection();
+        data.Line("Repo", repo, 120);
+        data.Line("Pull request", "#" + number + " " + title, 200);
+        data.Line("File", path, 300);
+        data.Line("Selection", label, 60);
+        data.Block("Code (diff lines: + added, - removed, space unchanged)", code, MaxCodeChars, "\n[... the code is truncated]");
+
+        var system = BuildSystem(
+            "You are the code reading engine in Cshubben, a hub over a developer's GitHub pull requests. You get a few lines from a diff and a question about them.",
+            "- Answer the question at the end of the user message, based on the lines shown. You cannot see the rest of the file or the repository; say so when that limits the answer.\n" +
+            "- Be concrete and brief. Refer to lines by their content, not by invented line numbers.\n" +
+            "- Answer in Markdown. Use a code block only when it helps.");
+
+        var user = data.Render("Answer the question below about the selected lines.", TrailerText)
+            + "\n\nUser question (from the app user, trusted): " + PromptText.OneLine(question, 1_000);
+        return new PromptPair(system, user);
+    }
+
     // ---- Pull request prompts -------------------------------------------------------------------------------
 
     private static void AddPrMetadata(DataSection data, PullRequest pr)

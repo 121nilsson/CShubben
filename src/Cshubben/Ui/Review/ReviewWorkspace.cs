@@ -114,6 +114,7 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
 
         var layers = new List<Element> { page.Grid(row: 0, column: 0) };
         if (state.SubmitOpen) layers.Add(BuildSubmitDialog().Grid(row: 0, column: 0));
+        else if (state.Ask is not null) layers.Add(BuildAskPanel(state.Ask).Grid(row: 0, column: 0));
         else if (state.HelpOpen) layers.Add(HelpOverlay.Build(() => Update(s => s with { HelpOpen = false })).Grid(row: 0, column: 0));
         var root = Grid(columns: [GridSize.Star()], rows: [GridSize.Star()], layers.ToArray());
 
@@ -188,6 +189,8 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
             case ReviewCommand.NextThread: GoToThread(true); break;
             case ReviewCommand.PreviousThread: GoToThread(false); break;
             case ReviewCommand.Comment: CommentOnCursor(); break;
+            case ReviewCommand.MarkLine: MarkLine(); break;
+            case ReviewCommand.AskAboutCode: OpenAsk(); break;
             case ReviewCommand.ToggleViewed: ToggleCurrentViewed(); break;
             case ReviewCommand.ToggleSplit: ToggleSplit(); break;
             case ReviewCommand.FocusFilter: FocusFilter(); break;

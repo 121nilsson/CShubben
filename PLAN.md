@@ -126,3 +126,9 @@ Remaining:
 - GitHub look: Octicons (merge, PR, closed, commit, branch, comment, check, cross) built from parsed SVG (`SvgPath` in Core, `GitHubStyle` in the app) in GitHub colours (purple merged, green open, red failed). Reactor's own path-text parser failed on icon data, so do not pass path strings to `PathDataString`.
 - Notifications: new kinds Approved, NewInImportantRepo, MainRed, DeployFailed, LinearAssigned, LinearOutOfSync. `BackgroundWatch` checks Drift (important repos, every 5 min) and Linear (every 3 min) after each refresh; `WatchDiff` (Core) finds the changes and `WatchSources` (Core/Composition) maps Drift and Linear results to plain values. First check is a baseline. Not tried with real toasts.
 - Ideas not built: notification history/bell, Linear team board and cycle progress, Drift mismatch with My-hub (red main not flagged, waiting deployments counted as running), repo chips in the review queue.
+
+### 2026-11-21, late evening: Claude integration
+- Model and effort per Claude function (`ClaudeFeature`, `AppSettings.ClaudeProfiles`, `ClaudeSettings.Resolve`). Order: user choice for the function, the function's default (Activity = haiku/low), the general Settings value. The general value was never applied before; `RealClaudeAssistant` now applies it.
+- Claude page (`Features/Digest`, `GitHubDigestData`, `DigestPage`): summaries of merged PRs for yesterday, 7 days, 30 days and this year across watched repos, with a free question and a per-run model/effort override. Runs only on a button press.
+- Review workspace: `m` marks a line, `a` asks Claude about the marked range or the selected line (`CodeSelectionBuilder`, `Prompts.CodeQuestion`). Claude sees only those lines.
+- Not done: asking Claude for a full review from the workspace (the PR inspector still has "Draft review"), live check of the Claude page with real data.

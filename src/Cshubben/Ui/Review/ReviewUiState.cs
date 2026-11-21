@@ -2,6 +2,9 @@ using Cshubben.Core.Features.Review;
 
 namespace Cshubben.Ui.Review;
 
+/// <summary>The question panel for picked lines. Answer is null until Claude replied.</summary>
+sealed record AskState(string Path, CodeSelection Selection, string Question, bool Running, Cshubben.Core.Features.Claude.ClaudeResult? Answer);
+
 /// <summary>Where the inline composer is open and what it starts with.</summary>
 sealed record ComposerState(string Path, int Line, DiffSide Side, int? StartLine, string Initial, string? EditPendingId = null);
 
@@ -59,6 +62,12 @@ sealed record ReviewUiState
 
     public bool FindOpen { get; init; }
 
+    /// <summary>Row key where a range of lines was marked, to ask about the lines up to the cursor.</summary>
+    public string? MarkKey { get; init; }
+
+    /// <summary>The open "ask Claude about these lines" panel.</summary>
+    public AskState? Ask { get; init; }
+
     public string FindQuery { get; init; } = string.Empty;
 
     /// <summary>Index of the current match, -1 before the first jump.</summary>
@@ -96,5 +105,5 @@ sealed record ReviewUiState
 
     /// <summary>True while a text box has focus or a dialog is open: single-key shortcuts must stay quiet then.</summary>
     public bool Typing =>
-        Composer is not null || ReplyThreadId is not null || EditCommentId is not null || SubmitOpen || HelpOpen || FilterFocused || FindFocused;
+        Composer is not null || ReplyThreadId is not null || EditCommentId is not null || SubmitOpen || HelpOpen || FilterFocused || FindFocused || Ask is not null;
 }
