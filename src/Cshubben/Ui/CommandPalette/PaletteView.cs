@@ -85,7 +85,7 @@ static class PaletteView
     /// Gives the card an opaque background that follows the window's actual theme, so the page behind the scrim
     /// cannot show through. Theme tokens are translucent and a looked-up app resource ignores the window's theme.
     /// </summary>
-    private static void SolidSurface(Border card)
+    private static void SolidSurface(Microsoft.UI.Xaml.Controls.Border card)
     {
         if (card.Tag is "solid-surface") return;
         card.Tag = "solid-surface";
