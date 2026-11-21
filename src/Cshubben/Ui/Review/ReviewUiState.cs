@@ -91,8 +91,8 @@ sealed record ReviewUiState
 
     public bool ShowDescription { get; init; }
 
-    /// <summary>Wrap long code lines instead of cutting them off (off by default so line numbers stay aligned).</summary>
-    public bool Wrap { get; init; }
+    /// <summary>Wrap long code lines. On by default: without it long lines are cut off and the diff has no horizontal scroll.</summary>
+    public bool Wrap { get; init; } = true;
 
     /// <summary>True while a text box has focus or a dialog is open: single-key shortcuts must stay quiet then.</summary>
     public bool Typing =>
