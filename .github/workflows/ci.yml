@@ -76,7 +76,7 @@ jobs:
       matrix:
         include:
           - shard: 1
-            shots: "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings;notes --select n-decision;review --select a1;overview --select a1 --tab 1;overview --select a1 --tab 3;overview --palette;review --select a1 --file payments.ts @1000x760"
+            shots: "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings;notes --select n-decision;notes --select n-links;review --select a1;overview --select a1 --tab 1;overview --select a1 --tab 3;overview --palette;review --select a1 --file payments.ts @1000x760"
           - shard: 2
             shots: "overview @1000x760;overview --select a1 @1000x760;reviews --select r3 @1000x760;notes @1000x760;notes --select n-decision @1000x760;review --select a1 @1000x760;linear @1000x760;stats @1000x760;settings @1000x760;overview @640x900;overview --select a1 @640x900;overview --select a1 --tab 1 @640x900;drift @1000x760;feed @1000x760;overview --palette pay @1000x560"
           - shard: 3
