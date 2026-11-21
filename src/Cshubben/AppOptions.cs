@@ -16,6 +16,9 @@ public static class AppOptions
     public static string? SelectedPr { get; private set; }
     public static int StartTab { get; private set; }
 
+    /// <summary>Set by <c>--theme light|dark</c>: overrides the saved theme (used for screenshots).</summary>
+    public static ThemeChoice? Theme { get; private set; }
+
     /// <summary>Set by <c>--file part-of-path</c>: the review page opens on the first changed file whose path contains it.</summary>
     public static string? StartFile { get; private set; }
 
@@ -55,6 +58,9 @@ public static class AppOptions
                     break;
                 case "--select" when next is not null:
                     SelectedPr = next;
+                    break;
+                case "--theme" when next is not null && Enum.TryParse<ThemeChoice>(next, ignoreCase: true, out var theme):
+                    Theme = theme;
                     break;
                 case "--file" when next is not null:
                     StartFile = next;

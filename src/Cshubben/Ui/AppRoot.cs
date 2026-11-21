@@ -288,7 +288,7 @@ sealed class AppRoot : Component
         return FlexColumn(TitleBar("Cshubben").Flex(shrink: 0),
                 CommandPalette.Host(paletteCtx, grid).Flex(grow: 1, basis: 0),
                 NotificationsHub.TrayElement().Flex(shrink: 0))
-            .RequestedTheme(ThemeOf(settings.Theme))
+            .RequestedTheme(ThemeOf(AppOptions.Theme ?? settings.Theme))
             .Backdrop(BackdropKind.Mica);
     }
 
