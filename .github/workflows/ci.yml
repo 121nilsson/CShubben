@@ -5,6 +5,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
     paths-ignore: ["**.md"]
   pull_request:
     paths-ignore: ["**.md"]
@@ -14,6 +15,10 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+# Least privilege: jobs only read. Only publish-screenshots overrides this with contents: write.
+permissions:
+  contents: read
 
 env:
   DOTNET_NOLOGO: "true"
@@ -31,8 +36,6 @@ jobs:
 
   app:
     runs-on: windows-latest
-    permissions:
-      contents: write   # to publish screenshots to the ci-screenshots branch
     strategy:
       fail-fast: false
       matrix:
@@ -44,13 +47,10 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-
-      - name: NuGet cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
-          restore-keys: nuget-${{ runner.os }}-
+          cache: true
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/*.csproj
 
       - name: Restore
         run: dotnet restore src/Cshubben/Cshubben.csproj -p:Platform=${{ matrix.platform }}
@@ -68,7 +68,8 @@ jobs:
   # Screenshots run as parallel shards (each one starts the app once per picture, which is the slow part).
   screenshots:
     needs: app
-    if: always() && needs.app.result == 'success'
+    # Still take screenshots when only the manual ARM64 leg failed; download-artifact fails if x64 is missing.
+    if: ${{ !cancelled() && (needs.app.result == 'success' || needs.app.result == 'failure') }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -82,6 +83,8 @@ jobs:
             shots: "reviews @640x900;notes @640x900;notes --select n-decision @640x900;review --select a1 @640x900;linear @640x900;stats @640x900;settings @640x900;review --select a1 @1920x1080;linear @1920x1080;stats @1920x1080;overview @1920x1080;overview --select a1 @1920x1080;overview --select a1 --tab 3 @640x900;drift @640x900;feed @640x900"
     steps:
       - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
 
       - uses: actions/download-artifact@v8
         with:
