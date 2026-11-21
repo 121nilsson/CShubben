@@ -51,11 +51,12 @@ public sealed class GitHubPipelineData : IPipelineData
         var sha = PipelineJson.HeadShaOf(prAnswer.Json)
             ?? throw new GitHubApiException(200, "Could not read the head commit of the pull request.");
 
-        var checksTask = _rest.GetAsync(repoUrl + "/commits/" + sha + "/check-runs?per_page=100&filter=all", null, cancellationToken);
+        var checksTask = ReadCheckRunsAsync(repoUrl + "/commits/" + sha + "/check-runs?per_page=100&filter=all", cancellationToken);
         var statusTask = ReadOptionalAsync(repoUrl + "/commits/" + sha + "/status?per_page=100", cancellationToken);
         await Task.WhenAll(checksTask, statusTask).ConfigureAwait(false);
 
-        var runs = new List<CheckRun>(PipelineJson.ParseCheckRuns((await checksTask.ConfigureAwait(false)).Json));
+        var runs = new List<CheckRun>();
+        foreach (var page in await checksTask.ConfigureAwait(false)) runs.AddRange(PipelineJson.ParseCheckRuns(page));
         runs.AddRange(PipelineJson.ParseCommitStatuses(await statusTask.ConfigureAwait(false)));
 
         // The failing step is only in the job, so look it up for the first few failed Actions jobs.
@@ -74,6 +75,22 @@ public sealed class GitHubPipelineData : IPipelineData
         }
 
         return runs;
+    }
+
+    /// <summary>Check runs come 100 at a time; a failing run on a later page must not be missed (up to 5 pages).</summary>
+    private async Task<IReadOnlyList<System.Text.Json.JsonElement?>> ReadCheckRunsAsync(string url, CancellationToken ct)
+    {
+        var pages = new List<System.Text.Json.JsonElement?>();
+        for (var page = 1; page <= 5; page++)
+        {
+            var response = await _rest.GetAsync(url + "&page=" + page.ToString(CultureInfo.InvariantCulture), null, ct).ConfigureAwait(false);
+            pages.Add(response.Json);
+            if (response.Json is not { ValueKind: System.Text.Json.JsonValueKind.Object } root
+                || !root.TryGetProperty("check_runs", out var list)
+                || list.ValueKind != System.Text.Json.JsonValueKind.Array
+                || list.GetArrayLength() < 100) break;
+        }
+        return pages;
     }
 
     // ------------------------------------------------------------------ conversation
@@ -243,7 +260,7 @@ public sealed class GitHubMergeActions : IMergeActions
 
     public bool IsDryRun => DryRun;
 
-    public async Task<ActionOutcome> MergeAsync(PullRequest pr, MergeMethodChoice method, CancellationToken cancellationToken)
+    public async Task<ActionOutcome> MergeAsync(PullRequest pr, MergeMethodChoice method, CancellationToken cancellationToken, string? expectedHeadSha = null)
     {
         try
         {
@@ -253,7 +270,7 @@ public sealed class GitHubMergeActions : IMergeActions
                 MergeMethodChoice.Rebase => GitHubMergeMethod.Rebase,
                 _ => GitHubMergeMethod.Merge,
             };
-            var result = await _writer.MergeAsync(pr.Repo, pr.Number, mapped, DryRun, cancellationToken).ConfigureAwait(false);
+            var result = await _writer.MergeAsync(pr.Repo, pr.Number, mapped, DryRun, cancellationToken, expectedHeadSha).ConfigureAwait(false);
             return result.Sent
                 ? new ActionOutcome(true, false, "Merged " + pr.Repo + " #" + pr.Number + " (" + MergeMethods.Short(method).ToLowerInvariant() + ").")
                 : new ActionOutcome(true, true, "Dry run: nothing was merged.");

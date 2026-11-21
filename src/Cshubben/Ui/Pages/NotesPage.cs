@@ -1,11 +1,11 @@
 using Cshubben.Core.Logic;
 using Cshubben.Core.Features.Notes;
+using Cshubben.Services;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Xaml;
 using static Microsoft.UI.Reactor.Factories;
-using MarkdownFactory = Microsoft.UI.Reactor.Advanced.Factories;
 
 namespace Cshubben.Ui.Pages;
 
@@ -23,6 +23,12 @@ sealed class NotesPage : Component
 
     /// <summary>Called with a local file path when an attachment is clicked. Null means do nothing.</summary>
     public static Action<string>? OpenPath { get; set; }
+
+    /// <summary>
+    /// Opens a pull request (repository, number) inside the app, in the inspector. Returns false when the PR is not in the
+    /// loaded data. The app shell assigns this; when it is null or returns false, the PR opens on GitHub instead.
+    /// </summary>
+    public static Func<string, int, bool>? OpenPullRequest { get; set; }
 
     public override Element Render()
     {
@@ -53,6 +59,9 @@ sealed class NotesPage : Component
         var (tagsText, setTagsText) = UseState(initial is null ? "" : string.Join(", ", initial.Tags));
         var (confirmDelete, setConfirmDelete) = UseState(false);
         var (error, setError) = UseState("");
+        var (attachMsg, setAttachMsg) = UseState("");
+        var (attachBad, setAttachBad) = UseState(false);
+        var (removing, setRemoving) = UseState<string?>(null);
 
         var selected = notes.FirstOrDefault(n => n.Id == selectedId);
         var allTags = NoteSearch.AllTags(notes);
@@ -81,6 +90,8 @@ sealed class NotesPage : Component
             setTagsText(string.Join(", ", n.Tags));
             setPreview(n.Body.Length > 0);
             setConfirmDelete(false);
+            setAttachMsg("");
+            setRemoving(null);
         }
 
         void NewNote()
@@ -126,11 +137,86 @@ sealed class NotesPage : Component
 
         void OpenAttachment(string noteId, string fileName)
         {
+            if (NoteAttachments.IsExecutable(fileName))
+            {
+                setError("\"" + fileName + "\" is a program or shortcut, so it is not opened from a note. Remove it, or find it in the notes folder.");
+                return;
+            }
             Guard(() =>
             {
                 var path = store.OpenAttachmentPathAsync(noteId, fileName).GetAwaiter().GetResult();
                 OpenPath?.Invoke(path);
             });
+        }
+
+        void OpenRef(NoteReference r)
+        {
+            if (!OpenReference(r)) setError("Could not open " + r.Display + ".");
+        }
+
+        void OpenLink(NoteLink l)
+        {
+            if (!OpenNoteLink(l)) setError("Could not open " + l.Target + ".");
+        }
+
+        void ReportAttach(AttachBatchResult r)
+        {
+            setAttachMsg(r.Summary);
+            setAttachBad(r.HasProblems);
+            setTick(Environment.TickCount);
+        }
+
+        void AttachPaths(IReadOnlyList<string> paths)
+        {
+            if (selected is null || paths.Count == 0) return;
+            var noteId = selected.Id;
+            setAttachMsg("Attaching...");
+            setAttachBad(false);
+            _ = Task.Run(async () =>
+            {
+                AttachBatchResult result;
+                try
+                {
+                    result = await NoteAttachments.AddFilesAsync(store, noteId, paths);
+                }
+                catch (Exception ex)
+                {
+                    result = new AttachBatchResult(Array.Empty<string>(), new[] { "Could not attach: " + ex.Message });
+                }
+                PostToUi(() => ReportAttach(result));
+            });
+        }
+
+        void PickFiles()
+        {
+            _ = PickAndAttach();
+
+            async Task PickAndAttach()
+            {
+                try
+                {
+                    var paths = await PickFilePathsAsync();
+                    PostToUi(() => AttachPaths(paths));
+                }
+                catch (Exception ex)
+                {
+                    PostToUi(() =>
+                    {
+                        setAttachMsg("Could not open the file picker: " + ex.Message);
+                        setAttachBad(true);
+                    });
+                }
+            }
+        }
+
+        void RemoveAttachment(string fileName)
+        {
+            if (selected is null) return;
+            var id = selected.Id;
+            Guard(() => store.RemoveAttachmentAsync(id, fileName).GetAwaiter().GetResult());
+            setRemoving(null);
+            setAttachMsg("Removed " + fileName + ".");
+            setAttachBad(false);
         }
 
         var dirty = selected is not null
@@ -142,10 +228,21 @@ sealed class NotesPage : Component
 
         var left = BuildList(notes, visible, allTags, activeTag, selected, now, query, setQuery, setTagFilter, LoadDraft, NewNote, shownError);
         Action? back = narrow ? () => { setSelectedId(null); setConfirmDelete(false); } : null;
-        var right = selected is null
+        Element right = selected is null
             ? BuildEmpty(NewNote)
             : BuildEditor(selected, title, setTitle, body, setBody, tagsText, setTagsText, preview, setPreview, dirty,
-                confirmDelete, setConfirmDelete, now, Save, TogglePin, Delete, OpenAttachment, back);
+                confirmDelete, setConfirmDelete, now, Save, TogglePin, Delete, OpenAttachment,
+                OpenRef, OpenLink, PickFiles, attachMsg, attachBad, removing, setRemoving, RemoveAttachment, back);
+
+        // Dropping files anywhere on the editor attaches them to the open note.
+        if (selected is not null)
+        {
+            right = right.OnDrop(args =>
+            {
+                var items = args.Data.GetFilesAsync();
+                _ = DroppedPathsAsync(items).ContinueWith(t => PostToUi(() => AttachPaths(t.Result)));
+            });
+        }
 
         // Narrow windows: one pane at a time (list, or the editor with a Back button).
         if (narrow)
@@ -290,6 +387,14 @@ sealed class NotesPage : Component
         Action togglePin,
         Action delete,
         Action<string, string> openAttachment,
+        Action<NoteReference> openRef,
+        Action<NoteLink> openLink,
+        Action pickFiles,
+        string attachMsg,
+        bool attachBad,
+        string? removing,
+        Action<string?> setRemoving,
+        Action<string> removeAttachment,
         Action? back = null)
     {
         var titleBox = TextBox(title, setTitle, placeholderText: "Title").Set(tb => { tb.FontSize = 20; });
@@ -331,7 +436,7 @@ sealed class NotesPage : Component
         {
             Element rendered = string.IsNullOrWhiteSpace(body)
                 ? Kit.Muted("Nothing to preview yet. Switch to Edit and write something.")
-                : MarkdownFactory.Markdown(body);
+                : Kit.Md(NoteMarkdown.Sanitize(body));
             bodyView = Border(rendered)
                 .Padding(12)
                 .MinHeight(240)
@@ -369,8 +474,9 @@ sealed class NotesPage : Component
             tagsView,
             toolbar,
             bodyView,
-            LinksSection(note),
-            AttachmentsSection(note, openAttachment)) with { RowGap = 12 };
+            MentionsSection(NoteReferences.DistinctForNote(note with { Body = body }), openRef),
+            LinksSection(note, openLink),
+            AttachmentsSection(note, openAttachment, pickFiles, attachMsg, attachBad, removing, setRemoving, removeAttachment)) with { RowGap = 12 };
 
         var panel = ScrollView(Border(column.FlexPadding(20, 16)).MaxWidth(900).HAlign(HorizontalAlignment.Left));
         return Border(panel)
@@ -380,7 +486,25 @@ sealed class NotesPage : Component
             .Margin(8, 16, 16, 16);
     }
 
-    private static Element LinksSection(Note note)
+    private static Element MentionsSection(IReadOnlyList<NoteReference> refs, Action<NoteReference> open)
+    {
+        if (refs.Count == 0) return Empty();
+        var chips = refs.Select(r =>
+            (Element)Button(
+                    HStack(6,
+                        Kit.Glyph(r.Kind == NoteReferenceKind.PullRequest ? "\uE71B" : "\uE8EC", 12).VAlign(VerticalAlignment.Center),
+                        TextBlock(r.Display).FontSize(12)),
+                    () => open(r))
+                .Padding(8, 2)
+                .MinHeight(24)
+                .AutomationName((r.Kind == NoteReferenceKind.PullRequest ? "Open pull request " : "Open Linear issue ") + r.Display)
+                .ToolTip(r.Kind == NoteReferenceKind.PullRequest ? "Open this pull request" : "Open in Linear")
+                .WithKey(r.Display)).ToArray();
+        var row = FlexRow(chips) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 6 };
+        return Section("Mentioned in this note", row);
+    }
+
+    private static Element LinksSection(Note note, Action<NoteLink> openLink)
     {
         Element content;
         if (note.Links.Count == 0)
@@ -391,13 +515,13 @@ sealed class NotesPage : Component
         {
             var rows = new List<Element>();
             for (var i = 0; i < note.Links.Count; i++)
-                rows.Add(LinkRow(note.Links[i], i));
+                rows.Add(LinkRow(note.Links[i], i, openLink));
             content = FlexColumn(rows.ToArray()) with { RowGap = 2 };
         }
         return Section("Links", content);
     }
 
-    private static Element LinkRow(NoteLink link, int index)
+    private static Element LinkRow(NoteLink link, int index, Action<NoteLink> openLink)
     {
         var hasLabel = !string.IsNullOrWhiteSpace(link.Label);
         var main = hasLabel ? link.Label : link.Target;
@@ -406,48 +530,130 @@ sealed class NotesPage : Component
         var row = Grid(
             columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
-            Kit.Glyph("", 14).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            Kit.Glyph("\uE71B", 14).VAlign(VerticalAlignment.Center).Grid(column: 0),
             VStack(2,
                 TextBlock(main).TextTrimming(TextTrimming.CharacterEllipsis),
                 sub).Grid(column: 1),
             Kit.Pill(KindLabel(link.Kind), Tone.Neutral).VAlign(VerticalAlignment.Center).Margin(8, 0, 0, 0).Grid(column: 2));
 
-        return Button(row, () => { })
+        return Button(row, () => openLink(link))
             .SubtleButton()
             .HAlign(HorizontalAlignment.Stretch)
             .HorizontalContentAlignment(HorizontalAlignment.Stretch)
-            .AutomationName(KindLabel(link.Kind) + " " + link.Target)
+            .AutomationName("Open " + KindLabel(link.Kind) + " " + link.Target)
             .WithKey(index + ":" + link.Target);
     }
 
-    private static Element AttachmentsSection(Note note, Action<string, string> open)
+    private static Element AttachmentsSection(
+        Note note,
+        Action<string, string> open,
+        Action pickFiles,
+        string message,
+        bool messageIsError,
+        string? removing,
+        Action<string?> setRemoving,
+        Action<string> remove)
     {
-        Element content;
-        if (note.Attachments.Count == 0)
+        var rows = new List<Element>();
+        foreach (var name in note.Attachments)
         {
-            content = Kit.Muted("No files attached.");
-        }
-        else
-        {
-            var rows = new List<Element>();
-            foreach (var name in note.Attachments)
+            var fileName = name;
+            var openRow = Grid(
+                columns: [GridSize.Px(28), GridSize.Star()],
+                rows: [GridSize.Auto],
+                Kit.Glyph("\uE8A5", 14).VAlign(VerticalAlignment.Center).Grid(column: 0),
+                TextBlock(fileName).TextTrimming(TextTrimming.CharacterEllipsis).VAlign(VerticalAlignment.Center).Grid(column: 1));
+            var openButton = Button(openRow, () => open(note.Id, fileName))
+                .SubtleButton()
+                .HAlign(HorizontalAlignment.Stretch)
+                .HorizontalContentAlignment(HorizontalAlignment.Stretch)
+                .AutomationName("Open " + fileName);
+
+            Element removeControls;
+            if (string.Equals(removing, fileName, StringComparison.Ordinal))
             {
-                var fileName = name;
-                var row = Grid(
-                    columns: [GridSize.Px(28), GridSize.Star()],
-                    rows: [GridSize.Auto],
-                    Kit.Glyph("", 14).VAlign(VerticalAlignment.Center).Grid(column: 0),
-                    TextBlock(fileName).TextTrimming(TextTrimming.CharacterEllipsis).VAlign(VerticalAlignment.Center).Grid(column: 1));
-                rows.Add(Button(row, () => open(note.Id, fileName))
-                    .SubtleButton()
-                    .HAlign(HorizontalAlignment.Stretch)
-                    .HorizontalContentAlignment(HorizontalAlignment.Stretch)
-                    .AutomationName(fileName)
-                    .WithKey(fileName));
+                removeControls = HStack(4,
+                    Button("Remove file", () => remove(fileName)).Foreground(Kit.Fg(Tone.Danger)).AutomationName("Confirm remove " + fileName),
+                    Button("Cancel", () => setRemoving(null)));
             }
-            content = FlexColumn(rows.ToArray()) with { RowGap = 2 };
+            else
+            {
+                removeControls = Button(Kit.Glyph("\uE711", 14), () => setRemoving(fileName))
+                    .SubtleButton()
+                    .AutomationName("Remove " + fileName)
+                    .ToolTip("Remove this attachment");
+            }
+
+            rows.Add(Grid(
+                    columns: [GridSize.Star(), GridSize.Auto],
+                    rows: [GridSize.Auto],
+                    openButton.Grid(column: 0),
+                    removeControls.VAlign(VerticalAlignment.Center).Grid(column: 1))
+                .WithKey(fileName));
         }
-        return Section("Attachments", content);
+
+        Element list;
+        if (rows.Count == 0) list = Kit.Muted("No files attached. Drop files here or use Add file.");
+        else list = FlexColumn(rows.ToArray()) with { RowGap = 2 };
+
+        Element? messageLine = null;
+        if (message.Length > 0)
+            messageLine = messageIsError
+                ? Kit.Muted(message).Foreground(Kit.Fg(Tone.Danger)).TextWrapping()
+                : Kit.Muted(message).TextWrapping();
+
+        var add = Button(HStack(6, Kit.Glyph("\uE710", 14), TextBlock("Add file")), pickFiles)
+            .AutomationName("Add file to note")
+            .HAlign(HorizontalAlignment.Left);
+
+        return Section("Attachments", VStack(8, list, add, messageLine));
+    }
+
+    private static bool OpenReference(NoteReference r)
+    {
+        if (r.Kind == NoteReferenceKind.PullRequest && OpenPullRequest?.Invoke(r.Repo, r.Number) == true) return true;
+        return Shell.OpenUrl(r.WebUrl);
+    }
+
+    private static bool OpenNoteLink(NoteLink link)
+    {
+        if (link.Kind == NoteLinkKind.Pr
+            && NoteReferences.TryParsePrTarget(link.Target, out var repo, out var number)
+            && OpenPullRequest?.Invoke(repo, number) == true)
+            return true;
+        var url = NoteReferences.LinkUrl(link);
+        return url is not null && Shell.OpenUrl(url);
+    }
+
+    private static void PostToUi(Action action)
+    {
+        var dispatcher = ReactorApp.UIDispatcher;
+        if (dispatcher is null || dispatcher.HasThreadAccess) action();
+        else dispatcher.TryEnqueue(() => action());
+    }
+
+    private static async Task<IReadOnlyList<string>> PickFilePathsAsync()
+    {
+        var window = ReactorApp.PrimaryWindow;
+        if (window is null) return Array.Empty<string>();
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+        picker.FileTypeFilter.Add("*");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(window));
+        var files = await picker.PickMultipleFilesAsync();
+        return files.Select(f => f.Path).Where(p => !string.IsNullOrEmpty(p)).ToList();
+    }
+
+    private static async Task<IReadOnlyList<string>> DroppedPathsAsync(Task<IReadOnlyList<Windows.Storage.IStorageItem>> items)
+    {
+        try
+        {
+            var list = await items;
+            return list.Select(i => i.Path).Where(p => !string.IsNullOrEmpty(p)).ToList();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<string>();
+        }
     }
 
     private static Element Section(string label, Element content) =>

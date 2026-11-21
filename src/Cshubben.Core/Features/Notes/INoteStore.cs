@@ -25,6 +25,9 @@ public interface INoteStore
     /// <summary>Stores a file next to the note. The file name must be a plain name without folders.</summary>
     Task AddAttachmentAsync(string noteId, string fileName, Stream content);
 
+    /// <summary>Deletes one attached file. Removing a file that is not there is not an error.</summary>
+    Task RemoveAttachmentAsync(string noteId, string fileName);
+
     /// <summary>A local file path for the attachment, suitable for opening in the default app.</summary>
     Task<string> OpenAttachmentPathAsync(string noteId, string fileName);
 }

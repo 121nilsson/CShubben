@@ -43,7 +43,7 @@ public sealed class GitHubInspectorActions(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new ActionOutcome(false, false, ex.Message);
+            return new ActionOutcome(false, false, ErrorText.Describe(ex));
         }
     }
 

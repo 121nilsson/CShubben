@@ -89,6 +89,18 @@ public sealed class FileNoteStore : INoteStore
         Bump();
     });
 
+    public Task RemoveAttachmentAsync(string noteId, string fileName) => Run(() =>
+    {
+        NoteNames.RequireId(noteId);
+        NoteNames.RequireFileName(fileName);
+        lock (_gate)
+        {
+            var target = SafeChild(FilesPath(noteId), fileName);
+            if (File.Exists(target)) File.Delete(target);
+        }
+        Bump();
+    });
+
     public Task<string> OpenAttachmentPathAsync(string noteId, string fileName) => Run(() =>
     {
         NoteNames.RequireId(noteId);

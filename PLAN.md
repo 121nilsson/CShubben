@@ -98,3 +98,17 @@ Slice F (after D): Review view, in order: file tree + unified diff read-only -> 
 - Screenshots: new flags `--palette [query]`, `--file <part of path>`, `--theme light|dark`; shard 4 shoots the dark theme. ui-guru passes 4 and 5 fixed the review header at 640 px and the Linear action rows.
 - Still not verified with a real account: GitHub/Linear/Claude live behaviour, writes, tray and toasts, and the Velopack release flow (first tag should be `v0.1.0`). First thing to try on the owner's machine: `Cshubben.exe --smoke`.
 - Open polish: copy buttons are plain subtle buttons (no menu), dark Settings/Notes not yet reviewed, content is capped and left-aligned at 1920, in-app screenshot mode not built (CI run is about 4 minutes), diff lines changed inside a line and revealed gap lines are highlighted without grammar state.
+
+## Accessibility
+Covered (static review of `src/Cshubben/Ui`, not verified with Narrator; no toolchain here):
+- Every icon-only or glyph button already had an `AutomationName` (rail, refresh, find, file navigation, copy, close, thread actions).
+- `Kit.Glyph` is now `AccessibilityView.Raw`, so decorative Segoe Fluent glyphs are not read; the owning control carries the name.
+- Rail items announce their count ("Review queue, 3 waiting"). The copy-link button announces "Copied" through `UseAnnounce` (live region).
+- Keyboard: palette handles Esc, Tab trap and ignores typing in text boxes (`KeyInput.IsTextInput`); review keys are disabled while `Typing`, Ctrl shortcuts still work; find box and composers close on Esc; no focus visuals removed.
+- Status never by colour alone: CI states have glyph plus label, diff lines have a +/- sign, resolved threads are dimmed to 0.85 (was 0.7) and also carry a "resolved" affordance.
+Remaining:
+- Announce other confirmations/errors ("Saved", "Copy answer", failures) with `UseAnnounce`; only the copy-link button does it so far.
+- Linear priority icon (bars) has no text of its own; it relies on the row name. `Theme.TertiaryText` is used only for decorative marks there.
+- Contrast of `Kit.Muted` and pills on tinted backgrounds is unmeasured; check in high-contrast and dark themes.
+- Small hit targets (18 px avatars/priority icons are not interactive; some SubtleButtons with 12 px text are under 32 px tall).
+- Notes page was out of scope for this pass. Tab order follows tree order and has not been audited.

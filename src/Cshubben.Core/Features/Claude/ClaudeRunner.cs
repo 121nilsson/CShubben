@@ -309,7 +309,7 @@ public sealed class ClaudeRunner
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
-            return ClaudeResult.Fail(ClaudeErrorKind.Failed, "Could not run `claude`: " + ex.Message, model, stopwatch.Elapsed);
+            return ClaudeResult.Fail(ClaudeErrorKind.Failed, "Could not run `claude`: " + SecretRedactor.Scrub(ex.Message, new[] { token }), model, stopwatch.Elapsed);
         }
 
         var elapsed = stopwatch.Elapsed;
@@ -325,7 +325,7 @@ public sealed class ClaudeRunner
         var output = ClaudeOutputParser.Parse(result.StdOut);
         if (output is null)
         {
-            var detail = ShortText(result.StdErr + " " + result.StdOut, 300);
+            var detail = ShortText(result.StdErr + " " + result.StdOut, 300, token);
             if (result.ExitCode != 0)
             {
                 var message = "claude exited with code " + result.ExitCode + (detail.Length > 0 ? ": " + detail : "");
@@ -339,7 +339,7 @@ public sealed class ClaudeRunner
 
         if (output.IsError)
         {
-            var message = "Claude reported an error: " + ShortText(output.Text, 300);
+            var message = "Claude reported an error: " + ShortText(output.Text, 300, token);
             return ClaudeAuth.IsAuthError(output.Text)
                 ? ClaudeResult.Fail(ClaudeErrorKind.AuthFailed, message + "\n" + ClaudeAuth.Hint, model, elapsed)
                 : ClaudeResult.Fail(ClaudeErrorKind.Failed, message, model, elapsed);
@@ -359,8 +359,9 @@ public sealed class ClaudeRunner
             output.OutputTokens);
     }
 
-    private static string ShortText(string text, int max)
+    private static string ShortText(string text, int max, string? secret = null)
     {
+        text = SecretRedactor.Scrub(text, new[] { secret });
         var collapsed = Regex.Replace(text, @"\s+", " ", RegexOptions.CultureInvariant).Trim();
         return collapsed.Length > max ? collapsed.Substring(0, max) + "…" : collapsed;
     }

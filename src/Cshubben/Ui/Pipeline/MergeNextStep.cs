@@ -62,7 +62,8 @@ sealed class MergeNextStep : Component<MergeNextStepProps>
                 ActionOutcome outcome;
                 try
                 {
-                    outcome = await merge.MergeAsync(pr, flow.Method, CancellationToken.None);
+                    var reviewedSha = readiness?.Facts.HeadSha;
+                    outcome = await merge.MergeAsync(pr, flow.Method, CancellationToken.None, string.IsNullOrEmpty(reviewedSha) ? null : reviewedSha);
                 }
                 catch (Exception ex)
                 {

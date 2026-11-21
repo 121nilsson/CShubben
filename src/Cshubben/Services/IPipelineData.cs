@@ -38,7 +38,8 @@ public interface IMergeActions
     /// <summary>True when the merge is only simulated.</summary>
     bool IsDryRun { get; }
 
-    Task<ActionOutcome> MergeAsync(PullRequest pr, MergeMethodChoice method, CancellationToken cancellationToken);
+    /// <param name="expectedHeadSha">The commit the checks and approvals were read for; when the branch has moved on, nothing is merged.</param>
+    Task<ActionOutcome> MergeAsync(PullRequest pr, MergeMethodChoice method, CancellationToken cancellationToken, string? expectedHeadSha = null);
 }
 
 /// <summary>

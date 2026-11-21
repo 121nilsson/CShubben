@@ -32,20 +32,28 @@ public sealed class GitHubWriter
 
     /// <summary>
     /// Two steps: read the head sha (a harmless GET, also done in a dry run), then merge with that sha.
-    /// In a dry run the merge request is returned but not sent.
+    /// When <paramref name="expectedHeadSha"/> (the commit that was reviewed) is given and the branch has moved on,
+    /// nothing is sent. In a dry run the merge request is returned but not sent.
     /// </summary>
-    public async Task<WriteResult> MergeAsync(string repo, int number, GitHubMergeMethod method, bool dryRun, CancellationToken cancellationToken = default)
+    public async Task<WriteResult> MergeAsync(string repo, int number, GitHubMergeMethod method, bool dryRun, CancellationToken cancellationToken = default, string? expectedHeadSha = null)
     {
         var headRequest = GitHubActions.FetchHeadShaRequest(repo, number);
         var head = await _rest.GetAsync(headRequest.Url, null, cancellationToken).ConfigureAwait(false);
         var sha = GitHubActions.ParseHeadSha(head.Json);
         if (sha is null) throw new GitHubApiException(head.Status, "Could not read the head commit of the pull request.");
 
+        if (!string.IsNullOrEmpty(expectedHeadSha)
+            && !sha.StartsWith(expectedHeadSha, StringComparison.OrdinalIgnoreCase)
+            && !expectedHeadSha.StartsWith(sha, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GitHubApiException(409, "The branch has new commits since the checks were read. Reload and check again before merging.");
+        }
+
         var result = await SendAsync(GitHubActions.MergeRequest(repo, number, method, sha), dryRun, cancellationToken).ConfigureAwait(false);
         if (result.Sent)
         {
             var merged = result.Response is not null && J.Bool(result.Response, "merged");
-            if (!merged) throw new GitHubApiException(200, "GitHub did not merge the pull request.");
+            if (!merged) throw new GitHubApiException(405, "GitHub did not merge the pull request.");
         }
         return result;
     }

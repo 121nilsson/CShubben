@@ -164,6 +164,13 @@ sealed class AppRoot : Component
 
         void Select(string id) { setSelected(id); setTab(0); }
         NotificationsHub.RefreshRequested = Refresh;
+        Pages.NotesPage.OpenPullRequest = (repo, number) =>
+        {
+            var target = Cshubben.Core.Features.Notes.NoteReferences.FindPullRequest(snap.All, repo, number);
+            if (target is null) return false;
+            NotificationsHub.SelectPr?.Invoke(target.Id);
+            return true;
+        };
         NotificationsHub.SelectPr = id => { setPage(snap.Find(id)?.Role == PrRole.Authored ? Page.Mine : Page.Reviews); Select(id); };
         PipelineServices.Merged = _ => Refresh();
 
@@ -195,7 +202,7 @@ sealed class AppRoot : Component
                     count is > 0 ? Kit.Pill(count.Value.ToString(), tone).Grid(column: 2) : Empty());
             return Border(Button(row, () => { setPage(def.Id); if (narrow) setSelected(null); })
                     .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
-                    .ToolTip(def.Label).AutomationName(def.Label))
+                    .ToolTip(def.Label).AutomationName(count is > 0 ? def.Label + ", " + count.Value + " waiting" : def.Label))
                 .Selected(active).CornerRadius(6);
         }
 

@@ -94,6 +94,30 @@ public sealed class InMemoryNoteStore : INoteStore
         return Task.CompletedTask;
     }
 
+    public Task RemoveAttachmentAsync(string noteId, string fileName)
+    {
+        try
+        {
+            NoteNames.RequireId(noteId);
+            NoteNames.RequireFileName(fileName);
+            lock (_gate)
+            {
+                _files.Remove(noteId + "/" + fileName);
+                if (_notes.TryGetValue(noteId, out var note))
+                    _notes[noteId] = note with
+                    {
+                        Attachments = note.Attachments.Where(a => !string.Equals(a, fileName, StringComparison.OrdinalIgnoreCase)).ToList(),
+                    };
+            }
+        }
+        catch (Exception ex)
+        {
+            return Task.FromException(ex);
+        }
+        Bump();
+        return Task.CompletedTask;
+    }
+
     /// <summary>Writes the attachment to a temporary file and returns its path.</summary>
     public Task<string> OpenAttachmentPathAsync(string noteId, string fileName)
     {
@@ -125,7 +149,7 @@ public sealed class InMemoryNoteStore : INoteStore
         Changed?.Invoke();
     }
 
-    /// <summary>Six realistic, fictional notes for demos and screenshots.</summary>
+    /// <summary>Seven realistic, fictional notes for demos and screenshots.</summary>
     public static InMemoryNoteStore Demo(DateTimeOffset? now = null)
     {
         var t = now ?? DateTimeOffset.UtcNow;
@@ -194,6 +218,16 @@ public sealed class InMemoryNoteStore : INoteStore
             false, t.AddDays(-20), "n-reading");
         reading = reading with { UpdatedAt = t.AddDays(-20), CreatedAt = t.AddDays(-30) };
 
-        return new InMemoryNoteStore(new[] { ideas, decision, meeting, snippet, claude, reading });
+        var links = Note.Create(
+            "Idempotency keys: rollout notes",
+            "Rollout plan for acme/api#412 (see https://github.com/acme/api/pull/412) and the follow-up ENG-231.\n\n" +
+            "- Check the retry behaviour in #409 before enabling the flag\n" +
+            "- Linear: https://linear.app/acme/issue/ENG-231/slow-order-listing\n" +
+            "- Code such as `acme/api#999` or `ENG-1` is not linked\n\n" +
+            "```\nacme/api#998\n```\n",
+            new[] { "api", "todo" }, null, false, t.AddHours(-5), "n-links");
+        links = links with { UpdatedAt = t.AddHours(-5), CreatedAt = t.AddHours(-5), Attachments = new[] { "rollout-checklist.pdf", "flag-config.json" } };
+
+        return new InMemoryNoteStore(new[] { ideas, decision, meeting, snippet, claude, reading, links });
     }
 }

@@ -10,6 +10,8 @@ public sealed record PullRequestHead(string Sha, string Ref, string? RepoFullNam
 /// <summary>Pure builders and parsers for committing a suggested change to the pull request branch (REST contents API).</summary>
 public static class SuggestionCommits
 {
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
     /// <summary>Reads head.sha, head.ref and head.repo.full_name from a pull request answer; null when unusable.</summary>
     public static PullRequestHead? ParseHead(JsonElement? pullRequest)
     {
@@ -36,10 +38,15 @@ public static class SuggestionCommits
         var raw = J.Str(contents, "content").Replace("\n", string.Empty).Replace("\r", string.Empty);
         try
         {
-            return (Encoding.UTF8.GetString(Convert.FromBase64String(raw)), blob);
+            return (StrictUtf8.GetString(Convert.FromBase64String(raw)), blob);
         }
         catch (FormatException)
         {
+            return null;
+        }
+        catch (DecoderFallbackException)
+        {
+            // Not UTF-8 text: rewriting it would replace bytes with U+FFFD and corrupt the file.
             return null;
         }
     }

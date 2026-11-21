@@ -302,7 +302,7 @@ public sealed class DemoMergeActions : IMergeActions
 {
     public bool IsDryRun => true;
 
-    public async Task<ActionOutcome> MergeAsync(PullRequest pr, MergeMethodChoice method, CancellationToken cancellationToken)
+    public async Task<ActionOutcome> MergeAsync(PullRequest pr, MergeMethodChoice method, CancellationToken cancellationToken, string? expectedHeadSha = null)
     {
         await Task.Delay(900, cancellationToken).ConfigureAwait(false);
         return new ActionOutcome(true, true, "Demo mode: " + pr.Repo + " #" + pr.Number + " was not merged. Nothing was sent to GitHub.");

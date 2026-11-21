@@ -19,6 +19,7 @@ sealed class CopyLinkButton : Component<CopyLinkProps>
     public override Element Render()
     {
         var (copied, setCopied) = UseState(false);
+        var announce = UseAnnounce();
 
         UseEffect(() =>
         {
@@ -45,13 +46,18 @@ sealed class CopyLinkButton : Component<CopyLinkProps>
             ? "[" + title.Replace("[", "(", StringComparison.Ordinal).Replace("]", ")", StringComparison.Ordinal) + "](" + url + ")"
             : url;
 
-        return Button(
+        var button = Button(
                 HStack(6, Kit.Glyph(copied ? GlyphCheck : GlyphCopy, 12), TextBlock(copied ? "Copied" : Props.Label).FontSize(12)),
                 () =>
                 {
-                    if (ExternalActions.Copy(text)) setCopied(true);
+                    if (!ExternalActions.Copy(text)) return;
+                    setCopied(true);
+                    announce.Announce("Copied");
                 })
             .SubtleButton()
             .AutomationName(Props.Label);
+
+        // The live region must be in the tree or the announcement is lost.
+        return HStack(0, announce.Region, button);
     }
 }

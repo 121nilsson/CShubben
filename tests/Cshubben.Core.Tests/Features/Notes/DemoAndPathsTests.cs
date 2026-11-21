@@ -8,12 +8,14 @@ public class DemoAndPathsTests
     private static readonly DateTimeOffset T = new(2026, 11, 20, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task Demo_has_six_notes_with_valid_ids()
+    public async Task Demo_has_seven_notes_with_valid_ids()
     {
         var notes = await InMemoryNoteStore.Demo(T).ListAsync();
-        Assert.Equal(6, notes.Count);
+        Assert.Equal(7, notes.Count);
+        foreach (var id in new[] { "n-ideas", "n-decision", "n-meeting", "n-snippet", "n-claude", "n-reading", "n-links" })
+            Assert.Contains(notes, n => n.Id == id);
         Assert.All(notes, n => Assert.True(NoteNames.IsValidId(n.Id)));
-        Assert.Equal(6, notes.Select(n => n.Id).Distinct().Count());
+        Assert.Equal(7, notes.Select(n => n.Id).Distinct().Count());
     }
 
     [Fact]

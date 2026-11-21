@@ -185,7 +185,7 @@ public static class LinkFilter
     public const string Removed = "[link removed]";
 
     private static readonly Regex UrlPattern = new(
-        @"https?://[^\s)\]>""'<]+",
+        @"\b(?:[a-z][a-z0-9+.\-]*://|(?:javascript|data|vbscript|mailto|file|tel):|www\.)[^\s)\]>""'<]+",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static bool IsGitHubUrl(string? url)

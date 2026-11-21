@@ -66,6 +66,9 @@ public static class SuggestionApplier
         if (lo < 1) return SuggestionPlan.Fail(path, "The suggestion has no valid line range.");
 
         var crlf = content.Contains("\r\n", StringComparison.Ordinal);
+        var withoutCrlf = content.Replace("\r\n", string.Empty, StringComparison.Ordinal);
+        if (withoutCrlf.Contains('\r') || (crlf && withoutCrlf.Contains('\n')))
+            return SuggestionPlan.Fail(path, "The file mixes line endings, so the suggestion cannot be applied safely from here.");
         var finalNewline = content.EndsWith('\n');
         var lines = SplitLines(content);
         if (hi > lines.Count)

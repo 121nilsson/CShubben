@@ -311,7 +311,7 @@ sealed partial class ReviewWorkspace
                 Kit.Muted(FileName(t.Path) + line),
                 t.IsOutdated ? Kit.Pill("outdated", Tone.Neutral) : Empty()),
             Kit.Muted(root is null ? string.Empty : ReviewKit.FirstLine(root.Body, 80)).TextTrimming(TextTrimming.CharacterEllipsis)
-                .Opacity(t.IsResolved ? 0.7 : 1.0));
+                .Opacity(t.IsResolved ? 0.85 : 1.0));
         return Border(Button(content, () => ShowThread(t))
                 .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Left)
                 .AutomationName("Thread by " + (root?.Author ?? "unknown") + " on " + t.Path))

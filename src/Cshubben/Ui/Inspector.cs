@@ -114,7 +114,25 @@ static class Inspector
             Kit.Muted($"+{pr.Additions}  −{pr.Deletions}  ·  {pr.ChangedFiles} files  ·  size {pr.SizeLabel}")));
 
         var description = Card(VStack(6, BodyStrong("Description"), Kit.Md(pr.Description)));
-        return FlexColumn(facts, description) with { RowGap = 12 };
+        return FlexColumn(facts, NotesRow(pr), description) with { RowGap = 12 };
+    }
+
+    /// <summary>"Notes (n)": notes that mention this PR by link or in their text. Nothing when there are none or the store fails.</summary>
+    private static Element? NotesRow(PullRequest pr)
+    {
+        try
+        {
+            var all = Pages.NotesPage.Store.ListAsync().GetAwaiter().GetResult();
+            var hits = Cshubben.Core.Features.Notes.NoteReferences.NotesMentioningPr(all, pr.Repo, pr.Number);
+            if (hits.Count == 0) return null;
+            var titles = hits.Take(3).Select(n => (Element)Kit.Muted(string.IsNullOrWhiteSpace(n.Title) ? "Untitled" : n.Title)
+                .TextTrimming(TextTrimming.CharacterEllipsis)).ToArray();
+            return Card(VStack(4, BodyStrong($"Notes ({hits.Count})"), VStack(2, titles)));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static Element Chip(string label, string value, Tone tone) =>
