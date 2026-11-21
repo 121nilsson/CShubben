@@ -40,13 +40,20 @@ public static class FeedFiltering
     /// <summary>Events within this time of each other with the same actor, pull request, kind and text are one event.</summary>
     public static readonly TimeSpan DuplicateWindow = TimeSpan.FromMinutes(15);
 
-    /// <summary>Drops repeats of the same event (a re-delivered comment, the same push seen twice). Input newest first; the newest of a repeat stays.</summary>
+    /// <summary>Drops repeats of the same event (a re-delivered comment or review request); pushes and deploys are never merged. Input newest first; the newest of a repeat stays.</summary>
     public static List<FeedItem> RemoveRepeats(IReadOnlyList<FeedItem> newestFirst)
     {
         var kept = new List<FeedItem>();
         var lastOf = new Dictionary<string, FeedItem>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in newestFirst)
         {
+            // Two pushes of "1 commit" are two pushes: only events that cannot happen twice for real are treated as repeats.
+            if (item.Kind is FeedKind.Pushed or FeedKind.Deployed)
+            {
+                kept.Add(item);
+                continue;
+            }
+
             var key = item.Repo + "|" + item.Number + "|" + item.Actor + "|" + item.Kind + "|" + item.Detail.Trim();
             if (lastOf.TryGetValue(key, out var previous) && previous.At - item.At <= DuplicateWindow) continue;
             lastOf[key] = item;
