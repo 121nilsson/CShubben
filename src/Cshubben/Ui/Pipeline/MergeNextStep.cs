@@ -84,7 +84,9 @@ sealed class MergeNextStep : Component<MergeNextStepProps>
         if (flow.Step == MergeStep.Done)
         {
             body = VStack(6,
-                TextBlock(dry ? "✓ Merge simulated" : "✓ Merged").FontSize(16).SemiBold().Foreground(dry ? Kit.Fg(Tone.Success) : GitHubStyle.Fg(Tone.Merged)),
+                (dry
+                    ? TextBlock("✓ Merge simulated").FontSize(16).SemiBold().Foreground(Kit.Fg(Tone.Success))
+                    : TextBlock("✓ Merged").FontSize(16).SemiBold().Foreground(GitHubStyle.Fg(Tone.Merged))),
                 Kit.Muted(flow.Message).TextWrapping());
         }
         else if (!flow.IsOpen)
