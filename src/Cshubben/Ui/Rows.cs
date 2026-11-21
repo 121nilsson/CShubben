@@ -23,8 +23,15 @@ static class Rows
             TextBlock("●").FontSize(10).Foreground(Kit.Fg(dotTone)).VAlign(VerticalAlignment.Center).Grid(column: 0),
             VStack(2,
                 TextBlock(pr.Title).TextTrimming(TextTrimming.CharacterEllipsis).SemiBold(),
-                Kit.Muted($"{pr.Repo} #{pr.Number} · {pr.Author}" + (pr.IsDraft ? " · draft" : ""))).Grid(column: 1),
-            (action.IsActionable ? Kit.Pill(action.Label, action.Tone) : Kit.Muted(action.Label))
+                Kit.Muted($"{pr.Repo} #{pr.Number} · {pr.Author}" + (pr.IsDraft ? " · draft" : "")).TextTrimming(TextTrimming.CharacterEllipsis),
+                HStack(8,
+                    Kit.Muted(pr.SizeLabel),
+                    Kit.Muted("+" + pr.Additions).Foreground(Kit.Fg(Tone.Success)),
+                    Kit.Muted("\u2212" + pr.Deletions).Foreground(Kit.Fg(Tone.Danger)),
+                    Kit.Muted(pr.ChangedFiles + (pr.ChangedFiles == 1 ? " file" : " files")))).Grid(column: 1),
+            HStack(8,
+                pr.Ci == CiState.Failure ? Kit.Pill("CI failing", Tone.Danger) : null,
+                action.IsActionable ? Kit.Pill(action.Label, action.Tone) : Kit.Muted(action.Label))
                 .VAlign(VerticalAlignment.Center).Margin(12, 0, 12, 0).Grid(column: 2),
             Kit.Muted(Age.Format(pr.UpdatedAt, now)).HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center).Grid(column: 3));
 
