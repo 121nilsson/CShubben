@@ -138,8 +138,8 @@ sealed class SettingsPage : Component<PageContext>
         var linearCard = Kit.SettingsCard("Linear",
             "Create a personal API key under Linear > Settings > Security & access. It is kept in the Windows credential store.",
             Row("Status", Text(linearStatus)),
-            HStack(8,
-                PasswordBox(linearInput, setLinearInput, placeholderText: "Paste a Linear API key").MinWidth(280),
+            FlexRow(
+                PasswordBox(linearInput, setLinearInput, placeholderText: "Paste a Linear API key").Flex(grow: 1, shrink: 1, basis: 0).MinWidth(120),
                 Button("Save", () =>
                 {
                     var key = linearInput.Trim();
@@ -148,13 +148,13 @@ sealed class SettingsPage : Component<PageContext>
                     setLinearInput("");
                     setLinearHasKey(true);
                     setLinearTest(null);
-                }).IsEnabled(linearInput.Trim().Length > 0),
+                }).IsEnabled(linearInput.Trim().Length > 0).Flex(shrink: 0),
                 Button("Clear", () =>
                 {
                     services.Secrets.Delete(SecretKeys.LinearApiKey);
                     setLinearHasKey(false);
                     setLinearTest(null);
-                }).IsEnabled(linearHasKey)),
+                }).IsEnabled(linearHasKey).Flex(shrink: 0)) with { ColumnGap = 8 },
             HStack(12,
                 Button("Test connection", TestLinear).IsEnabled(!linearTesting && (linearHasKey || linearEnv)),
                 Result(linearTest, linearTesting)));
@@ -204,8 +204,8 @@ sealed class SettingsPage : Component<PageContext>
             Kit.Muted("Pick a cheaper model or lower effort for summaries. \"Default\" uses the built-in choice for that function (activity summaries default to haiku, low), then the general setting above.").TextWrapping(),
             FlexColumn(ClaudeFeatures.All.Select(f => FeatureRow(f)).ToArray()) with { RowGap = 6 },
             Kit.Muted(ClaudeAuth.Hint).TextWrapping(),
-            HStack(8,
-                PasswordBox(claudeTokenInput, setClaudeTokenInput, placeholderText: "Optional: token from `claude setup-token`").MinWidth(280),
+            FlexRow(
+                PasswordBox(claudeTokenInput, setClaudeTokenInput, placeholderText: "Optional: token from `claude setup-token`").Flex(grow: 1, shrink: 1, basis: 0).MinWidth(120),
                 Button("Save", () =>
                 {
                     var token = claudeTokenInput.Trim();
@@ -214,13 +214,13 @@ sealed class SettingsPage : Component<PageContext>
                     setClaudeTokenInput("");
                     setClaudeHasToken(true);
                     CheckClaude();
-                }).IsEnabled(claudeTokenInput.Trim().Length > 0),
+                }).IsEnabled(claudeTokenInput.Trim().Length > 0).Flex(shrink: 0),
                 Button("Clear", () =>
                 {
                     services.Secrets.Delete(SecretKeys.ClaudeOAuthToken);
                     setClaudeHasToken(false);
                     CheckClaude();
-                }).IsEnabled(claudeHasToken)),
+                }).IsEnabled(claudeHasToken).Flex(shrink: 0)) with { ColumnGap = 8 },
             HStack(12,
                 Button("Check again", CheckClaude).IsEnabled(!claudeChecking),
                 claudeChecking ? Kit.Muted("Checking...") : Empty()));
