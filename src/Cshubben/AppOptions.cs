@@ -25,6 +25,9 @@ public static class AppOptions
     /// <summary>Set by <c>--file part-of-path</c>: the review page opens on the first changed file whose path contains it.</summary>
     public static string? StartFile { get; private set; }
 
+    /// <summary>Set by <c>--repos</c>: the Settings page shows the repository list first (screenshots).</summary>
+    public static bool ReposFirst { get; private set; }
+
     /// <summary>Set by <c>--palette [query]</c>: start with the command palette open (used for screenshots).</summary>
     public static string? PaletteQuery { get; private set; }
 
@@ -70,6 +73,9 @@ public static class AppOptions
                     break;
                 case "--file" when next is not null:
                     StartFile = next;
+                    break;
+                case "--repos":
+                    ReposFirst = true;
                     break;
                 case "--palette":
                     PaletteQuery = next is not null && !next.StartsWith("--", StringComparison.Ordinal) ? next : "";

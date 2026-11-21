@@ -81,13 +81,13 @@ jobs:
       matrix:
         include:
           - shard: 1
-            shots: "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings;notes --select n-decision;notes --select n-links;review --select a1;overview --select a1 --tab 1;overview --select a1 --tab 3;overview --palette;review --select a1 --file payments.ts @1000x760"
+            shots: "overview;overview --select a1;feed;mine --select a3;reviews --select r3;drift;linear;notes;stats;settings;settings --repos;notes --select n-decision;notes --select n-links;review --select a1;overview --select a1 --tab 1;overview --select a1 --tab 3;overview --palette;review --select a1 --file payments.ts @1000x760"
           - shard: 2
-            shots: "overview @1000x760;overview --select a1 @1000x760;reviews --select r3 @1000x760;notes @1000x760;notes --select n-decision @1000x760;review --select a1 @1000x760;linear @1000x760;stats @1000x760;settings @1000x760;overview @640x900;overview --select a1 @640x900;overview --select a1 --tab 1 @640x900;drift @1000x760;feed @1000x760;overview --palette pay @1000x560"
+            shots: "overview @1000x760;overview --select a1 @1000x760;reviews --select r3 @1000x760;notes @1000x760;notes --select n-decision @1000x760;review --select a1 @1000x760;linear @1000x760;stats @1000x760;settings @1000x760;settings --repos @1000x760;overview @640x900;overview --select a1 @640x900;overview --select a1 --tab 1 @640x900;drift @1000x760;feed @1000x760;overview --palette pay @1000x560"
           - shard: 3
             shots: "reviews @640x900;notes @640x900;notes --select n-decision @640x900;review --select a1 @640x900;linear @640x900;stats @640x900;settings @640x900;review --select a1 @1920x1080;linear @1920x1080;stats @1920x1080;linear --issue API-231 @1920x1080;overview @1920x1080;overview --select a1 @1920x1080;overview --select a1 --tab 3 @640x900;drift @640x900;feed @640x900"
           - shard: 4
-            shots: "overview --theme dark;overview --select a1 --theme dark;review --select a1 --theme dark;review --select a1 --file payments.ts --theme dark @1000x760;feed --theme dark;settings --theme dark;linear --theme dark;notes --theme dark;drift --theme dark;stats --theme dark;overview --palette --theme dark"
+            shots: "overview --theme dark;overview --select a1 --theme dark;review --select a1 --theme dark;settings --repos --theme dark;review --select a1 --file payments.ts --theme dark @1000x760;feed --theme dark;settings --theme dark;linear --theme dark;notes --theme dark;drift --theme dark;stats --theme dark;overview --palette --theme dark"
     steps:
       - uses: actions/checkout@v7
         with:

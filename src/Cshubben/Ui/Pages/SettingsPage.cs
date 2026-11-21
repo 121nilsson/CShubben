@@ -232,8 +232,8 @@ sealed class SettingsPage : Component<PageContext>
             Grid(
                 columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto, GridSize.Auto],
                 rows: [GridSize.Auto],
-                ToggleSwitch(r.Watched, v => Save(RepoDirectory.SetRepoWatched(settings, r.Repo, v)), "", "", "Watch " + r.Repo)
-                    .IsEnabled(ownerWatched).MinWidth(0).Grid(column: 0),
+                ToggleSwitch(r.Watched, v => Save(RepoDirectory.SetRepoWatched(settings, r.Repo, v)), "", "")
+                    .AutomationName("Watch " + r.Repo).IsEnabled(ownerWatched).MinWidth(0).VAlign(VerticalAlignment.Center).Grid(column: 0),
                 VStack(0, Body(r.Name), Kit.Muted(r.Repo)).VAlign(VerticalAlignment.Center).Margin(12, 0, 0, 0).Grid(column: 1),
                 ToggleButton(TextBlock("Important").FontSize(12), r.Important, v => Save(RepoDirectory.SetImportant(settings, r.Repo, v)))
                     .Padding(10, 3).VAlign(VerticalAlignment.Center).AutomationName("Important " + r.Repo).Grid(column: 2),
@@ -246,8 +246,8 @@ sealed class SettingsPage : Component<PageContext>
                 Grid(
                     columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto],
                     rows: [GridSize.Auto],
-                    ToggleSwitch(o.Watched, v => Save(RepoDirectory.SetOwnerWatched(settings, o.Owner, v)), "", "", "Watch everything from " + o.Owner)
-                        .MinWidth(0).Grid(column: 0),
+                    ToggleSwitch(o.Watched, v => Save(RepoDirectory.SetOwnerWatched(settings, o.Owner, v)), "", "")
+                        .AutomationName("Watch everything from " + o.Owner).MinWidth(0).VAlign(VerticalAlignment.Center).Grid(column: 0),
                     VStack(0,
                         BodyStrong(o.Owner),
                         Kit.Muted(o.WatchedRepos.ToString(CultureInfo.InvariantCulture) + " of " + o.Repos.Count.ToString(CultureInfo.InvariantCulture) + " repos watched"))
@@ -345,10 +345,11 @@ sealed class SettingsPage : Component<PageContext>
         return ScrollView(Kit.Capped(
             FlexColumn(
                 Kit.PageHeader("Settings", "Connections, repositories and preferences"),
+                AppOptions.ReposFirst ? reposCard.Margin(0, 0, 0, 12) : null,
                 githubCard.Margin(0, 0, 0, 12),
                 linearCard.Margin(0, 0, 0, 12),
                 claudeCard.Margin(0, 0, 0, 12),
-                reposCard.Margin(0, 0, 0, 12),
+                AppOptions.ReposFirst ? null : reposCard.Margin(0, 0, 0, 12),
                 Kit.SettingsCard("GitHub writes",
                     "Off by default: merging, reviewing, commenting and re-running jobs are only simulated (dry run) until you turn this on.",
                     ToggleSwitch(settings.AllowGitHubWrites, v => Save(settings with { AllowGitHubWrites = v }), "On", "Off", "Allow writes to GitHub"))
