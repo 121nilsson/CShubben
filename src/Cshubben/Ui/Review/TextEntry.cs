@@ -175,20 +175,15 @@ sealed class SubmitDialog : Component<SubmitProps>
 /// <summary>The "?" overlay with every shortcut. Buttons exist for all of them, so this is a reminder, not a requirement.</summary>
 static class HelpOverlay
 {
-    private static readonly (string Keys, string What)[] Shortcuts =
-    {
-        ("j / k", "Next / previous file"),
-        ("n / p", "Next / previous open thread"),
-        ("v", "Mark the file as viewed"),
-        ("c", "Comment on the selected line (click a line first)"),
-        ("Ctrl+Enter", "Save the comment you are writing"),
-        ("Esc", "Cancel the comment or close a dialog"),
-        ("?  or  F1", "Show this help"),
-    };
+    /// <summary>The review part of the shared shortcut catalog, plus the key that opens this sheet.</summary>
+    private static IEnumerable<(string Keys, string What)> Shortcuts() =>
+        Cshubben.Core.Features.CommandPalette.ShortcutCatalog.All
+            .Where(e => e.Group == "Code review" || (e.Group == "Everywhere" && e.Keys.StartsWith("?", StringComparison.Ordinal)))
+            .Select(e => (e.Keys, e.What));
 
     public static Element Build(Action close)
     {
-        var rows = Shortcuts.Select(s => (Element)Grid(
+        var rows = Shortcuts().Select(s => (Element)Grid(
             columns: [GridSize.Px(110), GridSize.Star()],
             rows: [GridSize.Auto],
             TextBlock(s.Keys).FontFamily(ReviewKit.Mono).SemiBold().Grid(column: 0),

@@ -29,13 +29,15 @@ sealed partial class ReviewWorkspace
 
         var rows = ReviewRows.Flatten(file, RowOptions(file));
         var shown = SplitActive ? SplitRows.From(rows) : rows;
+        var matches = S.FindOpen ? DiffSearch.Matches(rows, S.FindQuery) : Array.Empty<string>();
+        FindHits = new HashSet<string>(matches, StringComparer.Ordinal);
 
         var scrollIndex = -1;
         if (S.ScrollKey is not null)
         {
             for (var i = 0; i < shown.Count; i++)
             {
-                if (shown[i].Key == S.ScrollKey)
+                if (shown[i].Key == S.ScrollKey || (shown[i] is SplitRow pair && (pair.Left?.Key == S.ScrollKey || pair.Right?.Key == S.ScrollKey)))
                 {
                     scrollIndex = i;
                     break;
@@ -66,6 +68,7 @@ sealed partial class ReviewWorkspace
 
         return FlexColumn(
             BuildFileHeader(file).Flex(shrink: 0),
+            S.FindOpen ? BuildFindBar(matches.Count).Flex(shrink: 0) : Empty(),
             list.Flex(grow: 1, basis: 0));
     }
 
@@ -294,13 +297,14 @@ sealed partial class ReviewWorkspace
             TextBlock(sign).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(signColor).HAlign(HorizontalAlignment.Center).Grid(column: 2),
             CodeCell(file, row).Margin(0, 1, 8, 1).Grid(column: 3));
 
-        return Tinted(Border(grid).MinHeight(20), kind, cursor)
+        return Tinted(Border(grid).MinHeight(20), kind, cursor, FindHits.Contains(row.Key))
             .OnTapped((s, e) => Update(st => st with { CursorKey = row.Key }));
     }
 
-    private static BorderElement Tinted(BorderElement cell, DiffLineKind kind, bool cursor)
+    private static BorderElement Tinted(BorderElement cell, DiffLineKind kind, bool cursor, bool match = false)
     {
-        if (kind == DiffLineKind.Add) cell = cell.Background(Theme.SystemSuccessBackground);
+        if (match) cell = cell.Background(Theme.SystemCautionBackground);
+        else if (kind == DiffLineKind.Add) cell = cell.Background(Theme.SystemSuccessBackground);
         else if (kind == DiffLineKind.Remove) cell = cell.Background(Theme.SystemCriticalBackground);
         else if (cursor) cell = cell.Background(Theme.SubtleFill);
         if (cursor) cell = cell.BorderThickness(3, 0, 0, 0).BorderBrush(Theme.AccentText);
@@ -322,7 +326,7 @@ sealed partial class ReviewWorkspace
                 rows: [GridSize.Auto],
                 NumberCell(number, r.Commentable, cursor, () => OpenComposer(file, r, diffSide)).Grid(column: 0),
                 CodeCell(file, r).Margin(0, 1, 8, 1).Grid(column: 1));
-            return Tinted(Border(grid).MinHeight(20), tintKind, cursor)
+            return Tinted(Border(grid).MinHeight(20), tintKind, cursor, FindHits.Contains(r.Key))
                 .OnTapped((s, e) => Update(st => st with { CursorKey = r.Key }));
         }
 
@@ -456,16 +460,53 @@ sealed partial class ReviewWorkspace
             header.Add(Button("Delete", () => DeleteComment(t, c)).SubtleButton().AutomationName("Delete comment"));
         }
 
-        return VStack(4, FlexRow(header.ToArray()) with { ColumnGap = 8, Wrap = FlexWrap.Wrap, RowGap = 4 }, CommentBody(c.Body));
+        return VStack(4, FlexRow(header.ToArray()) with { ColumnGap = 8, Wrap = FlexWrap.Wrap, RowGap = 4 }, CommentBody(c.Body, t, c));
     }
 
-    private static Element CommentBody(string body)
+    /// <summary>
+    /// The comment text. A suggestion block gets a pill and, for posted comments, either the "Apply suggestion" action
+    /// (author or write access, open thread on the new side) or a note saying why it cannot be applied here.
+    /// </summary>
+    private Element CommentBody(string body, ReviewThread? thread = null, ReviewComment? comment = null)
     {
         if (SuggestionFormatter.Extract(body) is null) return Kit.Md(body);
-        return VStack(4,
+        var parts = new List<Element>
+        {
             Kit.Pill("Suggested change", Tone.Accent).HAlign(HorizontalAlignment.Left),
             Kit.Md(body),
-            Kit.Muted("Apply this on GitHub: it has no public API for applying suggestions."));
+        };
+
+        if (thread is null || comment is null)
+        {
+            parts.Add(Kit.Muted("Others can apply this once the review is submitted."));
+            return VStack(4, parts.ToArray());
+        }
+
+        var context = Props.Context;
+        var request = context.CanApplySuggestions ? SuggestionApplier.RequestFor(thread, comment, context.HeadSha) : null;
+        if (request is not null)
+        {
+            var open = S.Suggestion is { } st && st.CommentId == comment.Id;
+            if (open) parts.Add(SuggestionPanel(S.Suggestion!));
+            else
+            {
+                parts.Add(Button(HStack(6, Kit.Glyph(ReviewKit.GlyphCheck, 12), TextBlock("Apply suggestion")), () => PreviewSuggestion(thread, comment, request))
+                    .SubtleButton().HAlign(HorizontalAlignment.Left).IsEnabled(!S.Busy).AutomationName("Apply suggestion"));
+            }
+        }
+        else
+        {
+            parts.Add(Kit.Muted(SuggestionNote(thread, context.CanApplySuggestions)));
+        }
+        return VStack(4, parts.ToArray());
+    }
+
+    private static string SuggestionNote(ReviewThread thread, bool allowed)
+    {
+        if (thread.IsOutdated) return "This suggestion is outdated and cannot be applied.";
+        if (thread.IsResolved) return "Resolved suggestions cannot be applied.";
+        if (!allowed) return "Only the author or someone with write access can apply this suggestion.";
+        return "This suggestion cannot be applied here. Open it on GitHub.";
     }
 
     private Element PendingView(PendingComment p)
@@ -477,7 +518,9 @@ sealed partial class ReviewWorkspace
             Button("Edit", () => EditPending(p)).SubtleButton().AutomationName("Edit pending comment"),
             Button("Delete", () => DeletePending(p.Id)).SubtleButton().AutomationName("Delete pending comment")) with { ColumnGap = 8 };
         var card = Border(VStack(6, header, CommentBody(p.Body)))
-            .Background(Theme.CardBackground).WithBorder(Theme.SystemCaution, 1).CornerRadius(8).Padding(12);
+            .Background(Theme.CardBackground)
+            .WithBorder(S.CursorKey == "pending-" + p.Id ? Theme.AccentText : Theme.SystemCaution, S.CursorKey == "pending-" + p.Id ? 2 : 1)
+            .CornerRadius(8).Padding(12);
         return Border(card).Margin(InlineIndent, 4, 16, 8);
     }
 }

@@ -1,0 +1,77 @@
+name: Release
+
+# Tag v1.2.3 -> Velopack installer + update packages for x64 and ARM64, attached to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  package:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/*.csproj
+
+      - name: Version from tag
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $rid = if ("${{ matrix.platform }}" -eq "ARM64") { "win-arm64" } else { "win-x64" }
+          "RID=$rid" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Restore
+        run: dotnet restore src/Cshubben/Cshubben.csproj -p:Platform=${{ matrix.platform }}
+
+      # Always build with an explicit platform, otherwise WindowsAppSDKSelfContained fails.
+      - name: Publish
+        run: dotnet publish src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=${{ matrix.platform }} -p:Version=${{ env.VERSION }} -o publish/${{ matrix.platform }}
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
+
+      - name: Pack installer and update packages
+        run: vpk pack --packId Cshubben --packTitle Cshubben --packVersion ${{ env.VERSION }} --packDir publish/${{ matrix.platform }} --mainExe Cshubben.exe --runtime ${{ env.RID }} --channel ${{ env.RID }} --outputDir releases/${{ matrix.platform }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: releases-${{ matrix.platform }}
+          path: releases/${{ matrix.platform }}
+          if-no-files-found: error
+
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: releases-*
+          merge-multiple: true
+          path: releases
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la releases
+          gh release create "${{ github.ref_name }}" releases/* --repo "$GITHUB_REPOSITORY" --title "Cshubben ${{ github.ref_name }}" --generate-notes

@@ -5,6 +5,9 @@ namespace Cshubben.Ui.Review;
 /// <summary>Where the inline composer is open and what it starts with.</summary>
 sealed record ComposerState(string Path, int Line, DiffSide Side, int? StartLine, string Initial, string? EditPendingId = null);
 
+/// <summary>An open "apply suggestion" preview under one comment.</summary>
+sealed record SuggestionState(string ThreadId, string CommentId, SuggestionRequest Request, SuggestionPlan Plan);
+
 /// <summary>
 /// All state of the review workspace in one immutable record, updated with a reducer so that async results never
 /// overwrite changes the user made in the meantime.
@@ -52,6 +55,22 @@ sealed record ReviewUiState
 
     public bool HelpOpen { get; init; }
 
+    public SuggestionState? Suggestion { get; init; }
+
+    public bool FindOpen { get; init; }
+
+    public string FindQuery { get; init; } = string.Empty;
+
+    /// <summary>Index of the current match, -1 before the first jump.</summary>
+    public int FindIndex { get; init; } = -1;
+
+    public bool FindFocused { get; init; }
+
+    /// <summary>Changes whenever the find box or the file filter should take keyboard focus.</summary>
+    public int FindFocusNonce { get; init; }
+
+    public int FilterFocusNonce { get; init; }
+
     /// <summary>Narrow layout: 0 shows the file list, 1 the diff.</summary>
     public int Screen { get; init; }
 
@@ -77,5 +96,5 @@ sealed record ReviewUiState
 
     /// <summary>True while a text box has focus or a dialog is open: single-key shortcuts must stay quiet then.</summary>
     public bool Typing =>
-        Composer is not null || ReplyThreadId is not null || EditCommentId is not null || SubmitOpen || HelpOpen || FilterFocused;
+        Composer is not null || ReplyThreadId is not null || EditCommentId is not null || SubmitOpen || HelpOpen || FilterFocused || FindFocused;
 }

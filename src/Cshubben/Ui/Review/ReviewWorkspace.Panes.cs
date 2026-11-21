@@ -141,6 +141,14 @@ sealed partial class ReviewWorkspace
             .AutomationName("Filter files")
             .OnGotFocus((o, e) => Update(s => s with { FilterFocused = true }))
             .OnLostFocus((o, e) => Update(s => s with { FilterFocused = false }));
+        var filterSeen = FilterSeen;
+        var filterNonce = S.FilterFocusNonce;
+        filter = filter.Set(tb =>
+        {
+            if (filterSeen.Current == filterNonce) return;
+            filterSeen.Current = filterNonce;
+            tb.DispatcherQueue.TryEnqueue(() => tb.Focus(FocusState.Programmatic));
+        });
 
         Element list = rows.Count == 0
             ? Kit.EmptyNote(Files.Count == 0

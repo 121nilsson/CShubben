@@ -104,4 +104,5 @@ public sealed record ReviewContext(
     string? MyLastReviewedSha,
     string Viewer,
     IReadOnlyList<CommitInfo> Commits,
-    string Description = "");
+    string Description = "",
+    bool CanApplySuggestions = false);

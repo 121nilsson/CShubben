@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.UI.Reactor" />
     <PackageReference Include="Microsoft.UI.Reactor.Advanced" />
+    <PackageReference Include="Velopack" />
     <ProjectReference Include="../Cshubben.Core/Cshubben.Core.csproj" />
   </ItemGroup>
 </Project>

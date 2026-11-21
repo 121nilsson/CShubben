@@ -112,12 +112,14 @@ sealed class LinearView : Component<LinearProps>
             var board = Parts.Peek(boardResource);
             if (board is null)
             {
-                var failure = Parts.ErrorOf(boardResource);
+                var failure = boardResource is AsyncValue<LinearBoard>.Error boardError
+                    ? ErrorText.Classify(boardError.Exception, "Linear")
+                    : null;
                 content = failure is null
                     ? Card(Parts.Busy("Loading your issues…"))
                     : Card(VStack(10,
-                        Parts.Banner("Could not load Linear", Describe(failure), Tone.Danger),
-                        Button("Try again", Refresh).HAlign(HorizontalAlignment.Left)));
+                        Parts.Banner(failure.Title, FailureView.MessageOf(failure), FailureView.ToneOf(failure)),
+                        HStack(8, FailureView.Buttons(failure, Refresh, Props.OpenSettings, settingsPrimary: false))));
             }
             else
             {
@@ -154,10 +156,8 @@ sealed class LinearView : Component<LinearProps>
         }
     }
 
-    private static string Describe(string message) => message;
-
     private static string Describe(string message, Exception ex) =>
-        ex is LinearAuthException ? "Linear rejected the API key. Check it in Settings." : message;
+        ex is LinearAuthException ? "Linear rejected the API key. Check it in Settings." : ErrorText.Classify(ex, "Linear").Message;
 
     // ------------------------------------------------------------------ connect state
 

@@ -35,10 +35,12 @@ public sealed class GitHubReviewData : IReviewData
         query($owner: String!, $name: String!, $number: Int!) {
           viewer { login }
           repository(owner: $owner, name: $name) {
+            viewerPermission
             pullRequest(number: $number) {
               headRefOid
               baseRefOid
               body
+              author { login }
               reviews(last: 50, states: [APPROVED, CHANGES_REQUESTED, COMMENTED]) {
                 nodes { author { login } commit { oid } submittedAt }
               }
@@ -65,7 +67,8 @@ public sealed class GitHubReviewData : IReviewData
         }
 
         var commits = await GetCommitsAsync(pr, cancellationToken).ConfigureAwait(false);
-        return new ReviewContext(head, baseSha, mine, viewer, commits, Str(node, "body"));
+        var canApply = SuggestionApplier.CanApply(viewer, Str(Get(node, "author"), "login"), Str(Get(data, "repository"), "viewerPermission"));
+        return new ReviewContext(head, baseSha, mine, viewer, commits, Str(node, "body"), canApply);
     }
 
     public async Task<PullRequestDiff> GetPullRequestFilesAsync(ReviewTarget pr, CancellationToken cancellationToken = default)
@@ -421,6 +424,64 @@ public sealed class GitHubReviewData : IReviewData
         await MutateAsync(
             "mutation($input: DeletePullRequestReviewCommentInput!) { deletePullRequestReviewComment(input: $input) { clientMutationId } }",
             Input(("id", commentId)), cancellationToken).ConfigureAwait(false);
+    }
+
+    // ------------------------------------------------------------------ apply suggestion
+
+    public bool IsDryRun => DryRun;
+
+    private sealed record PreparedSuggestion(SuggestionPlan Plan, string? Repo, string? Branch, string? BlobSha);
+
+    /// <summary>Reads the PR head and the file (harmless GETs, also in a dry run) and plans the change.</summary>
+    private async Task<PreparedSuggestion> PrepareSuggestionAsync(ReviewTarget pr, SuggestionRequest request, CancellationToken ct)
+    {
+        Validate(pr);
+        PreparedSuggestion Fail(string message) => new(SuggestionPlan.Fail(request.Path, message), null, null, null);
+
+        if (!SuggestionCommits.IsSafePath(request.Path)) return Fail("This file path cannot be changed from here.");
+        if (!GitHubNames.IsCommitSha(request.ExpectedHeadSha)) return Fail("The review has no commit to apply the suggestion to. Reload the review.");
+
+        var headResponse = await _rest.GetAsync(GitHubActions.FetchHeadShaRequest(pr.Repo, pr.Number).Url, null, ct).ConfigureAwait(false);
+        var head = SuggestionCommits.ParseHead(headResponse.Json);
+        if (head is null) return Fail("Could not read the branch of the pull request.");
+        if (!string.Equals(head.Sha, request.ExpectedHeadSha, StringComparison.OrdinalIgnoreCase))
+            return Fail("The branch has new commits since this review was loaded. Reload the review, then apply the suggestion again.");
+        if (string.IsNullOrEmpty(head.RepoFullName) || !GitHubNames.TrySplitRepo(head.RepoFullName, out _, out _))
+            return Fail("The repository of the pull request branch is not available.");
+
+        RestResponse file;
+        try
+        {
+            var read = SuggestionCommits.ReadFileRequest(head.RepoFullName, request.Path, head.Sha);
+            file = await _rest.GetAsync(read.Url, null, ct).ConfigureAwait(false);
+        }
+        catch (GitHubApiException ex) when (ex.StatusCode == 404 || ex.StatusCode == 403)
+        {
+            return Fail("Could not read " + request.Path + " on the pull request branch.");
+        }
+
+        var parsed = SuggestionCommits.ParseFile(file.Json);
+        if (parsed is null) return Fail("Could not read the text of " + request.Path + ".");
+
+        var plan = SuggestionApplier.Plan(request.Path, parsed.Value.Text, request.StartLine, request.EndLine, request.CommentBody);
+        return new PreparedSuggestion(plan, head.RepoFullName, head.Ref, parsed.Value.BlobSha);
+    }
+
+    public async Task<SuggestionPlan> PreviewSuggestionAsync(ReviewTarget pr, SuggestionRequest request, CancellationToken cancellationToken = default) =>
+        (await PrepareSuggestionAsync(pr, request, cancellationToken).ConfigureAwait(false)).Plan;
+
+    public async Task<SuggestionOutcome> ApplySuggestionAsync(ReviewTarget pr, SuggestionRequest request, CancellationToken cancellationToken = default)
+    {
+        var prepared = await PrepareSuggestionAsync(pr, request, cancellationToken).ConfigureAwait(false);
+        var plan = prepared.Plan;
+        if (!plan.Ok) return new SuggestionOutcome(false, DryRun, plan.Error, plan);
+        if (plan.IsNoChange) return new SuggestionOutcome(false, DryRun, "The suggestion matches the current code, so there is nothing to commit.", plan);
+
+        var commit = SuggestionCommits.CommitFileRequest(prepared.Repo!, request.Path, prepared.Branch!, plan.CommitMessage, plan.NewContent, prepared.BlobSha!);
+        var result = await _writer.SendAsync(commit, DryRun, cancellationToken).ConfigureAwait(false);
+        return result.Sent
+            ? new SuggestionOutcome(true, false, "Committed the suggestion to " + prepared.Branch + ". Reload the review to see the new diff.", plan)
+            : new SuggestionOutcome(false, true, "Dry run: nothing was written. Turn on \"Allow writes to GitHub\" in Settings to commit this change.", plan);
     }
 
     // ------------------------------------------------------------------ plumbing

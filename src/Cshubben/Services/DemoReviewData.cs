@@ -49,7 +49,7 @@ public sealed class DemoReviewData : IReviewData
 
     public Task<ReviewContext> GetContextAsync(ReviewTarget pr, CancellationToken cancellationToken = default) =>
         Task.FromResult(new ReviewContext(Shas[4], "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432", Shas[1], DemoData.Viewer, Commits(),
-            "Adds `Idempotency-Key` handling to the payment endpoints.\n\n- charges require the header, refunds fall back to a random key\n- responses are cached in Redis for 24 hours\n- the retry loop only retries transient HTTP failures now"));
+            "Adds `Idempotency-Key` handling to the payment endpoints.\n\n- charges require the header, refunds fall back to a random key\n- responses are cached in Redis for 24 hours\n- the retry loop only retries transient HTTP failures now", true));
 
     public Task<PullRequestDiff> GetPullRequestFilesAsync(ReviewTarget pr, CancellationToken cancellationToken = default) =>
         Task.FromResult(new PullRequestDiff(DiffText, _files, ViewedStates(_files)));
@@ -149,6 +149,24 @@ public sealed class DemoReviewData : IReviewData
             else _threads[i] = changed;
         }
         return Task.CompletedTask;
+    }
+
+    public bool IsDryRun => true;
+
+    public async Task<SuggestionPlan> PreviewSuggestionAsync(ReviewTarget pr, SuggestionRequest request, CancellationToken cancellationToken = default)
+    {
+        var text = await GetFileContentAsync(pr, request.Path, Shas[4], cancellationToken).ConfigureAwait(false);
+        return text is null
+            ? SuggestionPlan.Fail(request.Path, "Could not read " + request.Path + ".")
+            : SuggestionApplier.Plan(request.Path, text, request.StartLine, request.EndLine, request.CommentBody);
+    }
+
+    public async Task<SuggestionOutcome> ApplySuggestionAsync(ReviewTarget pr, SuggestionRequest request, CancellationToken cancellationToken = default)
+    {
+        var plan = await PreviewSuggestionAsync(pr, request, cancellationToken).ConfigureAwait(false);
+        return plan.Ok
+            ? new SuggestionOutcome(false, true, "Demo: nothing was written to any branch.", plan)
+            : new SuggestionOutcome(false, true, plan.Error, plan);
     }
 
     private Task SetResolved(string threadId, bool resolved)

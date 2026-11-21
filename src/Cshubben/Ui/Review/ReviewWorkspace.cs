@@ -27,6 +27,9 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
     private bool ThreeColumns;
     private bool CanSplit;
     private Ref<int> Scrolled = new(0);
+    private Ref<int> FilterSeen = new(0);
+    private Ref<int> FindSeen = new(0);
+    private HashSet<string> FindHits = new(StringComparer.Ordinal);
 
     private ReviewTarget Target => Props.Target;
 
@@ -39,6 +42,8 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
         var narrow = windowWidth < 900;
         var (state, update) = UseReducer(Initial(b, narrow));
         var scrolled = UseRef(0);
+        var filterSeen = UseRef(0);
+        var findSeen = UseRef(0);
 
         UseEffect(() =>
         {
@@ -54,6 +59,8 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
 
         S = state;
         Scrolled = scrolled;
+        FilterSeen = filterSeen;
+        FindSeen = findSeen;
         Update = update;
         Narrow = narrow;
         ThreeColumns = windowWidth >= 1360;
@@ -141,21 +148,91 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
 
     private Command[] BuildCommands(bool enabled)
     {
-        Command Cmd(string label, VirtualKey key, Action action, VirtualKeyModifiers modifiers = VirtualKeyModifiers.None) =>
-            new Command { Label = label, Execute = action, Accelerator = Accelerator(key, modifiers), CanExecute = enabled };
-
-        return new[]
+        // Shortcuts with Ctrl keep working while a text box has focus (Ctrl+F in the find box), but not behind a dialog.
+        var noDialog = !S.SubmitOpen && !S.HelpOpen;
+        var list = new List<Command>();
+        foreach (var b in ReviewKeymap.Bindings)
         {
-            Cmd("Next file", VirtualKey.J, () => MoveFile(1)),
-            Cmd("Previous file", VirtualKey.K, () => MoveFile(-1)),
-            Cmd("Next open thread", VirtualKey.N, () => GoToThread(true)),
-            Cmd("Previous open thread", VirtualKey.P, () => GoToThread(false)),
-            Cmd("Toggle viewed", VirtualKey.V, ToggleCurrentViewed),
-            Cmd("Comment on the selected line", VirtualKey.C, CommentOnCursor),
-            Cmd("Keyboard help", VirtualKey.F1, () => Update(s => s with { HelpOpen = true })),
-            Cmd("Keyboard help", (VirtualKey)191, () => Update(s => s with { HelpOpen = true }), VirtualKeyModifiers.Shift),
-        };
+            var modifiers = VirtualKeyModifiers.None;
+            if (b.Ctrl) modifiers |= VirtualKeyModifiers.Control;
+            if (b.Shift) modifiers |= VirtualKeyModifiers.Shift;
+            var command = b.Command;
+            list.Add(new Command
+            {
+                Label = b.What,
+                Execute = () => Execute(command),
+                Accelerator = Accelerator(KeyFor(b.Key), modifiers),
+                CanExecute = b.Ctrl ? noDialog : enabled,
+            });
+        }
+        return list.ToArray();
     }
+
+    private static VirtualKey KeyFor(string key) => key switch
+    {
+        "f1" => VirtualKey.F1,
+        "/" or "?" => (VirtualKey)191,
+        "[" => (VirtualKey)219,
+        "]" => (VirtualKey)221,
+        _ => (VirtualKey)char.ToUpperInvariant(key[0]),
+    };
+
+    private void Execute(ReviewCommand command)
+    {
+        switch (command)
+        {
+            case ReviewCommand.NextLine: MoveCursor(1); break;
+            case ReviewCommand.PreviousLine: MoveCursor(-1); break;
+            case ReviewCommand.NextFile: MoveFile(1); break;
+            case ReviewCommand.PreviousFile: MoveFile(-1); break;
+            case ReviewCommand.NextThread: GoToThread(true); break;
+            case ReviewCommand.PreviousThread: GoToThread(false); break;
+            case ReviewCommand.Comment: CommentOnCursor(); break;
+            case ReviewCommand.ToggleViewed: ToggleCurrentViewed(); break;
+            case ReviewCommand.ToggleSplit: ToggleSplit(); break;
+            case ReviewCommand.FocusFilter: FocusFilter(); break;
+            case ReviewCommand.Find: OpenFind(); break;
+            case ReviewCommand.Help: Update(s => s with { HelpOpen = true }); break;
+        }
+    }
+
+    private IReadOnlyList<ReviewRow> CurrentRows() =>
+        Current is null ? Array.Empty<ReviewRow>() : ReviewRows.Flatten(Current, RowOptions(Current));
+
+    /// <summary>j / k: the cursor moves over code lines, threads and drafts of the current file.</summary>
+    private void MoveCursor(int delta)
+    {
+        if (Current is null) return;
+        var rows = CurrentRows();
+        var key = RowCursor.Move(rows, S.CursorKey, delta);
+        if (key is null)
+        {
+            Update(s => s with { Info = "This file has no lines to select." });
+            return;
+        }
+        var thread = rows.OfType<ThreadRow>().FirstOrDefault(r => r.Key == key)?.Thread;
+        Update(s => s with
+        {
+            CursorKey = key,
+            FocusedThreadId = thread?.Id,
+            ScrollKey = key,
+            ScrollNonce = s.ScrollNonce + 1,
+            Info = string.Empty,
+        });
+    }
+
+    private void ToggleSplit()
+    {
+        if (!CanSplit)
+        {
+            Update(s => s with { Info = "The window is too narrow for split view." });
+            return;
+        }
+        Update(s => s with { Split = !s.Split });
+    }
+
+    private void FocusFilter() =>
+        Update(s => s with { Screen = 0, FilterFocusNonce = s.FilterFocusNonce + 1 });
 
     // ------------------------------------------------------------------ actions
 
@@ -185,6 +262,8 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
             EditCommentId = null,
             CursorKey = null,
             ScrollKey = null,
+            FindIndex = -1,
+            Suggestion = null,
         });
 
     private void MoveFile(int delta)
@@ -270,11 +349,23 @@ sealed partial class ReviewWorkspace : Component<ReviewBundle>
         if (Current is null) return;
         if (S.CursorKey is null)
         {
-            Update(s => s with { Info = "Click a line first, then press c." });
+            Update(s => s with { Info = "Press j or click a line first, then press c." });
             return;
         }
-        var row = ReviewRows.Flatten(Current, RowOptions(Current)).OfType<LineRow>().FirstOrDefault(r => r.Key == S.CursorKey);
-        if (row is not null) OpenComposer(Current, row, ThreadAnchor.SideOf(row.Line));
+        var row = CurrentRows().FirstOrDefault(r => r.Key == S.CursorKey);
+        switch (row)
+        {
+            case LineRow line:
+                OpenComposer(Current, line, ThreadAnchor.SideOf(line.Line));
+                break;
+            case ThreadRow thread:
+                var threadId = thread.Thread.Id;
+                Update(s => s with { ReplyThreadId = threadId, Composer = null, EditCommentId = null });
+                break;
+            case PendingRow pending:
+                EditPending(pending.Comment);
+                break;
+        }
     }
 
     private void OpenComposer(DiffFile file, LineRow row, DiffSide side)

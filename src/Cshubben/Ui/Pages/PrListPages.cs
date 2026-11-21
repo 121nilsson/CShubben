@@ -13,6 +13,16 @@ static class PrListPages
     /// <summary>My PRs, grouped by what they need.</summary>
     public static Element Mine(HubSnapshot snap, string? selectedId, Action<string> onSelect)
     {
+        if (snap.Authored.Count == 0)
+        {
+            return Page("My PRs", "Open pull requests you created", new[]
+            {
+                EmptyCard("No open pull requests of yours",
+                    "When you open a pull request on GitHub it shows up here after the next refresh. "
+                    + "If you expected some, check the muted repositories and organisations in Settings, and that your token can see those repositories."),
+            });
+        }
+
         var all = snap.Authored.Select(p => new Attention(p, NextAction.For(p))).ToList();
         var groups = new (string Title, Func<Attention, bool> Match)[]
         {
@@ -27,6 +37,15 @@ static class PrListPages
     /// <summary>The review queue, grouped by who is waiting for whom.</summary>
     public static Element Reviews(HubSnapshot snap, string? selectedId, Action<string> onSelect)
     {
+        if (snap.Reviews.Count == 0)
+        {
+            return Page("Review queue", "Pull requests where you are a reviewer", new[]
+            {
+                EmptyCard("Nobody is waiting for your review",
+                    "Review requests addressed to you show up here. If you expected some, check the muted repositories and organisations in Settings."),
+            });
+        }
+
         var all = snap.Reviews.Select(p =>
         {
             snap.ReviewInfos.TryGetValue(p.Id, out var info);
@@ -40,6 +59,9 @@ static class PrListPages
                 snap, selectedId, onSelect));
         return Page("Review queue", "Pull requests where you are a reviewer", groups);
     }
+
+    private static Element EmptyCard(string title, string message) =>
+        Card(VStack(6, BodyStrong(title), Kit.Muted(message).TextWrapping()));
 
     private static Element Group(string title, IReadOnlyList<Attention> items, HubSnapshot snap, string? selectedId, Action<string> onSelect) =>
         items.Count == 0

@@ -79,3 +79,16 @@ Slice F (after D): Review view, in order: file tree + unified diff read-only -> 
 - CI: x64 build + core tests + 3 parallel screenshot shards, about 4 minutes. ARM64 only on manual runs and tags.
 - Not verified with a real account yet (no token in the sandbox): live GitHub loading, Linear key flow, Claude CLI discovery, toasts/tray on a real desktop. These are the first things to try on the owner's machine; report anything that misbehaves.
 - Known gaps vs My-hub: Windows installer/auto-update, syntax highlighting in diffs, suggestion apply, split-diff polish, background sync while the window is closed (tray exists, but it needs a real-world check).
+
+## Distribution
+- **Decision: Velopack** (`vpk`) with GitHub Releases as the update feed. Chosen over Inno Setup (installer only, no update story, we would
+  write the self-updater) and zip + hand-rolled updater (most code to own, no delta updates, no uninstall entry).
+- Velopack supports unpackaged self-contained .NET apps on win-x64 and win-arm64, installs per user without admin or Visual Studio
+  (`<Id>-<channel>-Setup.exe`, Start menu shortcut, Apps & Features entry), and updates from the `Velopack` NuGet package
+  (`UpdateManager` + `GithubSource`) with delta packages. NuGet `Velopack` 1.2.161 targets net10.0 and older; we use it from net11.0-windows.
+- `.github/workflows/release.yml` runs on tags `v*` (tag `v1.2.3` becomes package version `1.2.3`): publish x64 and ARM64 exactly as `ci.yml`,
+  `vpk pack` per platform with its own channel (`win-x64`, `win-arm64`) so each machine only sees updates for its architecture, then one
+  GitHub Release gets all Setup.exe files and update packages.
+- In the app: `IUpdateService` (Core, `Features/Updates`), Velopack implementation in `Services/UpdatesVelopack.cs`, About card in Settings.
+  Off in `--demo`/`--smoke`/screenshots and in unpackaged dev builds; checks only on a button click, errors become a status line.
+- Needs a public repo (or a token) for the GitHub feed. Not verified without a toolchain: first tag should be tried as `v0.1.0`.

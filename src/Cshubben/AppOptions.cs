@@ -26,6 +26,11 @@ public static class AppOptions
     public static bool Demo { get; private set; }
 
     /// <summary>
+    /// Set by <c>--smoke</c>: run the read-only diagnostics without a window, write <c>smoke-report.txt</c> to the data folder and exit.
+    /// </summary>
+    public static bool Smoke { get; private set; }
+
+    /// <summary>
     /// Demo data, kept only so older call sites still compile. Pages must read the live snapshot from
     /// <c>PageContext.Snapshot</c> instead.
     /// </summary>
@@ -41,6 +46,9 @@ public static class AppOptions
             {
                 case "--demo":
                     Demo = true;
+                    break;
+                case "--smoke":
+                    Smoke = true;
                     break;
                 case "--start" when next is not null && Enum.TryParse<Page>(next, ignoreCase: true, out var page):
                     StartPage = page;

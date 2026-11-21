@@ -53,6 +53,21 @@ public interface IReviewData
     Task<ReviewComment> EditCommentAsync(ReviewTarget pr, string commentId, string body, CancellationToken cancellationToken = default);
 
     Task DeleteCommentAsync(ReviewTarget pr, string commentId, CancellationToken cancellationToken = default);
+
+    /// <summary>True when writes are only simulated (nothing is sent to GitHub).</summary>
+    bool IsDryRun { get; }
+
+    /// <summary>
+    /// Reads the file and works out what applying the suggestion would change. Read-only, also in a dry run. The plan
+    /// is not Ok when the branch moved since the review was loaded or the suggestion no longer fits.
+    /// </summary>
+    Task<SuggestionPlan> PreviewSuggestionAsync(ReviewTarget pr, SuggestionRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Commits the suggestion to the pull request branch. Re-reads the file first, so it never overwrites newer work.
+    /// In a dry run nothing is written and the outcome says so.
+    /// </summary>
+    Task<SuggestionOutcome> ApplySuggestionAsync(ReviewTarget pr, SuggestionRequest request, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Where unsubmitted comments are kept between runs, so nothing written is ever lost.</summary>

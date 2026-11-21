@@ -18,6 +18,7 @@ namespace Cshubben.Services;
 /// <param name="Settings">Current app settings.</param>
 /// <param name="SaveSettings">Persists new settings and re-renders the shell.</param>
 /// <param name="Refresh">Reloads the data now.</param>
+/// <param name="OpenSettings">Goes to the Settings page (for "fix your token" buttons).</param>
 sealed record PageContext(
     HubSnapshot Snapshot,
     bool Loaded,
@@ -26,7 +27,8 @@ sealed record PageContext(
     AppServices Services,
     AppSettings Settings,
     Action<AppSettings> SaveSettings,
-    Action Refresh);
+    Action Refresh,
+    Action OpenSettings);
 
 /// <summary>A count shown next to a sidebar entry.</summary>
 sealed record PageBadge(int Count, Tone Tone);
@@ -74,7 +76,7 @@ static class PageRegistry
         new(Page.Drift, "Workspace", "", "Drift",
             c => Component<DriftPage, PageContext>(c)),
         new(Page.Linear, "Workspace", "", "Linear",
-            ctx => LinearPage.Build(ctx.Snapshot, null, ctx.Select, null)),
+            ctx => LinearPage.Build(ctx.Snapshot, null, ctx.Select, ctx.OpenSettings)),
         new(Page.Notes, "Workspace", "", "Notes",
             _ => Component<NotesPage>()),
         new(Page.Stats, "Workspace", "", "Stats",

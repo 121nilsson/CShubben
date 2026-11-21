@@ -24,11 +24,16 @@ public static class ShortcutCatalog
         list.Add(new ShortcutEntry("Command palette", "Enter", "Run the selected entry"));
         list.Add(new ShortcutEntry("Command palette", ">", "Only commands and pages"));
         list.Add(new ShortcutEntry("Command palette", "#123", "Find a pull request by number"));
-        list.Add(new ShortcutEntry("Code review", "j / k", "Next / previous file"));
-        list.Add(new ShortcutEntry("Code review", "n / p", "Next / previous open thread"));
+        list.Add(new ShortcutEntry("Code review", "j / k", "Next / previous line or comment"));
+        list.Add(new ShortcutEntry("Code review", "n / p", "Next / previous file"));
+        list.Add(new ShortcutEntry("Code review", "] / [", "Next / previous open thread"));
+        list.Add(new ShortcutEntry("Code review", "c", "Comment on the selected line, or reply to the selected thread"));
         list.Add(new ShortcutEntry("Code review", "v", "Mark the file as viewed"));
-        list.Add(new ShortcutEntry("Code review", "c", "Comment on the selected line"));
+        list.Add(new ShortcutEntry("Code review", "s", "Toggle split view"));
+        list.Add(new ShortcutEntry("Code review", "/", "Focus the file filter"));
+        list.Add(new ShortcutEntry("Code review", "Ctrl+F", "Find in this file (Enter / Shift+Enter jump)"));
         list.Add(new ShortcutEntry("Code review", "Ctrl+Enter", "Save the comment you are writing"));
+        list.Add(new ShortcutEntry("Code review", "Esc", "Cancel the comment or close find or a dialog"));
         return list;
     }
 }

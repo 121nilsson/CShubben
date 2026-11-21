@@ -8,6 +8,7 @@ using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Xaml;
+using FailureInfo = Cshubben.Core.Shared.Failure;
 using static Microsoft.UI.Reactor.Factories;
 
 namespace Cshubben.Ui;
@@ -32,7 +33,7 @@ sealed class AppRoot : Component
 
         // Data state. Setters may be called from background threads, hence threadSafe.
         var (snapshot, setSnapshot) = UseState<HubSnapshot?>(services.InitialSnapshot, true);
-        var (error, setError) = UseState<string?>(null, true);
+        var (error, setError) = UseState<FailureInfo?>(null, true);
         var (notice, setNotice) = UseState<string?>(null, true);
         var (warning, setWarning) = UseState<string?>(null, true);
         var (refreshing, setRefreshing) = UseState(false, true);
@@ -40,6 +41,7 @@ sealed class AppRoot : Component
         var (settings, setSettings) = UseState(services.Settings);
 
         var inFlight = UseRef(false);
+        var pausedUntil = UseRef<DateTimeOffset?>(null);
         var windowActive = UseRef(true);
         var intervalSeconds = UseRef(AppSettings.DefaultRefreshSeconds);
         var isActive = UseIsActive();
@@ -59,6 +61,7 @@ sealed class AppRoot : Component
                 IntegrationWiring.AttachGitHub(services);
                 NotificationsHub.OnSnapshot(loaded, services.Settings, services.IsDemo);
                 setError(null);
+                pausedUntil.Current = null;
                 setNotice(services.DemoReason is { } reason ? "Showing demo data. " + reason : null);
                 var warnings = services.GitHub?.LastWarnings;
                 setWarning(warnings is { Count: > 0 }
@@ -67,8 +70,11 @@ sealed class AppRoot : Component
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Keep whatever is on screen; the banner says the data may be old.
-                setError(ErrorText.Describe(ex));
+                // Keep whatever is on screen; the banner says what happened and what to do.
+                var failure = ErrorText.Classify(ex);
+                setError(failure);
+                // While rate limited, do not let the background timer hammer the API; a manual Retry still works.
+                pausedUntil.Current = failure.Kind == Cshubben.Core.Shared.FailureKind.RateLimited ? failure.RetryAt : null;
             }
             finally
             {
@@ -104,7 +110,11 @@ sealed class AppRoot : Component
                         if (elapsed >= intervalSeconds.Current)
                         {
                             elapsed = 0;
-                            if (windowActive.Current && !services.ForcedDemo) await RefreshAsync();
+                            if (windowActive.Current && !services.ForcedDemo
+                                && !(pausedUntil.Current is { } until && until > DateTimeOffset.UtcNow))
+                            {
+                                await RefreshAsync();
+                            }
                         }
                     }
                 }
@@ -125,7 +135,8 @@ sealed class AppRoot : Component
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                setError("Could not save settings: " + ex.Message);
+                setError(new FailureInfo(Cshubben.Core.Shared.FailureKind.Unknown, "Settings", "Could not save settings",
+                    ex.Message + " Check that the data folder is writable (Settings, Run checks).", true, false, null));
             }
 
             services.Settings = clean;
@@ -156,7 +167,13 @@ sealed class AppRoot : Component
         NotificationsHub.SelectPr = id => { setPage(snap.Find(id)?.Role == PrRole.Authored ? Page.Mine : Page.Reviews); Select(id); };
         PipelineServices.Merged = _ => Refresh();
 
-        var ctx = new PageContext(snap, loadedOnce, selectedId, Select, services, settings, SaveSettings, Refresh);
+        void OpenSettings()
+        {
+            setPage(Page.Settings);
+            if (narrow) setSelected(null);
+        }
+
+        var ctx = new PageContext(snap, loadedOnce, selectedId, Select, services, settings, SaveSettings, Refresh, OpenSettings);
 
         Element Item(PageDef def)
         {
@@ -216,16 +233,28 @@ sealed class AppRoot : Component
         Element content = pageDef is null
             ? Kit.ComingSoon(page.ToString(), "This page is not registered.")
             : pageDef.NeedsData && !loadedOnce
-                ? Kit.LoadingState("Loading your pull requests...")
+                // Never an eternal spinner: if the first load failed, say why and offer Retry / Settings.
+                ? (error is not null
+                    ? FailureView.Panel(error, Refresh, OpenSettings)
+                    : Kit.LoadingState("Loading your pull requests..."))
                 : pageDef.Build(ctx);
 
         // Banners never replace the page: stale data stays visible under an error.
         var banners = new List<Element>();
-        if (error is not null)
-            banners.Add(Kit.Banner(Tone.Danger, loadedOnce ? "Could not refresh. Showing the last data." : "Could not load your data.",
-                error, "Retry", Refresh));
+        // The full-page failure panel already says it all, so no banner on top of it.
+        var panelShown = pageDef is { NeedsData: true } && !loadedOnce;
+        if (error is not null && !panelShown)
+        {
+            banners.Add(loadedOnce
+                ? FailureView.Strip(FailureView.ToneOf(error), error.Title + " (showing the last data)", FailureView.MessageOf(error),
+                    FailureView.Buttons(error, Refresh, OpenSettings))
+                : FailureView.Banner(error, Refresh, OpenSettings));
+        }
+
         if (notice is not null)
-            banners.Add(Kit.Banner(Tone.Accent, "Demo data", notice, "Retry", Refresh));
+            banners.Add(FailureView.Strip(Tone.Accent, "Demo data", notice,
+                Button("Open Settings", OpenSettings).AutomationName("Open Settings"),
+                Button("Retry", Refresh).AutomationName("Retry")));
         if (warning is not null && error is null)
             banners.Add(Kit.Banner(Tone.Warning, "Partial data", warning));
 

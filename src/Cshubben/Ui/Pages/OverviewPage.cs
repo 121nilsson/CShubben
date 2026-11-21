@@ -30,9 +30,19 @@ static class OverviewPage
                         Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect)).ToArray())))
             ;
 
+        var nothingYet = snap.Authored.Count == 0 && snap.Reviews.Count == 0;
+        Element emptyNote = nothingYet
+            ? Card(VStack(6,
+                BodyStrong("No pull requests found"),
+                Kit.Muted("You have no open pull requests and no review requests right now. If that is not what you expect, "
+                    + "check the muted repositories and organisations in Settings, and that your GitHub token can see those repositories "
+                    + "(Settings, Run checks, tells you).").TextWrapping())).Margin(0, 0, 0, 16)
+            : Empty();
+
         return ScrollView(Kit.Capped(
             FlexColumn(
                 Kit.PageHeader("Overview", "What needs you right now"),
+                emptyNote,
                 Border(Component<BriefingCard, BriefingProps>(new BriefingProps(snap, onSelect))).Margin(0, 0, 0, 16),
                 (FlexRow(
                     Tile("Needs you", o.NeedsYou, o.NeedsYou > 0 ? Tone.Warning : Tone.Neutral, "across your PRs and reviews"),

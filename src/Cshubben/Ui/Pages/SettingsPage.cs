@@ -1,10 +1,12 @@
 using System.Globalization;
 using Cshubben.Core.Features.Claude;
+using Cshubben.Core.Features.Diagnostics;
 using Cshubben.Core.Features.GitHub;
 using Cshubben.Core.Features.Settings;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Shared;
 using Cshubben.Services;
+using Cshubben.Ui.Assist;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -48,6 +50,8 @@ sealed class SettingsPage : Component<PageContext>
         var (mutedOrgInput, setMutedOrgInput) = UseState("");
         var (repoError, setRepoError) = UseState("");
         var (notesDirInput, setNotesDirInput) = UseState(settings.NotesDirectory);
+        var (diagReport, setDiagReport) = UseState<DiagnosticReport?>(null, true);
+        var (diagRunning, setDiagRunning) = UseState(false, true);
 
         UseEffect(() =>
         {
@@ -90,6 +94,27 @@ sealed class SettingsPage : Component<PageContext>
             {
                 setClaude(await services.CheckClaudeAsync());
                 setClaudeChecking(false);
+            });
+        }
+
+        void RunChecks()
+        {
+            setDiagRunning(true);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    setDiagReport(await AppDiagnostics.RunAsync(services));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    setDiagReport(new DiagnosticReport(DateTimeOffset.UtcNow,
+                        new[] { DiagnosticResult.Fail("Diagnostics", ErrorText.Describe(ex)) }));
+                }
+                finally
+                {
+                    setDiagRunning(false);
+                }
             });
         }
 
@@ -266,6 +291,33 @@ sealed class SettingsPage : Component<PageContext>
             HStack(8,
                 Button("Open data folder", () => Shell.OpenFolder(services.DataFolder)).IsEnabled(!services.ForcedDemo)));
 
+        // ---- Diagnostics ----
+        Element DiagRow(DiagnosticResult r) =>
+            Grid(
+                columns: [GridSize.Px(64), GridSize.Px(150), GridSize.Star()],
+                rows: [GridSize.Auto],
+                HStack(0, Kit.Pill(DiagnosticReport.Label(r.Status), r.Status switch
+                {
+                    DiagnosticStatus.Fail => Tone.Danger,
+                    DiagnosticStatus.Warn => Tone.Warning,
+                    _ => Tone.Neutral,
+                })).Grid(column: 0),
+                BodyStrong(r.Name).VAlign(VerticalAlignment.Top).Grid(column: 1),
+                TextBlock(r.Detail).FontSize(12).Foreground(Theme.SecondaryText).TextWrapping().IsTextSelectionEnabled().Grid(column: 2))
+            .WithKey(r.Name);
+
+        var reportText = diagReport is null ? "" : AppDiagnostics.Text(services, diagReport);
+        var diagnosticsCard = Kit.SettingsCard("Diagnostics",
+            "Checks GitHub, Linear, the Claude CLI, the credential store and your data folder, one by one. It only reads: nothing is written to GitHub or Linear. The report never contains tokens, so it is safe to paste.",
+            HStack(12,
+                Button("Run checks", RunChecks).IsEnabled(!diagRunning),
+                diagRunning ? Kit.Muted("Running checks...") : Empty(),
+                diagReport is null || diagRunning ? Empty() : CopyLinkButton.For(reportText, "Copy report")),
+            diagReport is null
+                ? Empty()
+                : VStack(8, diagReport.Results.Select(DiagRow).ToArray()),
+            Kit.Muted("Without a window: run Cshubben.exe --smoke. The report is saved as " + SmokeMode.ReportFileName + " in the data folder."));
+
         return ScrollView(Kit.Capped(
             FlexColumn(
                 Kit.PageHeader("Settings", "Connections, repositories and preferences"),
@@ -280,7 +332,9 @@ sealed class SettingsPage : Component<PageContext>
                 notificationsCard.Margin(0, 0, 0, 12),
                 Component<NotificationsSettingsCard>().Margin(0, 0, 0, 12),
                 appearanceCard.Margin(0, 0, 0, 12),
-                dataCard)
+                dataCard.Margin(0, 0, 0, 12),
+                diagnosticsCard.Margin(0, 0, 0, 12),
+                AboutCard.Build())
             .FlexPadding(24, 16), 800));
     }
 
