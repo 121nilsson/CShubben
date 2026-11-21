@@ -1,3 +1,4 @@
+using Cshubben.Ui.Claude;
 using Cshubben.Core.Features.Feed;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
@@ -108,7 +109,9 @@ sealed class FeedView : Component<FeedProps>
         var prId = FindPr(snap, group);
         Action openPr = () =>
         {
+            // A PR that is not in the lists (merged, closed, someone else's) cannot open in the inspector: open it on GitHub instead.
             if (prId is not null) Props.OnSelect?.Invoke(prId);
+            else ExternalActions.OpenUrl(FeedLinks.UrlFor(group.Repo, group.Number));
         };
 
         var row = Rows.FeedGroupRow(group, snap.At, isExpanded, group.IsCollapsed ? () => toggle(group.Key) : openPr);
