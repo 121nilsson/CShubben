@@ -25,16 +25,22 @@ sealed class StatsPageHost : Component<PageContext>
         var live = !ctx.Services.ForcedDemo && hub is not null && ctx.Loaded && snap.Viewer.Length > 0;
         var (tick, setTick) = UseState(0, true);
 
+        var statsKey = "stats|" + snap.Viewer;
+
         var resource = UseResource<StatsInput?>(
             async ct =>
             {
                 if (!live || hub is null) return null;
-                var data = new GitHubStatsData(hub.GraphQl, snap.Viewer);
-                return await data.LoadAsync(StatsCalculator.DefaultWeeks, DateTimeOffset.UtcNow, ct);
+                return await PageCaches.Stats.GetAsync(statsKey, PageCaches.StatsTtl, () =>
+                    new GitHubStatsData(hub.GraphQl, snap.Viewer).LoadAsync(StatsCalculator.DefaultWeeks, DateTimeOffset.UtcNow, ct));
             },
             new object[] { live, snap.Viewer, snap.At.ToUnixTimeSeconds() / 3600, tick });
 
-        void Retry() => setTick(tick + 1);
+        void Retry()
+        {
+            PageCaches.Stats.Remove(statsKey);
+            setTick(tick + 1);
+        }
 
         if (!live)
         {
@@ -44,7 +50,7 @@ sealed class StatsPageHost : Component<PageContext>
                 : null);
         }
 
-        var input = Parts.Peek(resource);
+        var input = Parts.Peek(resource) ?? PageCaches.Stats.Peek(statsKey);
         if (input is not null)
         {
             var refreshing = resource is AsyncValue<StatsInput?>.Reloading;

@@ -76,6 +76,9 @@ public sealed class GitHubHubData : IHubData
         var all = new List<PullRequest>(authoredList);
         all.AddRange(reviewList);
 
+        // The feed only needs the repositories and keys of the listed PRs, so it runs next to the enrichment instead of after it.
+        var feedTask = _options.IncludeFeed ? LoadFeedAsync(all, viewer, cancellationToken) : null;
+
         var enrichTask = _prs.EnrichAsync(all, _options.IncludeMergeable, cancellationToken);
         var infoTask = _prs.FetchReviewInfosAsync(reviewList, viewer, cancellationToken);
         var enriched = await enrichTask.ConfigureAwait(false);
@@ -87,28 +90,35 @@ public sealed class GitHubHubData : IHubData
         var reviews = enriched.Prs.Skip(authoredList.Count).ToList();
 
         IReadOnlyList<FeedItem> feed = Array.Empty<FeedItem>();
-        if (_options.IncludeFeed)
+        if (feedTask is not null)
         {
-            try
-            {
-                var keys = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var pr in enriched.Prs)
-                {
-                    keys.Add(GitHubNames.PrKey(pr.Repo, pr.Number));
-                    _feed.SeedTitle(pr.Repo, pr.Number, pr.Title);
-                }
-                var repos = enriched.Prs.Select(p => p.Repo).Where(r => r.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                var feedResult = await _feed.FetchAsync(repos, viewer, keys, cancellationToken).ConfigureAwait(false);
-                feed = feedResult.Items;
-                warnings.AddRange(feedResult.Errors);
-            }
-            catch (Exception ex) when (Recoverable.Is(ex, cancellationToken))
-            {
-                warnings.Add("Activity feed unavailable: " + ex.Message);
-            }
+            var feedResult = await feedTask.ConfigureAwait(false);
+            feed = feedResult.Items;
+            warnings.AddRange(feedResult.Errors);
         }
 
         LastWarnings = warnings;
         return new HubSnapshot(viewer, authored, reviews, infos.Infos, feed, DateTimeOffset.UtcNow);
+    }
+
+    private async Task<(IReadOnlyList<FeedItem> Items, IReadOnlyList<string> Errors)> LoadFeedAsync(
+        IReadOnlyList<PullRequest> prs, string viewer, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var pr in prs)
+            {
+                keys.Add(GitHubNames.PrKey(pr.Repo, pr.Number));
+                _feed.SeedTitle(pr.Repo, pr.Number, pr.Title);
+            }
+            var repos = prs.Select(p => p.Repo).Where(r => r.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var result = await _feed.FetchAsync(repos, viewer, keys, cancellationToken).ConfigureAwait(false);
+            return (result.Items, result.Errors);
+        }
+        catch (Exception ex) when (Recoverable.Is(ex, cancellationToken))
+        {
+            return (Array.Empty<FeedItem>(), new[] { "Activity feed unavailable: " + ex.Message });
+        }
     }
 }

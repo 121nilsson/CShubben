@@ -40,16 +40,25 @@ sealed class DriftPage : Component<PageContext>
         // Live mode without a GitHub connection: do not show invented data next to real pull requests.
         var needsConnection = !ctx.Services.ForcedDemo && ctx.Services.GitHub is null && data.IsDemo;
 
+        var driftKey = "drift|" + (data.IsDemo ? "demo|" : "live|") + reposKey;
+
         var resource = UseResource<DriftReport>(
             async ct =>
             {
                 if (needsConnection || repos.Count == 0) return DriftReport.Empty;
-                var activities = await data.GetDriftAsync(repos, ct);
-                return DriftReport.Build(activities, DateTimeOffset.UtcNow);
+                return await PageCaches.Drift.GetAsync(driftKey, PageCaches.DriftTtl, async () =>
+                {
+                    var activities = await data.GetDriftAsync(repos, ct);
+                    return DriftReport.Build(activities, DateTimeOffset.UtcNow);
+                });
             },
             new object[] { data, reposKey, RefreshBucket(snap.At), tick, needsConnection });
 
-        void Refresh() => setTick(tick + 1);
+        void Refresh()
+        {
+            PageCaches.Drift.Remove(driftKey);
+            setTick(tick + 1);
+        }
 
         async Task Rerun(RepoRow row)
         {
@@ -63,7 +72,11 @@ sealed class DriftPage : Component<PageContext>
                 var result = await data.RerunFailedJobsAsync(row.Repo, ids, CancellationToken.None);
                 setStatus(row.Repo + ": " + result.Message);
                 setStatusTone(result.Ok ? Tone.Success : Tone.Danger);
-                if (result.Ok && !result.DryRun) setTick(tick + 1);
+                if (result.Ok && !result.DryRun)
+                {
+                    PageCaches.Drift.Remove(driftKey);
+                    setTick(tick + 1);
+                }
             }
             catch (Exception ex)
             {
@@ -77,7 +90,7 @@ sealed class DriftPage : Component<PageContext>
             }
         }
 
-        var report = Parts.Peek(resource);
+        var report = Parts.Peek(resource) ?? (needsConnection ? null : PageCaches.Drift.Peek(driftKey));
         var loading = Parts.IsLoading(resource) || resource is AsyncValue<DriftReport>.Reloading;
 
         var subtitle = needsConnection

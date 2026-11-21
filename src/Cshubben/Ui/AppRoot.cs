@@ -1,3 +1,5 @@
+using Cshubben.Core.Features.Notes;
+using Cshubben.Core.Features.Cache;
 using Cshubben.Core.Features.Settings;
 using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
@@ -58,6 +60,7 @@ sealed class AppRoot : Component
                 var data = await services.GetHubDataAsync();
                 var loaded = await data.LoadAsync();
                 setSnapshot(loaded);
+                if (!services.IsDemo) _ = Task.Run(() => SnapshotCache.TrySave(AppPaths.DataDirectory, loaded));
                 IntegrationWiring.AttachGitHub(services);
                 NotificationsHub.OnSnapshot(loaded, services.Settings, services.IsDemo);
                 setError(null);

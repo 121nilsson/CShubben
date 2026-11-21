@@ -1,3 +1,4 @@
+using Cshubben.Core.Features.Cache;
 using Cshubben.Core.Data;
 using Cshubben.Core.Features.Claude;
 using Cshubben.Core.Features.Feed;
@@ -94,11 +95,23 @@ sealed class AppServices
     public GitHubHubData? GitHub { get; private set; }
 
     /// <summary>Demo snapshot for --demo (shown immediately, no loading state); null for live mode.</summary>
+    private bool _cacheRead;
+
     public HubSnapshot? InitialSnapshot
     {
         get
         {
-            if (!ForcedDemo) return null;
+            if (!ForcedDemo)
+            {
+                // Live mode: paint the last real snapshot from disk at once; the first load replaces it a few seconds later.
+                if (!_cacheRead)
+                {
+                    _cacheRead = true;
+                    var cached = SnapshotCache.TryLoad(AppPaths.DataDirectory);
+                    if (cached is not null) _initialSnapshot = SnapshotFilter.Apply(cached, Settings);
+                }
+                return _initialSnapshot;
+            }
             _initialSnapshot ??= SnapshotFilter.Apply(_demo.Build(), Settings);
             return _initialSnapshot;
         }

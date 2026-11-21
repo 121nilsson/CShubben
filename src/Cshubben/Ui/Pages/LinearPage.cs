@@ -75,12 +75,14 @@ sealed class LinearView : Component<LinearProps>
 
         var wantTeams = activeKey.StartsWith(ReconKind.PrWithoutIssue + "|", StringComparison.Ordinal);
 
+        var boardKey = "linear|" + snap.Viewer + "|" + (data.IsDemo ? "demo" : "live");
+
         var boardResource = UseResource<LinearBoard>(
             async ct =>
             {
                 if (!data.IsConnected)
                     return new LinearBoard(Array.Empty<LinearIssue>(), Array.Empty<LinearIssue>(), Array.Empty<ReconPr>());
-                return await data.LoadAsync(snap, ct);
+                return await PageCaches.Linear.GetAsync(boardKey, PageCaches.LinearTtl, () => data.LoadAsync(snap, ct));
             },
             new object[] { data, tick, snap.At, data.IsConnected });
 
@@ -92,7 +94,11 @@ sealed class LinearView : Component<LinearProps>
             },
             new object[] { data, wantTeams });
 
-        void Refresh() => setTick(tick + 1);
+        void Refresh()
+        {
+            PageCaches.Linear.Remove(boardKey);
+            setTick(tick + 1);
+        }
 
         var header = Grid(
             columns: [GridSize.Star(), GridSize.Auto],
@@ -109,7 +115,7 @@ sealed class LinearView : Component<LinearProps>
         }
         else
         {
-            var board = Parts.Peek(boardResource);
+            var board = Parts.Peek(boardResource) ?? PageCaches.Linear.Peek(boardKey);
             if (board is null)
             {
                 var failure = boardResource is AsyncValue<LinearBoard>.Error boardError
@@ -144,6 +150,7 @@ sealed class LinearView : Component<LinearProps>
                 setStatusTone(Tone.Success);
                 setResolved([.. resolved, key]);
                 setActiveKey("");
+                PageCaches.Linear.Remove(boardKey);
                 setTick(tick + 1);
             }
             catch (Exception ex)
