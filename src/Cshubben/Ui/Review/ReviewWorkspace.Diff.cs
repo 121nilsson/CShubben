@@ -180,7 +180,7 @@ sealed partial class ReviewWorkspace
             .ToolTip("Comment on this line (c)");
     }
 
-    private Element CodeCell(LineRow row)
+    private Element CodeCell(DiffFile file, LineRow row)
     {
         var line = row.Line;
         if (row.Partner is not null && (line.Kind == DiffLineKind.Add || line.Kind == DiffLineKind.Remove))
@@ -191,9 +191,12 @@ sealed partial class ReviewWorkspace
             if (result.IsUseful)
             {
                 var spans = line.Kind == DiffLineKind.Remove ? result.OldSpans : result.NewSpans;
-                return Segments(spans, S.Wrap, line.Kind == DiffLineKind.Add ? Theme.SystemSuccess : Theme.SystemCritical);
+                return Segments(spans, S.Wrap, file.Path, line.Kind == DiffLineKind.Add ? Theme.SystemSuccess : Theme.SystemCritical);
             }
         }
+
+        if (SyntaxHighlighter.IsHighlighted(file.Path))
+            return Highlighted(ReviewKit.CodeText(line.Text), file.Path, S.Wrap);
 
         var plain = TextBlock(ReviewKit.CodeText(line.Text)).FontFamily(ReviewKit.Mono).FontSize(12);
         return S.Wrap
@@ -201,12 +204,37 @@ sealed partial class ReviewWorkspace
             : plain.TextWrapping(TextWrapping.NoWrap).TextTrimming(TextTrimming.CharacterEllipsis).ToolTip(line.Text.Trim());
     }
 
-    private static Element Segments(IReadOnlyList<DiffSpan> spans, bool wrap, ThemeRef strong)
+    private static ThemeRef TokenColor(TokenKind kind) => kind switch
+    {
+        TokenKind.Keyword => Theme.AccentText,
+        TokenKind.String => Theme.SystemCaution,
+        TokenKind.Number => Theme.AccentSecondary,
+        TokenKind.Comment => Theme.SecondaryText,
+        _ => Theme.PrimaryText,
+    };
+
+    /// <summary>One line of code with syntax colours; plain text for languages the highlighter does not know.</summary>
+    private static Element Highlighted(string text, string path, bool wrap)
+    {
+        if (!SyntaxHighlighter.IsHighlighted(path))
+            return TextBlock(text).FontFamily(ReviewKit.Mono).FontSize(12);
+
+        var parts = new List<Element>();
+        foreach (var token in SyntaxHighlighter.Tokenize(text, path))
+        {
+            var block = TextBlock(token.Text).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(TokenColor(token.Kind));
+            parts.Add(block.Flex(shrink: 0));
+        }
+
+        return FlexRow(parts.ToArray()) with { Wrap = wrap ? FlexWrap.Wrap : FlexWrap.NoWrap };
+    }
+
+    private static Element Segments(IReadOnlyList<DiffSpan> spans, bool wrap, string path, ThemeRef strong)
     {
         var parts = new List<Element>();
         foreach (var span in spans)
         {
-            var piece = TextBlock(ReviewKit.PieceText(span.Text)).FontFamily(ReviewKit.Mono).FontSize(12);
+            var piece = Highlighted(ReviewKit.PieceText(span.Text), path, wrap: false);
             if (span.Changed)
             {
                 parts.Add(Grid(
@@ -246,7 +274,7 @@ sealed partial class ReviewWorkspace
             NumberCell(line.OldNumber, row.Commentable, showPlusOld, Comment).Grid(column: 0),
             NumberCell(line.NewNumber, row.Commentable, showPlusNew, Comment).Grid(column: 1),
             TextBlock(sign).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(signColor).HAlign(HorizontalAlignment.Center).Grid(column: 2),
-            CodeCell(row).Margin(0, 1, 8, 1).Grid(column: 3));
+            CodeCell(file, row).Margin(0, 1, 8, 1).Grid(column: 3));
 
         return Tinted(Border(grid).MinHeight(20), kind, cursor)
             .OnTapped((s, e) => Update(st => st with { CursorKey = row.Key }));
@@ -275,7 +303,7 @@ sealed partial class ReviewWorkspace
                 columns: [GridSize.Px(44), GridSize.Star()],
                 rows: [GridSize.Auto],
                 NumberCell(number, r.Commentable, cursor, () => OpenComposer(file, r, diffSide)).Grid(column: 0),
-                CodeCell(r).Margin(0, 1, 8, 1).Grid(column: 1));
+                CodeCell(file, r).Margin(0, 1, 8, 1).Grid(column: 1));
             return Tinted(Border(grid).MinHeight(20), tintKind, cursor)
                 .OnTapped((s, e) => Update(st => st with { CursorKey = r.Key }));
         }
