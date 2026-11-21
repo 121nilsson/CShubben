@@ -218,6 +218,13 @@ sealed partial class ReviewWorkspace
     {
         // A text block drops trailing spaces when it is measured, so they travel to the start of the next token.
         var parts = new List<Element>();
+        var indent = text.Length - text.TrimStart(' ').Length;
+        if (indent > 0)
+        {
+            parts.Add(TextBlock(new string('\u00A0', indent)).FontFamily(ReviewKit.Mono).FontSize(12).Flex(shrink: 0));
+            text = text.Substring(indent);
+        }
+
         var carry = "";
         foreach (var token in SyntaxHighlighter.Tokenize(text, path))
         {
