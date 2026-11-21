@@ -16,11 +16,10 @@ static class Rows
     /// </summary>
     public static Element PrRow(PullRequest pr, NextAction action, bool selected, DateTimeOffset now, Action<string> onSelect)
     {
-        var dotTone = action.IsActionable ? action.Tone : Tone.Neutral;
         var content = Grid(
-            columns: [GridSize.Px(20), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
+            columns: [GridSize.Px(40), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
             rows: [GridSize.Auto],
-            TextBlock("●").FontSize(10).Foreground(Kit.Fg(dotTone)).VAlign(VerticalAlignment.Center).Grid(column: 0),
+            Avatars.Of(pr.Author, 28).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Center).Grid(column: 0),
             VStack(2,
                 TextBlock(pr.Title).TextTrimming(TextTrimming.CharacterEllipsis).SemiBold(),
                 Kit.Muted($"{pr.Repo} #{pr.Number} · {pr.Author}" + (pr.IsDraft ? " · draft" : "")).TextTrimming(TextTrimming.CharacterEllipsis),
@@ -99,12 +98,6 @@ static class Rows
         return "?";
     }
 
-    private static Element AvatarChip(string name, Tone tone) =>
-        Border(TextBlock(Initial(name)).FontSize(12).SemiBold().Foreground(Kit.Fg(tone))
-                .HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Center))
-            .Width(28).Height(28).CornerRadius(14).Background(Kit.Bg(tone))
-            .VAlign(VerticalAlignment.Center);
-
     /// <summary>
     /// A feed row for a group of events on one PR: unseen accent bar, avatar initial chip, verb icon with the collapsed
     /// summary ("maria pushed 3 commits, 2 comments"), repo and PR title, relative time. Groups of several events show a count
@@ -141,7 +134,7 @@ static class Rows
             columns: [GridSize.Px(3), GridSize.Px(28), GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
             Border(Empty()).Width(3).CornerRadius(2).Background(group.IsNew ? Theme.Accent : Theme.SubtleFill).Opacity(group.IsNew ? 1 : 0).Grid(column: 0),
-            AvatarChip(group.Newest.Actor, tone).Grid(column: 1),
+            Avatars.Of(group.Newest.Actor, 28).VAlign(VerticalAlignment.Center).Grid(column: 1),
             VStack(2, lines.ToArray()).VAlign(VerticalAlignment.Center).Margin(10, 0, 8, 0).Grid(column: 2),
             HStack(8, trailing.ToArray()).VAlign(VerticalAlignment.Center).Grid(column: 3));
 

@@ -106,7 +106,7 @@ static class Inspector
 
         var facts = Card(VStack(10,
             HStack(12,
-                VStack(0, Kit.Muted("Author"), BodyStrong(pr.Author)),
+                HStack(8, Avatars.Of(pr.Author, 28), VStack(0, Kit.Muted("Author"), BodyStrong(pr.Author))),
                 VStack(0, Kit.Muted("Opened"), BodyStrong(Age.Format(pr.CreatedAt, now) + " ago")),
                 VStack(0, Kit.Muted("Updated"), BodyStrong(Age.Format(pr.UpdatedAt, now) + " ago")),
                 VStack(0, Kit.Muted("Comments"), BodyStrong(pr.Comments.ToString()))),

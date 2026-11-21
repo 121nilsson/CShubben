@@ -84,13 +84,7 @@ static class ReviewKit
             Cshubben.Ui.Assist.CopyLinkButton.For(uri.AbsoluteUri)) with { ColumnGap = 2 };
     }
 
-    public static Element Avatar(string author, double size = 24)
-    {
-        var initial = author.Length == 0 ? "?" : author.Substring(0, 1).ToUpperInvariant();
-        return Border(TextBlock(initial).FontSize(size * 0.5).SemiBold().Foreground(Theme.AccentText)
-                .HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Center))
-            .Width(size).Height(size).CornerRadius(size / 2).Background(Theme.SystemAttentionBackground);
-    }
+    public static Element Avatar(string author, double size = 24) => Avatars.Of(author, size);
 
     public static (string Glyph, Tone Tone) StatusIcon(DiffFileStatus status) => status switch
     {
