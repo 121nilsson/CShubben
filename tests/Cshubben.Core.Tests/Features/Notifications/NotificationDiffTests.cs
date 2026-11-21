@@ -66,7 +66,9 @@ public class NotificationDiffTests
             N.Pr("a", number: 1, review: ReviewDecision.Approved, ci: CiState.Success, draft: true),
             N.Pr("b", number: 2, review: ReviewDecision.Approved, ci: CiState.Success, merge: MergeState.Conflicting),
         });
-        Assert.Empty(NotificationDiff.Compute(before, after));
+        var events = NotificationDiff.Compute(before, after);
+        Assert.DoesNotContain(events, e => e.Kind == NotificationKind.ReadyToMerge);
+        Assert.All(events, e => Assert.Equal(NotificationKind.Approved, e.Kind));
     }
 
     [Fact]

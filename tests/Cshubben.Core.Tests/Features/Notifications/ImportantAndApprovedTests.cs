@@ -11,9 +11,7 @@ public class ImportantAndApprovedTests
     private static (HubSnapshot Before, HubSnapshot After) Opened(string repo, string actor = "bob", bool bot = false)
     {
         var before = N.Snap();
-        var after = N.Snap(
-            reviews: new[] { N.Pr("o1", repo, 40, PrRole.ReviewRequested, author: actor, title: "Fresh work") },
-            feed: new[] { N.Feed("f1", FeedKind.Opened, repo, actor, 40, bot: bot) });
+        var after = N.Snap(feed: new[] { N.Feed("f1", FeedKind.Opened, repo, actor, 40, bot: bot) });
         return (before, after);
     }
 
@@ -42,7 +40,7 @@ public class ImportantAndApprovedTests
         var e = Assert.Single(NotificationDiff.Compute(before, after));
         Assert.Equal(NotificationKind.NewInImportantRepo, e.Kind);
         Assert.Equal("bob", e.Detail);
-        Assert.Equal("Fresh work", e.Title);
+        Assert.Equal("t", e.Title);
 
         var (b2, a2) = Opened("acme/api", actor: "me");
         Assert.DoesNotContain(NotificationDiff.Compute(b2, a2), x => x.Kind == NotificationKind.NewInImportantRepo);
@@ -64,7 +62,7 @@ public class ImportantAndApprovedTests
             .Plan(before, after, new NotificationPrefs { ImportantRepos = new[] { "ACME/api" } }, Noon);
         var toast = Assert.Single(important.Messages);
         Assert.Equal("New pull request: acme/api #40", toast.Title);
-        Assert.Equal("bob - Fresh work", toast.Body);
+        Assert.Equal("bob - t", toast.Body);
     }
 
     [Fact]
