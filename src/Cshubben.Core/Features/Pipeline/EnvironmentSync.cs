@@ -19,9 +19,9 @@ public static class EnvironmentSync
             .ToList();
         if (latest.Count < 2) return null;
 
-        var shas = latest.Select(d => d.Sha).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var shas = latest.Select(d => PipelineFormat.ShortSha(d.Sha)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (shas.Count == 1)
-            return new EnvironmentSyncInfo(false, "All " + latest.Count + " environments at " + PipelineFormat.ShortSha(shas[0]));
+            return new EnvironmentSyncInfo(false, "All " + latest.Count + " environments at " + shas[0]);
 
         return new EnvironmentSyncInfo(true,
             "Environments differ: " + string.Join(", ", latest.Select(d => d.Environment + " " + PipelineFormat.ShortSha(d.Sha))));
