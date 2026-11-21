@@ -47,6 +47,10 @@ jobs:
       - name: Publish
         run: dotnet publish src/Cshubben/Cshubben.csproj -c Release --no-restore -p:Platform=${{ matrix.platform }} -p:Version=${{ env.VERSION }} -o publish/${{ matrix.platform }}
 
+      - name: Prune languages
+        shell: pwsh
+        run: ./scripts/prune-languages.ps1 -Path publish/${{ matrix.platform }}
+
       - name: Install vpk
         run: dotnet tool install -g vpk
 

@@ -9,6 +9,8 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <RootNamespace>Cshubben</RootNamespace>
     <AssemblyName>Cshubben</AssemblyName>
+    <!-- Only English and Swedish translations of the .NET libraries. The rest are tens of MB. -->
+    <SatelliteResourceLanguages>en;sv</SatelliteResourceLanguages>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />
