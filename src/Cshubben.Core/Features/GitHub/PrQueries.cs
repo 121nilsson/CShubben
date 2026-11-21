@@ -51,7 +51,7 @@ public static class PrQueries
             ... on PullRequest {
               id
               reviewDecision
-              reviewThreads(first: 50) { nodes { isResolved } }
+              reviewThreads(first: 100) { nodes { isResolved } }
               commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
             }
           }
@@ -65,7 +65,7 @@ public static class PrQueries
               id
               mergeable
               reviewDecision
-              reviewThreads(first: 50) { nodes { isResolved } }
+              reviewThreads(first: 100) { nodes { isResolved } }
               commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
             }
           }

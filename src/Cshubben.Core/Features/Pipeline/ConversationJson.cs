@@ -19,7 +19,7 @@ public static class ConversationJson
               comments(first: 100) { nodes { id body createdAt url author { login __typename } } }
               reviews(first: 100) { nodes { id state body submittedAt url author { login __typename } } }
               commits(first: 100) { nodes { commit { oid messageHeadline committedDate url author { name user { login } } } } }
-              reviewThreads(first: 60) {
+              reviewThreads(first: 100) {
                 nodes {
                   id isResolved isOutdated path line
                   comments(first: 30) { nodes { id body createdAt url author { login __typename } } }

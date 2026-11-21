@@ -194,7 +194,13 @@ sealed partial class ReviewWorkspace
             if (result.IsUseful)
             {
                 var spans = line.Kind == DiffLineKind.Remove ? result.OldSpans : result.NewSpans;
-                return Segments(spans, S.Wrap, file.Path, line.Kind == DiffLineKind.Add ? Theme.SystemSuccess : Theme.SystemCritical);
+                IReadOnlyList<CodeToken>? lineTokens = null;
+                if (SyntaxHighlighter.IsHighlighted(file.Path))
+                    lineTokens = row.LineIndex >= 0 && row.HunkIndex >= 0 && row.HunkIndex < file.Hunks.Count
+                        ? HunkHighlighter.TokensFor(file.Hunks[row.HunkIndex], row.LineIndex, file.Path)
+                        : SyntaxHighlighter.Tokenize(line.Text, file.Path);
+                var slices = lineTokens is null ? null : TokenSlicer.Slice(lineTokens, spans);
+                return Segments(spans, slices, S.Wrap, file.Path, line.Kind == DiffLineKind.Add ? Theme.SystemSuccess : Theme.SystemCritical);
             }
         }
 
@@ -248,25 +254,36 @@ sealed partial class ReviewWorkspace
     private static Element Highlighted(string text, string path, bool wrap) =>
         FlexRow(TokenParts(text, path).ToArray()) with { Wrap = wrap ? FlexWrap.Wrap : FlexWrap.NoWrap };
 
-    private static Element Segments(IReadOnlyList<DiffSpan> spans, bool wrap, string path, ThemeRef strong)
+    private static Element Segments(IReadOnlyList<DiffSpan> spans, IReadOnlyList<IReadOnlyList<CodeToken>>? slices, bool wrap, string path, ThemeRef strong)
     {
+        // Trailing spaces travel to the start of the next piece (a text block drops them when it is measured).
         var parts = new List<Element>();
-        foreach (var span in spans)
+        var carry = "";
+        for (var i = 0; i < spans.Count; i++)
         {
-            var text = ReviewKit.PieceText(span.Text);
-            var pieces = SyntaxHighlighter.IsHighlighted(path)
-                ? TokenParts(text, path)
-                : new List<Element> { TextBlock(text.Replace(' ', '\u00A0')).FontFamily(ReviewKit.Mono).FontSize(12).Flex(shrink: 0) };
-            foreach (var piece in pieces)
+            var span = spans[i];
+            IReadOnlyList<CodeToken> tokens = slices is not null
+                ? slices[i]
+                : SyntaxHighlighter.IsHighlighted(path)
+                    ? SyntaxHighlighter.Tokenize(span.Text.Replace('\u00A0', ' '), path)
+                    : new[] { new CodeToken(span.Text, TokenKind.Plain) };
+
+            foreach (var token in tokens)
             {
+                var full = carry + token.Text.Replace('\u00A0', ' ').Replace("\t", "    ", StringComparison.Ordinal);
+                var body = full.TrimEnd(' ');
+                carry = full.Substring(body.Length);
+                if (body.Length == 0) continue;
+
+                var block = TextBlock(body.Replace(' ', '\u00A0')).FontFamily(ReviewKit.Mono).FontSize(12).Foreground(TokenColor(token.Kind));
                 parts.Add(span.Changed
                     ? Grid(
                             columns: [GridSize.Auto],
                             rows: [GridSize.Auto],
                             Border(Empty()).Background(strong).Opacity(0.35).Grid(row: 0, column: 0),
-                            piece.Grid(row: 0, column: 0))
+                            block.Grid(row: 0, column: 0))
                         .Flex(shrink: 0)
-                    : piece);
+                    : block.Flex(shrink: 0));
             }
         }
 
