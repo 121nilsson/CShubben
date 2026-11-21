@@ -29,7 +29,7 @@ static class TextMateTokenizer
                 var grammar = GrammarFor(path);
                 if (grammar is null) return null;
 
-                var result = grammar.TokenizeLine(text, null, TimeSpan.FromMilliseconds(50));
+                var result = grammar.TokenizeLine(text, null, TimeSpan.FromSeconds(2));
                 var tokens = new List<CodeToken>();
                 var pos = 0;
                 foreach (var token in result.Tokens)
