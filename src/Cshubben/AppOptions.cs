@@ -16,6 +16,9 @@ public static class AppOptions
     public static string? SelectedPr { get; private set; }
     public static int StartTab { get; private set; }
 
+    /// <summary>Set by <c>--palette [query]</c>: start with the command palette open (used for screenshots).</summary>
+    public static string? PaletteQuery { get; private set; }
+
     /// <summary>True when <c>--demo</c> was passed: demo data, no network, no real settings or credentials.</summary>
     public static bool Demo { get; private set; }
 
@@ -41,6 +44,9 @@ public static class AppOptions
                     break;
                 case "--select" when next is not null:
                     SelectedPr = next;
+                    break;
+                case "--palette":
+                    PaletteQuery = next is not null && !next.StartsWith("--", StringComparison.Ordinal) ? next : "";
                     break;
                 case "--tab" when next is not null && int.TryParse(next, out var tab):
                     StartTab = tab;

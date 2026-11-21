@@ -57,9 +57,9 @@ sealed class PaletteHost : Component<PaletteHostProps>
     {
         var ctx = Props.Ctx;
         var (_, windowHeight) = UseWindowSize();
-        var (open, setOpen) = UseState(false, true);
+        var (open, setOpen) = UseState(AppOptions.PaletteQuery is not null, true);
         var (help, setHelp) = UseState(false, true);
-        var (query, setQuery) = UseState("");
+        var (query, setQuery) = UseState(AppOptions.PaletteQuery ?? "");
         var (selected, setSelected) = UseState(0);
         var (chordPending, setChordPending) = UseState(false, true);
         var chord = UseRef(new ChordMatcher());
