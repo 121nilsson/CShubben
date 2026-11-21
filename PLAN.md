@@ -112,3 +112,7 @@ Remaining:
 - Contrast of `Kit.Muted` and pills on tinted backgrounds is unmeasured; check in high-contrast and dark themes.
 - Small hit targets (18 px avatars/priority icons are not interactive; some SubtleButtons with 12 px text are under 32 px tall).
 - Notes page was out of scope for this pass. Tab order follows tree order and has not been audited.
+
+## Status log (2026-11-21, afternoon)
+- Stats now reads real history: merged PRs authored by the viewer (first review by someone else, size) and reviews given, over 12 weeks, via GraphQL search (`StatsQueries`/`StatsMapper` in Core, `GitHubStatsData` + `StatsPageHost` in the app). Demo data only in `--demo` or without a GitHub connection (with a banner). Not verified against a real account.
+- Idea: a read-only `live-smoke` workflow (workflow_dispatch, Environment secrets `SMOKE_GITHUB_TOKEN`, `SMOKE_LINEAR_KEY`) that runs `--smoke` on the Windows runner.

@@ -21,7 +21,7 @@ static class StatsPage
 
     private const double ChartHeight = 72;
 
-    public static Element Build(HubSnapshot snap, StatsInput? input = null)
+    public static Element Build(HubSnapshot snap, StatsInput? input = null, Element? notice = null)
     {
         var real = input ?? Input;
         var report = StatsCalculator.Compute(real ?? DemoStats.Build(snap.At, snap.Viewer), snap.At);
@@ -93,6 +93,7 @@ static class StatsPage
         return ScrollView(Kit.Capped(
             FlexColumn(
                 Kit.PageHeader("Stats", subtitle),
+                notice?.Margin(0, 0, 0, 12),
                 tiles,
                 (FlexRow(throughput, trend, load, spread, sizes, repos) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 12 })
                     .Margin(0, 0, 0, 12),

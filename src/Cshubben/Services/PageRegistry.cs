@@ -80,7 +80,7 @@ static class PageRegistry
         new(Page.Notes, "Workspace", "", "Notes",
             _ => Component<NotesPage>()),
         new(Page.Stats, "Workspace", "", "Stats",
-            ctx => StatsPage.Build(ctx.Snapshot, null)),
+            ctx => Component<StatsPageHost, PageContext>(ctx)),
 
         new(Page.Settings, "", "", "Settings",
             c => Component<SettingsPage, PageContext>(c), Pinned: true),
