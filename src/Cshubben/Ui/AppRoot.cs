@@ -46,6 +46,11 @@ sealed class AppRoot : Component
         UseEffect(() => PagePrefetch.RecordVisit(page), page);
 
         var inFlight = UseRef(false);
+        // Pane state. The wanted value is read through a ref so callbacks from an earlier render (WinUI reports our own writes back
+        // through them) never mistake it for a user toggle; toggles only count once the pane has loaded.
+        var paneDesired = UseRef(true);
+        var paneReady = UseRef(false);
+        var paneHooked = UseRef(false);
         var pausedUntil = UseRef<DateTimeOffset?>(null);
         var windowActive = UseRef(true);
         var intervalSeconds = UseRef(AppSettings.DefaultRefreshSeconds);
@@ -155,6 +160,7 @@ sealed class AppRoot : Component
         // so the page in the middle keeps enough room for its rows.
         // The toggle in the sidebar header overrides the automatic choice everywhere, including the review page.
         var compact = settings.SidebarCollapsed ?? (windowWidth < 1200 || page == Page.Review);
+        paneDesired.Current = !compact;
         // Below this width the inspector replaces the list as a full-page view with a Back button.
         var narrow = windowWidth < 900;
         var inspectorWidth = windowWidth >= 1500 ? 480.0 : windowWidth >= 1200 ? 420.0 : 340.0;
@@ -236,6 +242,18 @@ sealed class AppRoot : Component
             }
         }
 
+        // WinUI may reset IsPaneOpen while it loads; once it has, put the wanted value back and start listening for user toggles.
+        void HookPane(WinUI.NavigationView nav)
+        {
+            if (paneHooked.Current) return;
+            paneHooked.Current = true;
+            nav.Loaded += (_, _) => nav.DispatcherQueue.TryEnqueue(() =>
+            {
+                nav.IsPaneOpen = paneDesired.Current;
+                paneReady.Current = true;
+            });
+        }
+
         void Navigate(string? tag)
         {
             if (tag == NavigationViewElement.SettingsTag) { OpenSettings(); return; }
@@ -250,12 +268,15 @@ sealed class AppRoot : Component
             .TitleBarAutoPadding(false)
             .IsPaneOpen(!compact, open =>
             {
-                // Echoes of our own value are ignored; only a real toggle by the user is saved (and ends the automatic mode).
-                if (open == compact) SaveSettings(settings with { SidebarCollapsed = !open });
+                // Only a real toggle by the user is saved (and ends the automatic mode). Echoes of our own writes and WinUI's
+                // own changes while the pane loads are ignored.
+                if (paneReady.Current && open != paneDesired.Current)
+                    SaveSettings(services.Settings with { SidebarCollapsed = !open });
             })
             .PaneFooter(RefreshFooter(compact, snapshot, now, refreshing, services.IsDemo, Refresh))
             .ItemInvoked(Navigate)
-            .Set(nav => ApplyBadges(nav));
+            .Set(nav => ApplyBadges(nav))
+            .Set(nav => HookPane(nav));
         sidebar = sidebar with { SelectedTag = page == Page.Settings ? NavigationViewElement.SettingsTag : page.ToString() };
 
         var pageDef = PageRegistry.Find(page);
