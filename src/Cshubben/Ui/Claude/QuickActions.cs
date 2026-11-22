@@ -72,20 +72,25 @@ sealed class QuickActions : Component<QuickActionsProps>
             setNoticeTone(Tone.Danger);
         }
 
-        Element Choice(string label, bool selected, Action onClick, string name) =>
-            Border(Button(label, onClick).SubtleButton().AutomationName(name))
+        Element Choice(string glyph, string label, bool selected, Action onClick, string name) =>
+            Border(Button(HStack(6, Kit.Glyph(glyph, 13).VAlign(VerticalAlignment.Center), TextBlock(label).VAlign(VerticalAlignment.Center)), onClick)
+                    .SubtleButton().AutomationName(name))
                 .Selected(selected).CornerRadius(6);
 
         var linearId = linear.IdentifierFor(pr);
         var isReviewer = pr.Role == PrRole.ReviewRequested;
 
         var row = FlexRow(
-            isReviewer ? Choice("Approve", open == QuickPanel.Review && verdict == ReviewVerdict.Approve, () => OpenReview(ReviewVerdict.Approve), "Approve this pull request") : null,
-            isReviewer ? Choice("Request changes", open == QuickPanel.Review && verdict == ReviewVerdict.RequestChanges, () => OpenReview(ReviewVerdict.RequestChanges), "Request changes") : null,
-            Choice("✦ Ask Claude", open == QuickPanel.Claude, () => Toggle(QuickPanel.Claude), "Ask Claude about this pull request"),
-            Choice("◇ " + (linearId ?? "Linear issue"), open == QuickPanel.Linear, () => Toggle(QuickPanel.Linear), "Linear issue"),
-            Choice(savedNote ? "✓ Saved" : "✎ Save to notes", false, SaveToNotes, "Save a note about this pull request"),
-            Choice("↗ GitHub", false, OpenGitHub, "Open on GitHub"),
+            isReviewer ? Choice("\uE73E", "Approve", open == QuickPanel.Review && verdict == ReviewVerdict.Approve, () => OpenReview(ReviewVerdict.Approve), "Approve this pull request") : null,
+            isReviewer ? Choice("\uE711", "Request changes", open == QuickPanel.Review && verdict == ReviewVerdict.RequestChanges, () => OpenReview(ReviewVerdict.RequestChanges), "Request changes") : null,
+            Choice("\uE8BD", "Ask Claude", open == QuickPanel.Claude, () => Toggle(QuickPanel.Claude), "Ask Claude about this pull request"),
+            Choice("\uE7C1", linearId ?? "Linear issue", open == QuickPanel.Linear, () => Toggle(QuickPanel.Linear), "Linear issue"),
+            Choice(savedNote ? "\uE73E" : "\uE70F", savedNote ? "Saved" : "Save to notes", false, SaveToNotes, "Save a note about this pull request"))
+            with { Wrap = FlexWrap.Wrap, ColumnGap = 4, RowGap = 4 };
+
+        // Links out of the app: one deliberate second row, same weight, so nothing wraps by accident.
+        var links = FlexRow(
+            Choice("\uE8A7", "GitHub", false, OpenGitHub, "Open on GitHub"),
             CopyLinkButton.For(pr.Url),
             CopyLinkButton.For(pr.Url, "Copy Markdown", pr.Repo + "#" + pr.Number + " " + pr.Title))
             with { Wrap = FlexWrap.Wrap, ColumnGap = 4, RowGap = 4 };
@@ -102,6 +107,7 @@ sealed class QuickActions : Component<QuickActionsProps>
 
         return FlexColumn(
             row.WithKey("row"),
+            links.WithKey("links"),
             noticeLine?.WithKey("notice"),
             Border(claudePanel).IsVisible(open == QuickPanel.Claude).WithKey("panel-claude"),
             Border(linearPanel).IsVisible(open == QuickPanel.Linear).WithKey("panel-linear"),

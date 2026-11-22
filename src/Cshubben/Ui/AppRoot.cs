@@ -197,11 +197,15 @@ sealed class AppRoot : Component
             var count = badge?.Count;
             var tone = badge?.Tone ?? Tone.Neutral;
             Element row = compact
-                ? VStack(2,
-                    Kit.Glyph(def.Glyph).HAlign(HorizontalAlignment.Center),
+                ? Grid(
+                    columns: [GridSize.Star()],
+                    rows: [GridSize.Auto],
+                    Kit.Glyph(def.Glyph).HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Center).Margin(0, 4, 0, 4),
                     count is > 0
-                        ? TextBlock(count.Value.ToString()).FontSize(10).SemiBold().Foreground(Kit.Fg(tone)).HAlign(HorizontalAlignment.Center)
-                        : null)
+                        ? Border(TextBlock(count.Value.ToString()).FontSize(11).SemiBold().Foreground(Kit.Fg(tone)))
+                            .Background(Kit.Bg(tone)).CornerRadius(8).Padding(4, 0)
+                            .HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Top).Margin(0, -2, -2, 0)
+                        : Empty())
                 : Grid(
                     columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
                     rows: [GridSize.Auto],
@@ -223,9 +227,7 @@ sealed class AppRoot : Component
         var sidebarChildren = new List<Element>
         {
             compact
-                ? VStack(4,
-                    sidebarToggle.HAlign(HorizontalAlignment.Center),
-                    TextBlock("◆").FontSize(18).Foreground(Theme.AccentText).HAlign(HorizontalAlignment.Center)).Margin(0, 4, 0, 8)
+                ? sidebarToggle.HAlign(HorizontalAlignment.Center).Margin(0, 4, 0, 8)
                 : Grid(
                     columns: [GridSize.Star(), GridSize.Auto],
                     rows: [GridSize.Auto],

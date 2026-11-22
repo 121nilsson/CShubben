@@ -63,15 +63,20 @@ sealed partial class ReviewWorkspace
         }
         facts.Add(Kit.Pill((pr?.SizeLabel ?? SizeOf(Props.Full.Files)) + " · " + ReviewTimeEstimate.Label(Props.Full.Files), Tone.Neutral));
         facts.Add(BuildProgress());
+
+        // Two different things, kept apart: which changes to show, and how to lay them out.
+        var views = new List<Element>();
         var range = BuildRangeToggle();
-        if (range is not null) facts.Add(range);
+        if (range is not null) views.Add(range);
         if (CanSplit)
         {
-            facts.Add(ToggleButton("Split view", S.Split, v => Update(s => s with { Split = v })).AutomationName("Split view"));
+            views.Add(SelectorBar([SelectorBarItem("Unified"), SelectorBarItem("Split")], S.Split ? 1 : 0,
+                i => Update(s => s with { Split = i == 1 })).AutomationName("Diff layout"));
         }
 
         var factRow = FlexRow(facts.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 10, RowGap = 6, AlignItems = FlexAlign.Center };
-        return Border(FlexColumn(titleRow.Flex(shrink: 0), factRow.Flex(shrink: 0)) with { RowGap = 6 })
+        var viewRow = FlexRow(views.ToArray()) with { Wrap = FlexWrap.Wrap, ColumnGap = 24, RowGap = 4, AlignItems = FlexAlign.Center };
+        return Border(FlexColumn(titleRow.Flex(shrink: 0), factRow.Flex(shrink: 0), viewRow.Flex(shrink: 0)) with { RowGap = 4 })
             .Padding(16, 8).BorderThickness(0, 0, 0, 1).BorderBrush(Theme.DividerStroke);
     }
 

@@ -99,7 +99,7 @@ sealed partial class ReviewWorkspace
         var nav = FlexRow(
             Button(Kit.Glyph("", 12), () => MoveFile(-1)).SubtleButton().AutomationName("Previous file").ToolTip("Previous file (k)"),
             Button(Kit.Glyph("", 12), () => MoveFile(1)).SubtleButton().AutomationName("Next file").ToolTip("Next file (j)"),
-            ToggleButton("Wrap", S.Wrap, v => Update(s => s with { Wrap = v })).AutomationName("Wrap long lines").ToolTip("Wrap long lines"),
+            CheckBox(S.Wrap, v => Update(s => s with { Wrap = v }), label: "Wrap").AutomationName("Wrap long lines").ToolTip("Wrap long lines"),
             CheckBox(viewed, v => ToggleViewed(file.Path, v), label: "Viewed").AutomationName("Viewed (v)"),
             ReviewKit.OpenOnGitHub(ReviewKit.FileUrl(Target, file.Path), "Open file on GitHub")) with { ColumnGap = 4 };
 

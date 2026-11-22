@@ -73,7 +73,7 @@ static class PageRegistry
 
         new(Page.Review, "Pull requests", "\uE943", "Code review", BuildReview),
 
-        new(Page.Drift, "Workspace", "", "Drift",
+        new(Page.Drift, "Workspace", "\uE898", "Drift",
             c => Component<DriftPage, PageContext>(c)),
         new(Page.Linear, "Workspace", "", "Linear",
             ctx => LinearPage.Build(ctx.Snapshot, null, ctx.Select, ctx.OpenSettings)),
