@@ -58,6 +58,11 @@ public sealed record AppSettings
     /// <summary>"system", "light" or "dark".</summary>
     public string Theme { get; init; } = ThemeChoice.FollowSystem;
 
+    /// <summary>
+    /// Sidebar chosen by the user: true = icon rail, false = open, null = automatic (rail on narrow windows and on the review page).
+    /// </summary>
+    public bool? SidebarCollapsed { get; init; }
+
     /// <summary>One row per PR instead of two lines.</summary>
     public bool CompactLists { get; init; }
 

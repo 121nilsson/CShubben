@@ -38,6 +38,7 @@ public sealed class SettingsTests : IDisposable
             ClaudeEffort = "high",
             Theme = "dark",
             CompactLists = true,
+            SidebarCollapsed = true,
             RefreshSeconds = 120,
             NotesDirectory = "D:/notes",
         });
@@ -51,6 +52,8 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal("high", s.ClaudeEffort);
         Assert.Equal("dark", s.Theme);
         Assert.True(s.CompactLists);
+        Assert.True(s.SidebarCollapsed);
+        Assert.Null(new AppSettings().SidebarCollapsed);
         Assert.Equal(120, s.RefreshSeconds);
         Assert.Equal("D:/notes", s.NotesDirectory);
         Assert.False(File.Exists(File1 + ".tmp"));

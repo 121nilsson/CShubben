@@ -152,7 +152,8 @@ sealed class AppRoot : Component
 
         // Responsive: on narrow windows the sidebar becomes an icon rail and the inspector gets slimmer,
         // so the page in the middle keeps enough room for its rows.
-        var compact = windowWidth < 1200 || page == Page.Review;
+        // The toggle in the sidebar header overrides the automatic choice everywhere, including the review page.
+        var compact = settings.SidebarCollapsed ?? (windowWidth < 1200 || page == Page.Review);
         // Below this width the inspector replaces the list as a full-page view with a Back button.
         var narrow = windowWidth < 900;
         var railWidth = compact ? 64.0 : 248.0;
@@ -216,12 +217,21 @@ sealed class AppRoot : Component
         Element Section(string text) => compact ? Border(Empty()).Height(12) : Kit.SectionLabel(text);
 
         // Sidebar entries come from the registry: grouped by section in registry order, pinned ones at the bottom.
+        var toggleLabel = compact ? "Expand sidebar" : "Collapse sidebar";
+        var sidebarToggle = Button(Kit.Glyph("\uE700"), () => SaveSettings(settings with { SidebarCollapsed = !compact }))
+            .SubtleButton().ToolTip(toggleLabel).AutomationName(toggleLabel);
         var sidebarChildren = new List<Element>
         {
-            (compact
-                ? (Element)TextBlock("◆").FontSize(18).Foreground(Theme.AccentText).HAlign(HorizontalAlignment.Center)
-                : HStack(8, TextBlock("◆").FontSize(18).Foreground(Theme.AccentText), TextBlock("Cshubben").FontSize(16).SemiBold()))
-                .Margin(compact ? 0 : 12, 8, 0, 8),
+            compact
+                ? VStack(4,
+                    sidebarToggle.HAlign(HorizontalAlignment.Center),
+                    TextBlock("◆").FontSize(18).Foreground(Theme.AccentText).HAlign(HorizontalAlignment.Center)).Margin(0, 4, 0, 8)
+                : Grid(
+                    columns: [GridSize.Star(), GridSize.Auto],
+                    rows: [GridSize.Auto],
+                    HStack(8, TextBlock("◆").FontSize(18).Foreground(Theme.AccentText), TextBlock("Cshubben").FontSize(16).SemiBold())
+                        .VAlign(VerticalAlignment.Center).Grid(column: 0),
+                    sidebarToggle.VAlign(VerticalAlignment.Center).Grid(column: 1)).Margin(12, 8, 0, 8),
         };
         string? currentSection = null;
         foreach (var def in PageRegistry.All)
