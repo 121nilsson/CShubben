@@ -10,6 +10,7 @@ using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Xaml;
+using WinUI = Microsoft.UI.Xaml.Controls;
 using FailureInfo = Cshubben.Core.Shared.Failure;
 using static Microsoft.UI.Reactor.Factories;
 
@@ -156,7 +157,6 @@ sealed class AppRoot : Component
         var compact = settings.SidebarCollapsed ?? (windowWidth < 1200 || page == Page.Review);
         // Below this width the inspector replaces the list as a full-page view with a Back button.
         var narrow = windowWidth < 900;
-        var railWidth = compact ? 64.0 : 248.0;
         var inspectorWidth = windowWidth >= 1500 ? 480.0 : windowWidth >= 1200 ? 420.0 : 340.0;
 
         var loadedOnce = snapshot is not null;
@@ -190,51 +190,10 @@ sealed class AppRoot : Component
 
         var ctx = new PageContext(snap, loadedOnce, selectedId, Select, services, settings, SaveSettings, Refresh, OpenSettings);
 
-        Element Item(PageDef def)
-        {
-            var active = page == def.Id;
-            var badge = def.Badge?.Invoke(ctx);
-            var count = badge?.Count;
-            var tone = badge?.Tone ?? Tone.Neutral;
-            Element row = compact
-                ? Grid(
-                    columns: [GridSize.Star()],
-                    rows: [GridSize.Auto],
-                    Kit.Glyph(def.Glyph).HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Center).Margin(0, 4, 0, 4),
-                    count is > 0
-                        ? Border(TextBlock(count.Value.ToString()).FontSize(11).SemiBold().Foreground(Kit.Fg(tone)))
-                            .Background(Kit.Bg(tone)).CornerRadius(8).Padding(4, 0)
-                            .HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Top).Margin(0, -2, -2, 0)
-                        : Empty())
-                : Grid(
-                    columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
-                    rows: [GridSize.Auto],
-                    Kit.Glyph(def.Glyph).VAlign(VerticalAlignment.Center).Grid(column: 0),
-                    (active ? BodyStrong(def.Label) : Body(def.Label)).VAlign(VerticalAlignment.Center).Grid(column: 1),
-                    count is > 0 ? Kit.Pill(count.Value.ToString(), tone).Grid(column: 2) : Empty());
-            return Border(Button(row, () => { setPage(def.Id); if (narrow) setSelected(null); })
-                    .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
-                    .ToolTip(def.Label).AutomationName(count is > 0 ? def.Label + ", " + count.Value + " waiting" : def.Label))
-                .Selected(active).CornerRadius(6);
-        }
-
-        Element Section(string text) => compact ? Border(Empty()).Height(12) : Kit.SectionLabel(text);
-
-        // Sidebar entries come from the registry: grouped by section in registry order, pinned ones at the bottom.
-        var toggleLabel = compact ? "Expand sidebar" : "Collapse sidebar";
-        var sidebarToggle = Button(Kit.Glyph("\uE700"), () => SaveSettings(settings with { SidebarCollapsed = !compact }))
-            .SubtleButton().ToolTip(toggleLabel).AutomationName(toggleLabel);
-        var sidebarChildren = new List<Element>
-        {
-            compact
-                ? sidebarToggle.HAlign(HorizontalAlignment.Center).Margin(0, 4, 0, 8)
-                : Grid(
-                    columns: [GridSize.Star(), GridSize.Auto],
-                    rows: [GridSize.Auto],
-                    HStack(8, TextBlock("◆").FontSize(18).Foreground(Theme.AccentText), TextBlock("Cshubben").FontSize(16).SemiBold())
-                        .VAlign(VerticalAlignment.Center).Grid(column: 0),
-                    sidebarToggle.VAlign(VerticalAlignment.Center).Grid(column: 1)).Margin(12, 8, 0, 8),
-        };
+        // Sidebar: the platform NavigationView, built from the registry. Entries are grouped by section in registry order;
+        // pinned ones (Settings) use the built-in settings item at the bottom.
+        var menu = new List<NavigationViewItemData>();
+        var badges = new Dictionary<string, PageBadge>();
         string? currentSection = null;
         foreach (var def in PageRegistry.All)
         {
@@ -242,18 +201,62 @@ sealed class AppRoot : Component
             if (def.Section != currentSection)
             {
                 currentSection = def.Section;
-                sidebarChildren.Add(Section(def.Section));
+                if (!string.IsNullOrEmpty(def.Section)) menu.Add(NavItemHeader(def.Section));
             }
 
-            sidebarChildren.Add(Item(def).WithKey(def.Id.ToString()));
+            menu.Add(new NavigationViewItemData(def.Label, null, def.Id.ToString()) { IconElement = FontIcon(def.Glyph) });
+            if (def.Badge?.Invoke(ctx) is { Count: > 0 } badge) badges[def.Id.ToString()] = badge;
         }
 
-        sidebarChildren.Add(Empty().Flex(grow: 1));
-        sidebarChildren.Add(RefreshFooter(compact, snapshot, now, refreshing, services.IsDemo, Refresh));
-        foreach (var def in PageRegistry.All)
-            if (def.Pinned) sidebarChildren.Add(Item(def).WithKey(def.Id.ToString()));
+        // The platform InfoBadge on each menu item. Reactor's NavItem data has no badge slot, so it is attached to the live
+        // items here (setters run after the menu is reconciled); the same badge instance is reused and only its value changes.
+        void ApplyBadges(WinUI.NavigationView nav)
+        {
+            foreach (var item in nav.MenuItems.OfType<WinUI.NavigationViewItem>())
+            {
+                if (item.Tag is not string tag || !badges.TryGetValue(tag, out var b))
+                {
+                    item.InfoBadge = null;
+                    continue;
+                }
 
-        var sidebar = FlexColumn(sidebarChildren.ToArray()).FlexPadding(8, 4);
+                var badge = item.InfoBadge ?? new WinUI.InfoBadge();
+                badge.Value = b.Count;
+                var styleKey = b.Tone switch
+                {
+                    Tone.Warning => "CautionValueInfoBadgeStyle",
+                    Tone.Danger => "CriticalValueInfoBadgeStyle",
+                    Tone.Success => "SuccessValueInfoBadgeStyle",
+                    Tone.Accent => "AttentionValueInfoBadgeStyle",
+                    _ => "InformationalValueInfoBadgeStyle",
+                };
+                if (Application.Current.Resources.TryGetValue(styleKey, out var resource) && resource is Style style)
+                    badge.Style = style;
+                item.InfoBadge = badge;
+            }
+        }
+
+        void Navigate(string? tag)
+        {
+            if (tag == NavigationViewElement.SettingsTag) { OpenSettings(); return; }
+            if (tag is not null && Enum.TryParse<Page>(tag, true, out var pg)) { setPage(pg); if (narrow) setSelected(null); }
+        }
+
+        var sidebar = NavigationView(menu.ToArray())
+            .PaneDisplayMode(WinUI.NavigationViewPaneDisplayMode.Left)
+            .PaneTitle("Cshubben")
+            .OpenPaneLength(248)
+            .BackButtonVisible(false)
+            .TitleBarAutoPadding(false)
+            .IsPaneOpen(!compact, open =>
+            {
+                // Echoes of our own value are ignored; only a real toggle by the user is saved (and ends the automatic mode).
+                if (open == compact) SaveSettings(settings with { SidebarCollapsed = !open });
+            })
+            .PaneFooter(RefreshFooter(compact, snapshot, now, refreshing, services.IsDemo, Refresh))
+            .ItemInvoked(Navigate)
+            .Set(nav => ApplyBadges(nav));
+        sidebar = sidebar with { SelectedTag = page == Page.Settings ? NavigationViewElement.SettingsTag : page.ToString() };
 
         var pageDef = PageRegistry.Find(page);
         Element content = pageDef is null
@@ -293,18 +296,16 @@ sealed class AppRoot : Component
                 rows: [GridSize.Auto, GridSize.Star()],
                 bannerStack.Grid(row: 0),
                 content.Grid(row: 1)))
-            .Background(Theme.LayerFill).CornerRadius(8).Margin(0, 0, 8, 8);
+            .Margin(0);
 
-        Element grid = selected is not null && narrow
-            ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
-                sidebar.Grid(column: 0),
-                Inspector.Build(selected, snap, tab, SetInspectorTab, () => setSelected(null), fullPage: true).Grid(column: 1))
+        Element content2 = selected is not null && narrow
+            ? Inspector.Build(selected, snap, tab, SetInspectorTab, () => setSelected(null), fullPage: true)
             : selected is null
-            ? Grid(columns: [GridSize.Px(railWidth), GridSize.Star()], rows: [GridSize.Star()],
-                sidebar.Grid(column: 0), main.Grid(column: 1))
-            : Grid(columns: [GridSize.Px(railWidth), GridSize.Star(), GridSize.Px(inspectorWidth)], rows: [GridSize.Star()],
-                sidebar.Grid(column: 0), main.Grid(column: 1),
-                Inspector.Build(selected, snap, tab, SetInspectorTab, () => setSelected(null)).Grid(column: 2));
+            ? main
+            : Grid(columns: [GridSize.Star(), GridSize.Px(inspectorWidth)], rows: [GridSize.Star()],
+                main.Grid(column: 0),
+                Inspector.Build(selected, snap, tab, SetInspectorTab, () => setSelected(null)).Grid(column: 1));
+        Element grid = sidebar with { Content = content2 };
 
         var paletteCtx = new PaletteContext(snap, selectedId,
             PageRegistry.All.Where(d => d.Id != Page.Review).Select(d => new PalettePage(d.Id.ToString(), d.Label, d.Glyph)).ToList(),
