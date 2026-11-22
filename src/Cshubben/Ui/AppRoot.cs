@@ -200,11 +200,11 @@ sealed class AppRoot : Component
                 ? Grid(
                     columns: [GridSize.Star()],
                     rows: [GridSize.Auto],
-                    Kit.Glyph(def.Glyph).HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Center).Margin(0, 6, 12, 6),
+                    Kit.Glyph(def.Glyph).HAlign(HorizontalAlignment.Center).VAlign(VerticalAlignment.Center).Margin(0, 4, 0, 4),
                     count is > 0
                         ? Border(TextBlock(count.Value.ToString()).FontSize(11).SemiBold().Foreground(Kit.Fg(tone)))
                             .Background(Kit.Bg(tone)).CornerRadius(8).Padding(4, 0)
-                            .HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Top).Margin(0, 0, 2, 0)
+                            .HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Top).Margin(0, -2, -2, 0)
                         : Empty())
                 : Grid(
                     columns: [GridSize.Px(28), GridSize.Star(), GridSize.Auto],
