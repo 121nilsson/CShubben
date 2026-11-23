@@ -19,8 +19,21 @@ public sealed class ErrorsSettingsTests : IDisposable
         Assert.False(s.Enabled);
         Assert.Equal("", s.GrafanaUrl);
         Assert.Equal("", s.RepoRoot);
+        Assert.Equal("", s.LokiDatasource);
+        Assert.Equal("default", s.Namespace);
+        Assert.False(s.IncludeWarnings);
         Assert.Empty(s.Bindings);
         Assert.Empty(s.Namespaces);
+    }
+
+    [Fact]
+    public void Namespace_and_datasource_are_trimmed_and_repaired()
+    {
+        var s = new ErrorsSettings { Namespace = "two words", LokiDatasource = "  P8E80F9AEF21F6940  " }.Sanitized();
+        Assert.Equal("default", s.Namespace);
+        Assert.Equal("P8E80F9AEF21F6940", s.LokiDatasource);
+        Assert.Equal("prod", new ErrorsSettings { Namespace = " prod " }.Sanitized().Namespace);
+        Assert.Equal("default", new ErrorsSettings { Namespace = null! }.Sanitized().Namespace);
     }
 
     [Fact]

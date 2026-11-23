@@ -23,6 +23,15 @@ public sealed record ErrorsSettings
     /// <summary>Base address of Grafana, for example https://grafana.example.com. Empty when not set.</summary>
     public string GrafanaUrl { get; init; } = "";
 
+    /// <summary>Uid of the Loki data source in Grafana. Empty means "use the first Loki data source".</summary>
+    public string LokiDatasource { get; init; } = "";
+
+    /// <summary>Value of the "namespace" label the applications run in.</summary>
+    public string Namespace { get; init; } = DefaultNamespace;
+
+    /// <summary>Also read warnings, not only errors.</summary>
+    public bool IncludeWarnings { get; init; }
+
     /// <summary>Folder that holds the local clones (one sub folder per repository). Empty when not set.</summary>
     public string RepoRoot { get; init; } = "";
 
@@ -32,10 +41,14 @@ public sealed record ErrorsSettings
     /// <summary>Namespace prefix to repository.</summary>
     public IReadOnlyList<NamespaceBinding> Namespaces { get; init; } = Array.Empty<NamespaceBinding>();
 
+    public const string DefaultNamespace = "default";
+
     /// <summary>Fixes anything invalid or null after loading, so the rest of the app can trust the values.</summary>
     public ErrorsSettings Sanitized() => this with
     {
         GrafanaUrl = RepoBindings.NormalizeUrl(GrafanaUrl) ?? "",
+        LokiDatasource = LokiDatasource?.Trim() ?? "",
+        Namespace = RepoBindings.NormalizeApp(Namespace) ?? DefaultNamespace,
         RepoRoot = RepoRoot?.Trim() ?? "",
         Bindings = RepoBindings.CleanBindings(Bindings),
         Namespaces = RepoBindings.CleanNamespaces(Namespaces),

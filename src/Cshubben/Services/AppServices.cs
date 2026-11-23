@@ -1,6 +1,7 @@
 using Cshubben.Core.Features.Cache;
 using Cshubben.Core.Data;
 using Cshubben.Core.Features.Claude;
+using Cshubben.Core.Features.Errors;
 using Cshubben.Core.Features.Feed;
 using Cshubben.Core.Features.GitHub;
 using Cshubben.Core.Features.Linear;
@@ -64,11 +65,30 @@ sealed class AppServices
     {
         // Demo mode (screenshots, CI) never touches the user's real settings or credentials.
         ISettingsStore settings = forcedDemo
-            ? new InMemorySettingsStore()
+            ? new InMemorySettingsStore(DemoSettings())
             : new FileSettingsStore(FileSettingsStore.DefaultPath(AppPaths.DataDirectory));
         ISecretStore secrets = forcedDemo ? new InMemorySecretStore() : new WindowsSecretStore();
         return new AppServices(forcedDemo, settings, secrets);
     }
+
+    /// <summary>Settings for --demo: the Errors module switched on, with made-up applications bound to made-up repositories.</summary>
+    private static AppSettings DemoSettings() => new()
+    {
+        Errors = new ErrorsSettings
+        {
+            Enabled = true,
+            GrafanaUrl = "https://grafana.example.com",
+            Bindings = new RepoBinding[]
+            {
+                new("binders-api", "acme/binders"),
+                new("properties-api", "acme/properties"),
+                new("notifications-messagefactory", "acme/notifications"),
+                new("activities-api", "acme/activities"),
+                new("contracts-api", "acme/contracts"),
+            },
+            Namespaces = new NamespaceBinding[] { new("Acme.BuildingBlocks", "acme/building-blocks") },
+        },
+    };
 
     /// <summary>True when --demo was passed.</summary>
     public bool ForcedDemo { get; }
@@ -213,6 +233,22 @@ sealed class AppServices
         {
             var viewer = await new LinearClient(Http, key).GetViewerAsync(cancellationToken);
             return new ConnectionResult(true, "Connected as " + viewer.Name + ".");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ConnectionResult(false, ErrorText.Describe(ex));
+        }
+    }
+
+    /// <summary>Reads the label names of the Loki data source with the saved address and token.</summary>
+    public async Task<ConnectionResult> TestGrafanaAsync(CancellationToken cancellationToken = default)
+    {
+        if (ForcedDemo) return new ConnectionResult(true, "Demo data, no connection needed.");
+        var errors = Settings.Errors;
+        var client = new GrafanaClient(Http, () => Settings.Errors.GrafanaUrl, () => Secrets.Get(SecretKeys.GrafanaToken));
+        try
+        {
+            return new ConnectionResult(true, await client.TestAsync(errors.LokiDatasource, cancellationToken));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
