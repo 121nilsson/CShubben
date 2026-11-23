@@ -57,12 +57,12 @@ public sealed class DemoData(DateTimeOffset? now = null) : IHubData
         var infos = new Dictionary<string, ReviewInfo>
         {
             ["r1"] = new("r1", true, null, Ago(2), ReviewDecision.None),
-            ["r2"] = new("r2", false, null, Ago(4), ReviewDecision.None),
+            ["r2"] = new("r2", false, null, Ago(4), ReviewDecision.None, new[] { "backend" }),
             ["r3"] = new("r3", true, Ago(20), Ago(9), ReviewDecision.ChangesRequested),
             ["r4"] = new("r4", true, Ago(24), Ago(30), ReviewDecision.Approved),
             ["r5"] = new("r5", true, Ago(40), Ago(50), ReviewDecision.ChangesRequested),
             ["r6"] = new("r6", true, Ago(90), Ago(80), ReviewDecision.None),
-            ["r7"] = new("r7", false, null, Ago(120), ReviewDecision.None),
+            ["r7"] = new("r7", false, null, Ago(120), ReviewDecision.None, new[] { "docs-team" }),
         };
         // r3 got new commits after the viewer's review (9 h ago vs reviewed 20 h ago).
 
