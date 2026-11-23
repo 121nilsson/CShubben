@@ -28,8 +28,11 @@ sealed class ErrorsPage : Component<PageContext>
         var ctx = Props;
         var errors = ctx.Settings.Errors;
 
+        var (windowWidth, _) = UseWindowSize();
+        var narrow = windowWidth < 900;
         var (tick, setTick) = UseState(0, true);
         var (picked, setPicked) = UseState("");
+        var (showDetail, setShowDetail) = UseState(false);
 
         var resolved = ErrorsServices.SourceFor(ctx.Services, errors);
         var sourceKey = resolved?.Key ?? "";
@@ -74,10 +77,12 @@ sealed class ErrorsPage : Component<PageContext>
             columns: [GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
             Kit.PageHeader("Errors", subtitle).Grid(column: 0),
-            (loading
-                ? ProgressRing().IsActive().Width(18).Height(18)
-                : (Element)Button("Refresh", Refresh).SubtleButton().AutomationName("Refresh errors"))
-                .VAlign(VerticalAlignment.Top).Margin(8, 4, 0, 0).Grid(column: 1));
+            // A fixed slot, so the header does not shift when the button turns into a spinner.
+            Border((loading
+                    ? ProgressRing().IsActive().Width(18).Height(18)
+                    : (Element)Button("Refresh", Refresh).SubtleButton().AutomationName("Refresh errors"))
+                    .HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center))
+                .Width(96).Height(36).VAlign(VerticalAlignment.Top).Margin(8, 0, 0, 0).Grid(column: 1));
 
         Element content;
         if (resolved is null)
@@ -98,14 +103,41 @@ sealed class ErrorsPage : Component<PageContext>
         else
         {
             var now = DateTimeOffset.UtcNow;
-            var list = AppList(snapshot, selected, app => setPicked(app));
-            var detail = selected is null
-                ? Card(Kit.Muted("No applications to show yet. Bind applications to repositories in Settings, or wait for the first errors."))
-                : Detail(ctx, errors, snapshot, selected, groups, now, Refresh);
+            if (snapshot.Apps.Count == 0)
+            {
+                content = Card(Kit.Muted("No applications with errors in the last 24 hours. Bind applications to repositories in Settings to list them here even when they are quiet."));
+            }
+            else
+            {
+                void Pick(string app)
+                {
+                    setPicked(app);
+                    setShowDetail(true);
+                }
 
-            content = FlexRow(
-                list.Width(320).Flex(shrink: 0),
-                detail.Flex(grow: 1, basis: 360)) with { Wrap = FlexWrap.Wrap, ColumnGap = 16, RowGap = 16 };
+                var list = AppList(snapshot, selected, Pick);
+                var detail = selected is null
+                    ? Card(Kit.Muted("Pick an application."))
+                    : Detail(ctx, errors, snapshot, selected, groups, now, Refresh);
+
+                if (narrow)
+                {
+                    // Narrow windows: one pane at a time, the list or the picked application with a Back button.
+                    content = showDetail && selected is not null
+                        ? VStack(12,
+                            Button("← Applications", () => setShowDetail(false)).SubtleButton().HAlign(HorizontalAlignment.Left).AutomationName("Back to the application list"),
+                            detail)
+                        : list;
+                }
+                else
+                {
+                    content = Grid(
+                        columns: [GridSize.Px(320), GridSize.Star()],
+                        rows: [GridSize.Auto],
+                        list.Grid(column: 0),
+                        detail.Margin(16, 0, 0, 0).Grid(column: 1));
+                }
+            }
         }
 
         return ScrollView(Kit.Capped(
@@ -126,37 +158,48 @@ sealed class ErrorsPage : Component<PageContext>
         if (snapshot.Apps.Count == 0)
             return Card(Kit.Muted("No applications with errors in the last 24 hours."));
 
-        var rows = snapshot.Apps.Select(app => AppRow(app, snapshot.Window, string.Equals(app.App, selected?.App, StringComparison.Ordinal), pick)).ToArray();
+        // One scale for the whole list, so a quiet application looks quiet next to a spiking one.
+        var peak = snapshot.Apps.Max(a => ErrorsKit.Peak(a.Counts, ListBars));
+        var rows = snapshot.Apps.Select(app => AppRow(app, snapshot.Window, string.Equals(app.App, selected?.App, StringComparison.Ordinal), peak, pick)).ToArray();
         return VStack(4, rows);
     }
 
-    private static Element AppRow(AppSpike app, ErrorWindow window, bool isSelected, Action<string> pick)
+    private static Element AppRow(AppSpike app, ErrorWindow window, bool isSelected, int peak, Action<string> pick)
     {
         var tone = app.IsSpike ? Tone.Danger : Tone.Neutral;
         var rate = app.Total == 0 ? "no errors" : ErrorsText.PerHour(app, window);
-        var title = FlexRow(
-            BodyStrong(app.App).Flex(grow: 1),
-            app.IsSpike ? Kit.Pill(ErrorsText.Factor(app.Factor), Tone.Danger) : null) with { ColumnGap = 8 };
+        var quiet = app.Total == 0;
+
+        var name = TextBlock(app.App).SemiBold().TextTrimming(TextTrimming.CharacterEllipsis);
+        var title = Grid(
+            columns: [GridSize.Star(), GridSize.Auto],
+            rows: [GridSize.Auto],
+            (quiet ? name.Foreground(Theme.SecondaryText) : name).Grid(column: 0),
+            (app.IsSpike ? Kit.Pill(ErrorsText.Factor(app.Factor), Tone.Danger) : Empty()).Margin(8, 0, 0, 0).Grid(column: 1));
+
+        var glyph = TextBlock(ErrorsText.TrendGlyph(app.Trend)).Foreground(app.IsSpike ? Kit.Fg(Tone.Danger) : Theme.SecondaryText)
+            .AutomationName(ErrorsText.TrendWord(app.Trend));
+        var rateText = app.IsSpike ? TextBlock(rate).FontSize(12).Foreground(Kit.Fg(Tone.Danger)) : Kit.Muted(rate);
 
         var body = VStack(6,
             title,
-            HStack(8,
-                TextBlock(ErrorsText.TrendGlyph(app.Trend)).FontSize(14).Foreground(app.IsSpike ? Kit.Fg(Tone.Danger) : Theme.SecondaryText)
-                    .AutomationName(ErrorsText.TrendWord(app.Trend)),
-                Kit.Muted(rate)),
-            ErrorsKit.Bars(app.Counts, ListBars, 22, 4, tone));
+            HStack(6, glyph, rateText),
+            ErrorsKit.Bars(app.Counts, ListBars, 22, tone, peak));
 
-        var accent = Border(Empty()).Width(3).Background(isSelected ? Theme.Accent : Theme.CardBackground).CornerRadius(2);
-        var row = Grid(
-            columns: [GridSize.Px(3), GridSize.Star()],
-            rows: [GridSize.Auto],
-            accent.Grid(column: 0),
-            body.Margin(10, 4, 4, 4).Grid(column: 1));
+        // A spiking row is tinted, the picked row is filled, and the picked row also has an accent strip.
+        var fill = app.IsSpike ? Kit.Bg(Tone.Danger) : isSelected ? Theme.SubtleFill : Theme.CardBackground;
+        var strip = Border(Empty()).Width(3).Margin(0, 6, 0, 6).CornerRadius(2).Background(isSelected ? Theme.Accent : Theme.CardBackground);
+        var row = Border(Grid(
+                columns: [GridSize.Px(3), GridSize.Star()],
+                rows: [GridSize.Auto],
+                strip.Grid(column: 0),
+                body.Margin(10, 6, 8, 6).Grid(column: 1)))
+            .Background(fill).CornerRadius(6);
 
         return Button(row, () => pick(app.App))
             .SubtleButton()
             .HAlign(HorizontalAlignment.Stretch)
-            .AutomationName(app.App + ", " + rate + ", " + ErrorsText.TrendWord(app.Trend) + (app.IsSpike ? ", spiking" : ""))
+            .AutomationName(app.App + ", " + rate + ", " + ErrorsText.TrendWord(app.Trend) + (app.IsSpike ? ", spiking" : "") + (isSelected ? ", selected" : ""))
             .WithKey(app.App);
     }
 
@@ -171,26 +214,28 @@ sealed class ErrorsPage : Component<PageContext>
     {
         var repo = RepoBindings.RepoFor(errors, app.App);
         var repoLine = repo is null
-            ? (Element)HStack(8, Kit.Muted("Not bound to a repository."), Button("Bind in Settings", ctx.OpenSettings).SubtleButton().AutomationName("Open Settings to bind a repository"))
+            ? (Element)(FlexRow(Kit.Muted("Not bound to a repository."), Button("Bind in Settings", ctx.OpenSettings).SubtleButton().AutomationName("Open Settings to bind a repository"))
+                with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 })
             : Kit.Muted("Repository: " + repo);
 
-        var facts = HStack(8,
+        var facts = FlexRow(
             app.IsSpike ? Kit.Pill("Spiking " + ErrorsText.Factor(app.Factor), Tone.Danger) : null,
             Kit.Pill(ErrorsText.TrendGlyph(app.Trend) + " " + ErrorsText.TrendWord(app.Trend), Tone.Neutral),
-            Kit.Pill(app.Total + (app.Total == 1 ? " error" : " errors") + " in 24 h", Tone.Neutral));
+            Kit.Pill(app.Total + (app.Total == 1 ? " error" : " errors") + " in 24 h", Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 6 };
 
         var chart = app.Total == 0
             ? (Element)Kit.Muted("No errors in the last 24 hours.")
             : VStack(4,
-                ErrorsKit.Bars(app.Counts, ChartBars, 72, 6, app.IsSpike ? Tone.Danger : Tone.Neutral),
+                ErrorsKit.Bars(app.Counts, ChartBars, 72, app.IsSpike ? Tone.Danger : Tone.Neutral),
                 Grid(
-                    columns: [GridSize.Star(), GridSize.Auto],
+                    columns: [GridSize.Star(), GridSize.Auto, GridSize.Star()],
                     rows: [GridSize.Auto],
                     Kit.Muted("6 h ago").Grid(column: 0),
-                    Kit.Muted("now").Grid(column: 1)));
+                    Kit.Muted("peak " + ErrorsKit.Peak(app.Counts, ChartBars) + " per " + (int)snapshot.Window.Step.TotalMinutes + " min").Grid(column: 1),
+                    Kit.Muted("now").HAlign(HorizontalAlignment.Right).Grid(column: 2)));
 
         var overview = Card(VStack(10,
-            Title(app.App),
+            Title(app.App).TextTrimming(TextTrimming.CharacterEllipsis),
             repoLine,
             facts,
             chart.Margin(0, 4, 0, 0)));
@@ -217,23 +262,24 @@ sealed class ErrorsPage : Component<PageContext>
 
     private static Element GroupCard(ErrorsSettings errors, ErrorGroup group, ErrorWindow window, DateTimeOffset now)
     {
-        var tone = group.Kind == ErrorKind.MissingBackendRole ? Tone.Warning : Tone.Danger;
+        var warning = group.Kind == ErrorKind.MissingBackendRole;
+        var tone = warning ? Tone.Warning : Tone.Danger;
         var repo = RepoBindings.RepoForNamespace(errors, group.Method);
 
-        var meta = HStack(8,
-            Kit.Pill(group.Count + (group.Count == 1 ? " error" : " errors"), group.Kind == ErrorKind.MissingBackendRole ? Tone.Warning : Tone.Danger),
+        var meta = FlexRow(
+            Kit.Pill(group.Count + (group.Count == 1 ? " error" : " errors"), tone),
             Kit.Muted("first " + ErrorsText.Ago(group.FirstSeen, now) + " · last " + ErrorsText.Ago(group.LastSeen, now)),
             group.Pods.Count == 0 ? null : Kit.Muted(group.Pods.Count + (group.Pods.Count == 1 ? " pod" : " pods")),
-            repo is null ? null : Kit.Pill(repo, Tone.Neutral));
+            repo is null ? null : Kit.Pill(repo, Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
 
         return Card(VStack(8,
-            BodyStrong(group.Title),
-            Kit.Muted(group.Detail).TextWrapping(),
+            TextBlock(group.Title).SemiBold().TextWrapping().MaxLines(2).TextTrimming(TextTrimming.CharacterEllipsis),
+            Kit.Muted(group.Detail).TextWrapping().MaxLines(3).TextTrimming(TextTrimming.CharacterEllipsis),
             group.Hint is null
                 ? null
                 : Border(TextBlock(group.Hint).FontSize(12).TextWrapping())
                     .Background(Kit.Bg(Tone.Warning)).CornerRadius(6).Padding(10, 6),
-            ErrorsKit.Bars(group.Counts, ChartBars, 24, 6, tone),
+            ErrorsKit.Bars(group.Counts, ChartBars, 24, tone),
             meta)).WithKey(group.Key);
     }
 }
