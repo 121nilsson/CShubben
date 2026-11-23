@@ -1,4 +1,5 @@
 using Cshubben.Core.Features.Cache;
+using Cshubben.Core.Features.Errors;
 using Cshubben.Core.Features.Linear;
 using Cshubben.Core.Features.Pipeline;
 using Cshubben.Core.Features.Stats;
@@ -17,6 +18,8 @@ static class PageCaches
     public static readonly StaleCache<StatsInput> Stats = new();
     public static readonly StaleCache<LinearIssue> Issues = new();
     public static readonly StaleCache<TeamReport> Team = new();
+    public static readonly StaleCache<ErrorsSnapshot> Errors = new();
+    public static readonly StaleCache<IReadOnlyList<ErrorGroup>> ErrorGroups = new();
 
     private static readonly Dictionary<string, DateTimeOffset> Saved = new();
 
@@ -74,5 +77,6 @@ static class PageCaches
     public static readonly TimeSpan LinearTtl = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan DriftTtl = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan IssueTtl = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan ErrorsTtl = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan StatsTtl = TimeSpan.FromMinutes(30);
 }
