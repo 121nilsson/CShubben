@@ -23,6 +23,9 @@ public enum ClaudeFeature
 
     /// <summary>Drafted replies and Linear issues.</summary>
     Drafts,
+
+    /// <summary>Why an error in the logs happened, from the log line and the deployed code.</summary>
+    ErrorAnalysis,
 }
 
 public static class ClaudeFeatures
@@ -36,6 +39,7 @@ public static class ClaudeFeatures
         ClaudeFeature.Review => "Review drafts",
         ClaudeFeature.CodeQuestion => "Questions about code lines",
         ClaudeFeature.Activity => "Activity summaries (day, week, year)",
+        ClaudeFeature.ErrorAnalysis => "Error analysis on Errors",
         _ => "Drafted replies and Linear issues",
     };
 

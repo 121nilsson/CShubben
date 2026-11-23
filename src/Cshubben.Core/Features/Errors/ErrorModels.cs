@@ -94,6 +94,8 @@ public enum ErrorKind
 /// <param name="Hint">What to do about it, when the kind of error tells.</param>
 /// <param name="Method">Full name of the top application frame (namespace, type, method), when there is a stack trace.</param>
 /// <param name="File">Path of that frame inside its repository (starts with the project folder), when known.</param>
+/// <param name="Line">Line of that frame, when known.</param>
+/// <param name="Samples">The most recent log lines of the group (full text, newest first), for digging into one error.</param>
 public sealed record ErrorGroup(
     string Key,
     string Title,
@@ -106,4 +108,6 @@ public sealed record ErrorGroup(
     IReadOnlyList<string> Pods,
     IReadOnlyList<int> Counts,
     string? Method,
-    string? File);
+    string? File,
+    int? Line = null,
+    IReadOnlyList<LogEntry>? Samples = null);

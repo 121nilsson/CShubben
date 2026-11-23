@@ -33,6 +33,8 @@ sealed class ErrorsPage : Component<PageContext>
         var (tick, setTick) = UseState(0, true);
         var (picked, setPicked) = UseState("");
         var (showDetail, setShowDetail) = UseState(false);
+        var (quietOpen, setQuietOpen) = UseState(false);
+        var (expanded, setExpanded) = UseState("");
 
         var resolved = ErrorsServices.SourceFor(ctx.Services, errors);
         var sourceKey = resolved?.Key ?? "";
@@ -115,10 +117,10 @@ sealed class ErrorsPage : Component<PageContext>
                     setShowDetail(true);
                 }
 
-                var list = AppList(snapshot, selected, Pick);
+                var list = AppList(snapshot, selected, Pick, quietOpen, setQuietOpen);
                 var detail = selected is null
                     ? Card(Kit.Muted("Pick an application."))
-                    : Detail(ctx, errors, snapshot, selected, groups, now, Refresh);
+                    : Detail(ctx, errors, snapshot, selected, groups, now, Refresh, expanded, setExpanded);
 
                 if (narrow)
                 {
@@ -141,7 +143,7 @@ sealed class ErrorsPage : Component<PageContext>
         }
 
         return ScrollView(Kit.Capped(
-            FlexColumn(header, content).FlexPadding(24, 16)));
+            FlexColumn(header, content).FlexPadding(24, 16), 2400));
     }
 
     private static string ServiceName(ErrorsSettings errors) => errors.Source == ErrorsSettings.SourceGrafana ? "Grafana" : "The log service";
@@ -153,16 +155,52 @@ sealed class ErrorsPage : Component<PageContext>
             : snapshot.Apps.FirstOrDefault(a => string.Equals(a.App, picked, StringComparison.OrdinalIgnoreCase))
               ?? snapshot.Apps.FirstOrDefault();
 
-    private static Element AppList(ErrorsSnapshot snapshot, AppSpike? selected, Action<string> pick)
+    private static Element AppList(ErrorsSnapshot snapshot, AppSpike? selected, Action<string> pick, bool quietOpen, Action<bool> setQuietOpen)
     {
         if (snapshot.Apps.Count == 0)
             return Card(Kit.Muted("No applications with errors in the last 24 hours."));
 
         // One scale for the whole list, so a quiet application looks quiet next to a spiking one.
         var peak = snapshot.Apps.Max(a => ErrorsKit.Peak(a.Counts, ListBars));
-        var rows = snapshot.Apps.Select(app => AppRow(app, snapshot.Window, string.Equals(app.App, selected?.App, StringComparison.Ordinal), peak, pick)).ToArray();
-        return VStack(4, rows);
+        Element Row(AppSpike app) =>
+            AppRow(app, snapshot.Window, string.Equals(app.App, selected?.App, StringComparison.Ordinal), peak, pick);
+
+        var spiking = snapshot.Apps.Where(a => a.IsSpike).ToArray();
+        var active = snapshot.Apps.Where(a => !a.IsSpike && a.Now > 0).ToArray();
+        var quiet = snapshot.Apps.Where(a => !a.IsSpike && a.Now <= 0).ToArray();
+        var quietShown = quietOpen || (selected is not null && quiet.Any(a => a.App == selected.App));
+
+        var parts = new List<Element?>();
+        if (spiking.Length > 0)
+        {
+            parts.Add(Section("Spiking", spiking.Length, Tone.Danger));
+            parts.AddRange(spiking.Select(Row));
+        }
+
+        if (active.Length > 0)
+        {
+            parts.Add(Section("Active", active.Length, Tone.Neutral));
+            parts.AddRange(active.Select(Row));
+        }
+
+        if (quiet.Length > 0)
+        {
+            parts.Add(Button(
+                    Section((quietShown ? "▾ " : "▸ ") + "Quiet last hour", quiet.Length, Tone.Neutral),
+                    () => setQuietOpen(!quietShown))
+                .SubtleButton().HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Left)
+                .AutomationName((quietShown ? "Hide" : "Show") + " quiet applications"));
+            if (quietShown) parts.AddRange(quiet.Select(Row));
+        }
+
+        return VStack(4, parts.Where(p => p is not null).Select(p => p!).ToArray());
     }
+
+    private static Element Section(string label, int count, Tone tone) =>
+        HStack(6,
+            TextBlock(label.ToUpperInvariant()).FontSize(11).SemiBold().Foreground(Kit.Fg(tone)),
+            TextBlock(count.ToString()).FontSize(11).Foreground(Theme.SecondaryText))
+            .Margin(4, 12, 0, 2);
 
     private static Element AppRow(AppSpike app, ErrorWindow window, bool isSelected, int peak, Action<string> pick)
     {
@@ -198,7 +236,7 @@ sealed class ErrorsPage : Component<PageContext>
 
         return Button(row, () => pick(app.App))
             .SubtleButton()
-            .HAlign(HorizontalAlignment.Stretch)
+            .HAlign(HorizontalAlignment.Stretch).HorizontalContentAlignment(HorizontalAlignment.Stretch)
             .AutomationName(app.App + ", " + rate + ", " + ErrorsText.TrendWord(app.Trend) + (app.IsSpike ? ", spiking" : "") + (isSelected ? ", selected" : ""))
             .WithKey(app.App);
     }
@@ -210,13 +248,17 @@ sealed class ErrorsPage : Component<PageContext>
         AppSpike app,
         AsyncValue<IReadOnlyList<ErrorGroup>> groups,
         DateTimeOffset now,
-        Action refresh)
+        Action refresh,
+        string expanded,
+        Action<string> setExpanded)
     {
         var repo = RepoBindings.RepoFor(errors, app.App);
-        var repoLine = repo is null
-            ? (Element)(FlexRow(Kit.Muted("Not bound to a repository."), Button("Bind in Settings", ctx.OpenSettings).SubtleButton().AutomationName("Open Settings to bind a repository"))
-                with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 })
-            : Kit.Muted("Repository: " + repo);
+        Element? bindBanner = repo is null
+            ? Kit.Banner(Tone.Accent, "Not bound to a repository",
+                "Bind " + app.App + " to a repository to tie a spike to recent deploys and code.",
+                "Bind in Settings", ctx.OpenSettings)
+            : null;
+        var repoLine = repo is null ? null : Kit.Muted("Repository: " + repo);
 
         var facts = FlexRow(
             app.IsSpike ? Kit.Pill("Spiking " + ErrorsText.Factor(app.Factor), Tone.Danger) : null,
@@ -226,18 +268,15 @@ sealed class ErrorsPage : Component<PageContext>
         var chart = app.Total == 0
             ? (Element)Kit.Muted("No errors in the last 24 hours.")
             : VStack(4,
-                ErrorsKit.Bars(app.Counts, ChartBars, 72, app.IsSpike ? Tone.Danger : Tone.Neutral),
-                Grid(
-                    columns: [GridSize.Star(), GridSize.Auto, GridSize.Star()],
-                    rows: [GridSize.Auto],
-                    Kit.Muted("6 h ago").Grid(column: 0),
-                    Kit.Muted("peak " + ErrorsKit.Peak(app.Counts, ChartBars) + " per " + (int)snapshot.Window.Step.TotalMinutes + " min").Grid(column: 1),
-                    Kit.Muted("now").HAlign(HorizontalAlignment.Right).Grid(column: 2)));
+                ErrorsKit.GridBars(app.Counts, ChartBars, 110, app.IsSpike ? Tone.Danger : Tone.Neutral),
+                ErrorsKit.TimeAxis(snapshot.Window, ChartBars),
+                Kit.Muted("Peak " + ErrorsKit.Peak(app.Counts, ChartBars) + " errors per " + (int)snapshot.Window.Step.TotalMinutes + " min"));
 
-        var overview = Card(VStack(10,
+        var overview = Card(VStack(12,
             Title(app.App).TextTrimming(TextTrimming.CharacterEllipsis),
             repoLine,
             facts,
+            bindBanner,
             chart.Margin(0, 4, 0, 0)));
 
         Element list;
@@ -254,32 +293,131 @@ sealed class ErrorsPage : Component<PageContext>
         }
         else
         {
-            list = VStack(8, found.Select(g => GroupCard(errors, g, snapshot.Window, now)).ToArray());
+            list = VStack(8, found.Select(g => GroupCard(ctx.Services, errors, app, g, snapshot.Window, now, expanded == g.Key, () => setExpanded(expanded == g.Key ? "" : g.Key))).ToArray());
         }
 
         return VStack(12, overview, list);
     }
 
-    private static Element GroupCard(ErrorsSettings errors, ErrorGroup group, ErrorWindow window, DateTimeOffset now)
+    private static Element GroupCard(
+        AppServices services,
+        ErrorsSettings errors,
+        AppSpike app,
+        ErrorGroup group,
+        ErrorWindow window,
+        DateTimeOffset now,
+        bool open,
+        Action toggle)
     {
         var warning = group.Kind == ErrorKind.MissingBackendRole;
         var tone = warning ? Tone.Warning : Tone.Danger;
         var repo = RepoBindings.RepoForNamespace(errors, group.Method);
+        var mono = "Cascadia Mono, Consolas";
+
+        // "ExceptionType · File.cs:40" becomes a bold name with the location as code text under it. Lines without an
+        // exception (no " · ") keep the whole text as the name and show the logger as the location.
+        var split = group.Title.IndexOf(" · ", StringComparison.Ordinal);
+        var name = split > 0 ? group.Title[..split] : group.Title;
+        var location = split > 0 ? group.Title[(split + 3)..] : (group.Detail.Length > 0 ? group.Detail : null);
+        var showDetail = split > 0 && group.Detail.Length > 0;
+
+        var head = Grid(
+            columns: [GridSize.Star(), GridSize.Auto],
+            rows: [GridSize.Auto],
+            VStack(2,
+                TextBlock(name).FontSize(16).SemiBold().TextWrapping().MaxLines(open ? 6 : 2).TextTrimming(TextTrimming.CharacterEllipsis),
+                location is null
+                    ? null
+                    : TextBlock(location).FontFamily(mono).FontSize(12).Foreground(Theme.SecondaryText)).Grid(column: 0),
+            Kit.Pill(group.Count + (group.Count == 1 ? " error" : " errors"), tone).VAlign(VerticalAlignment.Top).Margin(12, 0, 0, 0).Grid(column: 1));
+
+        // The chart zooms in on when this error happened, so a short burst is not one bar among 72.
+        var zoom = ErrorZoom.Around(group.Counts, window, group.FirstSeen, group.LastSeen);
+        var chart = zoom.Counts.Count == 0
+            ? null
+            : VStack(2,
+                ErrorsKit.GridBars(zoom.Counts, zoom.Counts.Count, 44, tone),
+                ErrorsKit.RangeAxis(zoom.From, zoom.To));
 
         var meta = FlexRow(
-            Kit.Pill(group.Count + (group.Count == 1 ? " error" : " errors"), tone),
             Kit.Muted("first " + ErrorsText.Ago(group.FirstSeen, now) + " · last " + ErrorsText.Ago(group.LastSeen, now)),
             group.Pods.Count == 0 ? null : Kit.Muted(group.Pods.Count + (group.Pods.Count == 1 ? " pod" : " pods")),
-            repo is null ? null : Kit.Pill(repo, Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
+            repo is null ? null : Kit.Pill(repo, Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 4 };
 
-        return Card(VStack(8,
-            TextBlock(group.Title).SemiBold().TextWrapping().MaxLines(2).TextTrimming(TextTrimming.CharacterEllipsis),
-            Kit.Muted(group.Detail).TextWrapping().MaxLines(3).TextTrimming(TextTrimming.CharacterEllipsis),
+        var toggleButton = Button(open ? "Hide details ▴" : "Show details ▾", toggle)
+            .SubtleButton().HAlign(HorizontalAlignment.Left)
+            .AutomationName((open ? "Hide" : "Show") + " details of " + name);
+
+        var body = Card(VStack(10,
+            head,
+            showDetail ? TextBlock(group.Detail).FontSize(13).TextWrapping().MaxLines(open ? 8 : 3).TextTrimming(TextTrimming.CharacterEllipsis) : null,
             group.Hint is null
                 ? null
                 : Border(TextBlock(group.Hint).FontSize(12).TextWrapping())
                     .Background(Kit.Bg(Tone.Warning)).CornerRadius(6).Padding(10, 6),
-            ErrorsKit.Bars(group.Counts, ChartBars, 24, tone),
-            meta)).WithKey(group.Key);
+            chart,
+            meta,
+            toggleButton,
+            open ? Details(services, errors, app, group, now) : null));
+
+        return body.WithKey(group.Key);
+    }
+
+    /// <summary>The digging part of an error: where in the code, the latest full log line with its stack trace, and recent occurrences.</summary>
+    private static Element Details(AppServices services, ErrorsSettings errors, AppSpike app, ErrorGroup group, DateTimeOffset now)
+    {
+        const string mono = "Cascadia Mono, Consolas";
+        var repo = RepoBindings.RepoForNamespace(errors, group.Method) ?? RepoBindings.RepoFor(errors, app.App);
+        var samples = group.Samples ?? Array.Empty<LogEntry>();
+        var latest = samples.Count > 0 ? samples[0] : null;
+
+        Element Label(string text) => TextBlock(text.ToUpperInvariant()).FontSize(11).SemiBold().Foreground(Theme.SecondaryText);
+        Element Code(string text) => TextBlock(text).FontFamily(mono).FontSize(12).TextWrapping().IsTextSelectionEnabled();
+
+        string? url = null;
+        if (repo is not null && group.File is not null)
+            url = "https://github.com/" + repo + "/blob/HEAD/src/" + group.File + (group.Line is { } line ? "#L" + line : "");
+
+        var where = FlexColumn(
+            Label("Where"),
+            group.Method is null ? Kit.Muted("No stack trace in the log line.") : Code(group.Method),
+            group.File is null ? null : Code(group.File + (group.Line is { } l ? ":" + l : ""))) with { RowGap = 4 };
+
+        var actions = FlexRow(
+            url is null ? null : Button("Open in GitHub", () => ExternalActions.OpenUrl(url)).AutomationName("Open the file in GitHub"),
+            latest is null ? null : Button("Copy log line", () => ExternalActions.Copy(latest.Message)).SubtleButton().AutomationName("Copy the full log line"),
+            group.Method is null ? null : Button("Copy location", () => ExternalActions.Copy(group.Method + (group.File is null ? "" : " (" + group.File + (group.Line is { } n ? ":" + n : "") + ")"))).SubtleButton().AutomationName("Copy the code location"))
+            with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
+
+        Element? trace = null;
+        if (latest is not null)
+        {
+            var text = latest.Message.Replace("\r\n", "\n").Trim();
+            trace = FlexColumn(
+                Label("Latest log line · " + latest.At.ToLocalTime().ToString("HH:mm:ss") + (latest.Pod.Length > 0 ? " · " + latest.Pod : "")),
+                Border(ScrollView(Code(text)).MaxHeight(320))
+                    .Background(Theme.SubtleFill).CornerRadius(6).Padding(10, 8)) with { RowGap = 4 };
+        }
+
+        Element? occurrences = null;
+        if (samples.Count > 1)
+        {
+            occurrences = FlexColumn(
+                Label("Recent occurrences"),
+                VStack(2, samples.Select(s => Grid(
+                    columns: [GridSize.Px(130), GridSize.Star()],
+                    rows: [GridSize.Auto],
+                    Kit.Muted(s.At.ToLocalTime().ToString("HH:mm:ss") + " · " + ErrorsText.Ago(s.At, now)).Grid(column: 0),
+                    Kit.Muted(s.Pod.Length > 0 ? s.Pod : "-").TextTrimming(TextTrimming.CharacterEllipsis).Grid(column: 1))).ToArray())) with { RowGap = 4 };
+        }
+
+        var pods = group.Pods.Count == 0
+            ? null
+            : FlexColumn(Label("Pods"), Code(string.Join("\n", group.Pods))) with { RowGap = 4 };
+
+        var analysis = ErrorAnalysisPanel.Build(new ErrorAnalysisProps(services, errors, app, group)).WithKey("analysis|" + group.Key);
+
+        return Border(FlexColumn(analysis, where, actions, trace, occurrences, pods) with { RowGap = 12 })
+            .Padding(0, 6, 0, 0);
     }
 }

@@ -19,7 +19,7 @@ sealed class LoopbackAuthorization : IAuthorizationCallback, IDisposable
         _listener = new TcpListener(IPAddress.Loopback, 0);
         _listener.Start(4);
         _port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-        RedirectUri = "http://127.0.0.1:" + _port + "/callback";
+        RedirectUri = "http://localhost:" + _port + "/callback";
     }
 
     public string RedirectUri { get; }
@@ -49,7 +49,7 @@ sealed class LoopbackAuthorization : IAuthorizationCallback, IDisposable
                     "200 OK",
                     "<html><body style=\"font-family:sans-serif\"><h3>You can close this tab</h3><p>Return to Cshubben.</p></body></html>",
                     timeout.Token).ConfigureAwait(false);
-                return new Uri("http://127.0.0.1:" + _port + target);
+                return new Uri("http://localhost:" + _port + target);
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
