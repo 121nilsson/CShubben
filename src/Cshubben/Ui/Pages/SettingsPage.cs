@@ -203,18 +203,18 @@ sealed class SettingsPage : Component<PageContext>
             BodyStrong("Per function"),
             Kit.Muted("Pick a cheaper model or lower effort for summaries. \"Default\" uses the built-in choice for that function (activity summaries default to haiku, low), then the general setting above.").TextWrapping(),
             FlexColumn(ClaudeFeatures.All.Select(f => FeatureRow(f)).ToArray()) with { RowGap = 6 },
-            Kit.Muted(ClaudeAuth.Hint).TextWrapping(),
+            Kit.Muted(ClaudeAuth.SettingsHelp).TextWrapping(),
             FlexRow(
                 PasswordBox(claudeTokenInput, setClaudeTokenInput, placeholderText: "Optional: token from `claude setup-token`").Flex(grow: 1, shrink: 1, basis: 0).MinWidth(120),
                 Button("Save", () =>
                 {
-                    var token = claudeTokenInput.Trim();
-                    if (token.Length == 0) return;
+                    var token = ClaudeAuth.CleanToken(claudeTokenInput);
+                    if (token is null) return;
                     services.Secrets.Set(SecretKeys.ClaudeOAuthToken, token);
                     setClaudeTokenInput("");
                     setClaudeHasToken(true);
                     CheckClaude();
-                }).IsEnabled(claudeTokenInput.Trim().Length > 0).Flex(shrink: 0),
+                }).IsEnabled(ClaudeAuth.CleanToken(claudeTokenInput) is not null).Flex(shrink: 0),
                 Button("Clear", () =>
                 {
                     services.Secrets.Delete(SecretKeys.ClaudeOAuthToken);

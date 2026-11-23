@@ -115,8 +115,9 @@ sealed class DigestPage : Component<PageContext>
 
         Element PeriodButton(DigestPeriod p)
         {
-            var button = Button(DigestRange.ShortLabel(p), () => setPeriod(p)).IsEnabled(!running);
-            return p == period ? button.AccentButton() : button.SubtleButton();
+            // A ToggleButton carries its checked state, so the highlight follows the selection on every render.
+            return ToggleButton(TextBlock(DigestRange.ShortLabel(p)), p == period, _ => setPeriod(p))
+                .IsEnabled(!running).AutomationName(DigestRange.ShortLabel(p)).WithKey("period-" + p);
         }
 
         var periods = FlexRow(
