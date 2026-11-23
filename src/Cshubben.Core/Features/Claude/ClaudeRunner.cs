@@ -82,8 +82,29 @@ public static class ClaudeAuth
 {
     public const string TokenEnvVar = "CLAUDE_CODE_OAUTH_TOKEN";
 
+    /// <summary>Shown after a failed call. Claude rejected the login; the cause is in the error text above it.</summary>
     public const string Hint =
-        "The Claude login has expired. Run `claude setup-token` in a terminal and paste the token under Settings, or run `claude auth login`.";
+        "Claude did not accept the login. Run `claude setup-token` in a terminal and paste the token under Settings, or run `claude auth login`.";
+
+    /// <summary>Always-visible help in Settings (not an error).</summary>
+    public const string SettingsHelp =
+        "Optional: if summaries ask you to sign in, run `claude setup-token` in a terminal and paste the token below, or run `claude auth login`.";
+
+    /// <summary>
+    /// Removes every whitespace character. `claude setup-token` prints the token wrapped over several lines, so a pasted
+    /// token often has line breaks inside it, which Trim() would leave in place.
+    /// </summary>
+    public static string? CleanToken(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var sb = new System.Text.StringBuilder(raw.Length);
+        foreach (var c in raw)
+        {
+            if (!char.IsWhiteSpace(c) && !char.IsControl(c) && c != '\u200B' && c != '\uFEFF') sb.Append(c);
+        }
+
+        return sb.Length == 0 ? null : sb.ToString();
+    }
 
     private static readonly string[] Phrases =
     {
@@ -240,10 +261,9 @@ public sealed class ClaudeRunner
 
     public static string? ResolveToken(ISecretStore? secrets)
     {
-        var fromEnv = Environment.GetEnvironmentVariable(ClaudeAuth.TokenEnvVar);
-        if (!string.IsNullOrWhiteSpace(fromEnv)) return fromEnv.Trim();
-        var stored = secrets?.Get(SecretKeys.ClaudeOAuthToken);
-        return string.IsNullOrWhiteSpace(stored) ? null : stored.Trim();
+        var fromEnv = ClaudeAuth.CleanToken(Environment.GetEnvironmentVariable(ClaudeAuth.TokenEnvVar));
+        if (fromEnv is not null) return fromEnv;
+        return ClaudeAuth.CleanToken(secrets?.Get(SecretKeys.ClaudeOAuthToken));
     }
 
     /// <summary>The command-line arguments (without the prompt, which goes on stdin).</summary>
@@ -283,10 +303,10 @@ public sealed class ClaudeRunner
         }
 
         Dictionary<string, string>? env = null;
-        var token = _token();
-        if (!string.IsNullOrWhiteSpace(token))
+        var token = ClaudeAuth.CleanToken(_token());
+        if (token is not null)
         {
-            env = new Dictionary<string, string> { [ClaudeAuth.TokenEnvVar] = token.Trim() };
+            env = new Dictionary<string, string> { [ClaudeAuth.TokenEnvVar] = token };
         }
 
         var args = BuildArguments(request.SystemPrompt, model, ClaudeOptions.ResolveEffort(request.Effort));

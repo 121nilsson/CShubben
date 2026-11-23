@@ -247,4 +247,24 @@ public class ClaudeOutputParserTests
     {
         Assert.Equal(expected, ClaudeAuth.IsAuthError(message));
     }
+
+    [Theory]
+    [InlineData("sk-ant-oat01-abc\r\ndef-ghi\n", "sk-ant-oat01-abcdef-ghi")]
+    [InlineData("  sk-ant-oat01-abc def  ", "sk-ant-oat01-abcdef")]
+    [InlineData("\uFEFFsk-ant-oat01-abc\u200B", "sk-ant-oat01-abc")]
+    [InlineData("   ", null)]
+    [InlineData(null, null)]
+    public void CleanToken_removes_whitespace_inside_the_token(string? raw, string? expected)
+    {
+        Assert.Equal(expected, ClaudeAuth.CleanToken(raw));
+    }
+
+    [Fact]
+    public async Task Token_with_line_breaks_is_sent_as_one_line()
+    {
+        var fake = new FakeProcessRunner(Out(Ok));
+        var runner = new ClaudeRunner(fake, () => "claude", () => "sk-ant-oat01-abc\ndef");
+        await runner.RunAsync(new ClaudeRequest("s", "u"));
+        Assert.Equal("sk-ant-oat01-abcdef", fake.Calls[0].Env![ClaudeAuth.TokenEnvVar]);
+    }
 }
