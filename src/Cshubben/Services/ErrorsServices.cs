@@ -6,36 +6,86 @@ namespace Cshubben.Services;
 
 /// <summary>
 /// Where the Errors page gets its data. This is the one place that joins the Errors feature (logs) with the Settings feature
-/// (address, token, application bindings); the two features do not know about each other.
+/// (addresses, application bindings) and the credential store; the features do not know about each other.
 /// </summary>
 static class ErrorsServices
 {
-    /// <summary>The source for the current settings and a cache key that changes whenever the answer would; null when not connected.</summary>
+    private static readonly object Gate = new();
+    private static string? _sessionUrl;
+    private static McpOAuthSession? _session;
+    private static McpClient? _client;
+
+    /// <summary>The sign-in for the MCP server in the settings (one per address, kept so the access token is reused).</summary>
+    public static McpOAuthSession SessionFor(AppServices services, string mcpUrl)
+    {
+        lock (Gate)
+        {
+            if (_session is null || !string.Equals(_sessionUrl, mcpUrl, StringComparison.Ordinal))
+            {
+                _session = new McpOAuthSession(services.Http, mcpUrl, services.Secrets);
+                _client = new McpClient(services.Http, mcpUrl, ct => _session.GetAccessTokenAsync(ct));
+                _sessionUrl = mcpUrl;
+            }
+
+            return _session;
+        }
+    }
+
+    private static McpClient ClientFor(AppServices services, string mcpUrl)
+    {
+        SessionFor(services, mcpUrl);
+        lock (Gate) return _client!;
+    }
+
+    /// <summary>True when the settings name everything the chosen source needs (not whether the sign-in or token is valid).</summary>
+    public static bool IsConfigured(ErrorsSettings settings) =>
+        settings.Source == ErrorsSettings.SourceGrafana
+            ? settings.GrafanaUrl.Length > 0
+            : settings.McpUrl.Length > 0 && settings.Workspace.Length > 0 && settings.ResourceGroup.Length > 0;
+
+    /// <summary>The source for the current settings and a cache key that changes whenever the answer would; null when not set up.</summary>
     public static (IErrorSource Source, string Key)? SourceFor(AppServices services, ErrorsSettings settings)
     {
         var apps = settings.Bindings.Select(b => b.App).ToList();
-        var query = new ErrorsQuery(settings.Namespace, settings.IncludeWarnings, settings.LokiDatasource, apps);
 
         if (services.ForcedDemo)
             return (new DemoErrorSource(), "errors|demo|" + string.Join("|", apps));
 
-        var token = services.Secrets.Get(SecretKeys.GrafanaToken);
-        if (settings.GrafanaUrl.Length == 0 || string.IsNullOrWhiteSpace(token)) return null;
+        if (settings.Source == ErrorsSettings.SourceGrafana)
+        {
+            var token = services.Secrets.Get(SecretKeys.GrafanaToken);
+            if (settings.GrafanaUrl.Length == 0 || string.IsNullOrWhiteSpace(token)) return null;
 
-        var client = new GrafanaClient(
-            services.Http,
-            () => services.Settings.Errors.GrafanaUrl,
-            () => services.Secrets.Get(SecretKeys.GrafanaToken));
-        var key = string.Join(
+            var client = new GrafanaClient(
+                services.Http,
+                () => services.Settings.Errors.GrafanaUrl,
+                () => services.Secrets.Get(SecretKeys.GrafanaToken));
+            var query = new ErrorsQuery(settings.Namespace, settings.IncludeWarnings, settings.LokiDatasource, apps);
+            var key = string.Join(
+                "|",
+                "errors",
+                "grafana",
+                settings.GrafanaUrl,
+                settings.LokiDatasource,
+                settings.Namespace,
+                settings.IncludeWarnings ? "w" : "e",
+                StableKey.Hash(token),
+                string.Join(",", apps));
+            return (new GrafanaErrorSource(client, query), key);
+        }
+
+        if (!IsConfigured(settings)) return null;
+        var azure = new AzureLogsQuery(settings.Workspace, settings.ResourceGroup, settings.IncludeWarnings, apps);
+        var azureKey = string.Join(
             "|",
             "errors",
-            settings.GrafanaUrl,
-            settings.LokiDatasource,
-            settings.Namespace,
+            "azure",
+            settings.McpUrl,
+            settings.Workspace,
+            settings.ResourceGroup,
             settings.IncludeWarnings ? "w" : "e",
-            StableKey.Hash(token),
             string.Join(",", apps));
-        return (new GrafanaErrorSource(client, query), key);
+        return (new AzureLogsErrorSource(ClientFor(services, settings.McpUrl), azure), azureKey);
     }
 
     /// <summary>The cache key of the groups of one application.</summary>

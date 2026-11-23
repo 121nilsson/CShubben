@@ -20,6 +20,18 @@ public sealed record ErrorsSettings
     /// <summary>Shows the Errors page and allows the module to talk to Grafana.</summary>
     public bool Enabled { get; init; }
 
+    /// <summary>Where the logs are read from: <see cref="SourceAzure"/> (Azure Monitor through the MCP server) or <see cref="SourceGrafana"/>.</summary>
+    public string Source { get; init; } = SourceAzure;
+
+    /// <summary>Address of the MCP server in front of Azure Monitor. Not a secret, but internal, so it is a setting and not code.</summary>
+    public string McpUrl { get; init; } = "";
+
+    /// <summary>Name of the Log Analytics workspace.</summary>
+    public string Workspace { get; init; } = "";
+
+    /// <summary>Resource group of the workspace.</summary>
+    public string ResourceGroup { get; init; } = "";
+
     /// <summary>Base address of Grafana, for example https://grafana.example.com. Empty when not set.</summary>
     public string GrafanaUrl { get; init; } = "";
 
@@ -42,10 +54,16 @@ public sealed record ErrorsSettings
     public IReadOnlyList<NamespaceBinding> Namespaces { get; init; } = Array.Empty<NamespaceBinding>();
 
     public const string DefaultNamespace = "default";
+    public const string SourceAzure = "azure";
+    public const string SourceGrafana = "grafana";
 
     /// <summary>Fixes anything invalid or null after loading, so the rest of the app can trust the values.</summary>
     public ErrorsSettings Sanitized() => this with
     {
+        Source = string.Equals(Source?.Trim(), SourceGrafana, StringComparison.OrdinalIgnoreCase) ? SourceGrafana : SourceAzure,
+        McpUrl = RepoBindings.NormalizeUrl(McpUrl) ?? "",
+        Workspace = RepoBindings.NormalizeApp(Workspace) ?? "",
+        ResourceGroup = RepoBindings.NormalizeApp(ResourceGroup) ?? "",
         GrafanaUrl = RepoBindings.NormalizeUrl(GrafanaUrl) ?? "",
         LokiDatasource = LokiDatasource?.Trim() ?? "",
         Namespace = RepoBindings.NormalizeApp(Namespace) ?? DefaultNamespace,

@@ -82,14 +82,17 @@ sealed class ErrorsPage : Component<PageContext>
         Element content;
         if (resolved is null)
         {
-            content = Kit.Banner(Tone.Accent, "Connect Grafana",
-                "Add the Grafana address and a service account token in Settings to start reading the logs.",
+            var grafana = errors.Source == ErrorsSettings.SourceGrafana;
+            content = Kit.Banner(Tone.Accent, grafana ? "Connect Grafana" : "Connect the log service",
+                grafana
+                    ? "Add the Grafana address and a service account token in Settings to start reading the logs."
+                    : "Add the MCP address, workspace and resource group in Settings, then sign in, to start reading the logs.",
                 "Open Settings", ctx.OpenSettings);
         }
         else if (snapshot is null)
         {
             content = overview is AsyncValue<ErrorsSnapshot>.Error failed
-                ? FailureView.Banner(ErrorText.Classify(failed.Exception, "Grafana"), Refresh, ctx.OpenSettings)
+                ? FailureView.Banner(ErrorText.Classify(failed.Exception, ServiceName(errors)), Refresh, ctx.OpenSettings)
                 : Card(Parts.Busy("Reading the logs…"));
         }
         else
@@ -108,6 +111,8 @@ sealed class ErrorsPage : Component<PageContext>
         return ScrollView(Kit.Capped(
             FlexColumn(header, content).FlexPadding(24, 16)));
     }
+
+    private static string ServiceName(ErrorsSettings errors) => errors.Source == ErrorsSettings.SourceGrafana ? "Grafana" : "The log service";
 
     /// <summary>The picked application if it is still there, else the worst one (the list is already ordered).</summary>
     private static AppSpike? Pick(ErrorsSnapshot? snapshot, string picked) =>
@@ -195,7 +200,7 @@ sealed class ErrorsPage : Component<PageContext>
         if (found is null)
         {
             list = groups is AsyncValue<IReadOnlyList<ErrorGroup>>.Error failed
-                ? FailureView.Banner(ErrorText.Classify(failed.Exception, "Grafana"), refresh, ctx.OpenSettings)
+                ? FailureView.Banner(ErrorText.Classify(failed.Exception, ServiceName(errors)), refresh, ctx.OpenSettings)
                 : Card(Parts.Busy("Reading the errors of " + app.App + "…"));
         }
         else if (found.Count == 0)

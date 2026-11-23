@@ -240,20 +240,55 @@ sealed class AppServices
         }
     }
 
-    /// <summary>Reads the label names of the Loki data source with the saved address and token.</summary>
+    /// <summary>Checks the chosen log source with the saved settings and sign-in or token.</summary>
     public async Task<ConnectionResult> TestGrafanaAsync(CancellationToken cancellationToken = default)
     {
         if (ForcedDemo) return new ConnectionResult(true, "Demo data, no connection needed.");
         var errors = Settings.Errors;
-        var client = new GrafanaClient(Http, () => Settings.Errors.GrafanaUrl, () => Secrets.Get(SecretKeys.GrafanaToken));
         try
         {
-            return new ConnectionResult(true, await client.TestAsync(errors.LokiDatasource, cancellationToken));
+            if (errors.Source == ErrorsSettings.SourceGrafana)
+            {
+                var client = new GrafanaClient(Http, () => Settings.Errors.GrafanaUrl, () => Secrets.Get(SecretKeys.GrafanaToken));
+                return new ConnectionResult(true, await client.TestAsync(errors.LokiDatasource, cancellationToken));
+            }
+
+            if (!ErrorsServices.IsConfigured(errors)) return new ConnectionResult(false, "Fill in the MCP address, workspace and resource group first.");
+            var azure = new AzureLogsErrorSource(
+                new McpClient(Http, errors.McpUrl, ct => ErrorsServices.SessionFor(this, errors.McpUrl).GetAccessTokenAsync(ct)),
+                new AzureLogsQuery(errors.Workspace, errors.ResourceGroup, errors.IncludeWarnings, Array.Empty<string>()));
+            return new ConnectionResult(true, await azure.TestAsync(cancellationToken));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new ConnectionResult(false, ErrorText.Describe(ex));
         }
+    }
+
+    /// <summary>True when a sign-in to the log service is saved.</summary>
+    public bool IsSignedInToLogs(string mcpUrl) =>
+        !ForcedDemo && mcpUrl.Length > 0 && ErrorsServices.SessionFor(this, mcpUrl).HasSignedIn;
+
+    /// <summary>Opens the browser for the Microsoft sign-in to the log service and saves the result.</summary>
+    public async Task<ConnectionResult> SignInToLogsAsync(string mcpUrl, CancellationToken cancellationToken = default)
+    {
+        if (ForcedDemo) return new ConnectionResult(true, "Demo mode, nothing to sign in to.");
+        try
+        {
+            using var callback = new LoopbackAuthorization();
+            await ErrorsServices.SessionFor(this, mcpUrl).SignInAsync(callback, cancellationToken);
+            return new ConnectionResult(true, "Signed in.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ConnectionResult(false, ErrorText.Describe(ex));
+        }
+    }
+
+    /// <summary>Forgets the saved sign-in to the log service.</summary>
+    public void SignOutOfLogs(string mcpUrl)
+    {
+        if (!ForcedDemo && mcpUrl.Length > 0) ErrorsServices.SessionFor(this, mcpUrl).SignOut();
     }
 
     /// <summary>Finds the claude CLI, asks it for its version and reports how it would authenticate.</summary>

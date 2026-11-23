@@ -27,6 +27,21 @@ public sealed class ErrorsSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Source_and_azure_fields_are_repaired()
+    {
+        Assert.Equal("azure", new ErrorsSettings().Source);
+        Assert.Equal("azure", new ErrorsSettings { Source = "nonsense" }.Sanitized().Source);
+        Assert.Equal("azure", new ErrorsSettings { Source = null! }.Sanitized().Source);
+        Assert.Equal("grafana", new ErrorsSettings { Source = " Grafana " }.Sanitized().Source);
+
+        var s = new ErrorsSettings { McpUrl = "http://example.com/mcp", Workspace = "two words", ResourceGroup = " rg-1 " }.Sanitized();
+        Assert.Equal("", s.McpUrl);
+        Assert.Equal("", s.Workspace);
+        Assert.Equal("rg-1", s.ResourceGroup);
+        Assert.Equal("https://logs.example.com", new ErrorsSettings { McpUrl = "https://logs.example.com/" }.Sanitized().McpUrl);
+    }
+
+    [Fact]
     public void Namespace_and_datasource_are_trimmed_and_repaired()
     {
         var s = new ErrorsSettings { Namespace = "two words", LokiDatasource = "  P8E80F9AEF21F6940  " }.Sanitized();
