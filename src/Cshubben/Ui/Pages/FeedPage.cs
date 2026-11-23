@@ -76,7 +76,7 @@ sealed class FeedView : Component<FeedProps>
 
         Element body = layout.IsEmpty
             ? EmptyState(snap.Feed.Count == 0, ShowEverything)
-            : Kit.Capped(FlexColumn(layout.Entries.Select(e => Entry(e, snap, expanded, Toggle)).ToArray()) with { RowGap = 2 });
+            : Kit.Capped(FlexColumn(layout.Entries.Select(e => Entry(e, snap, expanded, Toggle).WithKey(e.Group?.Key ?? e.Kind + "|" + e.Label)).ToArray()) with { RowGap = 2 });
 
         var column = FlexColumn(
             Kit.PageHeader("Feed", subtitle).Margin(0, 0, 0, 0),

@@ -88,11 +88,11 @@ sealed class PaletteHost : Component<PaletteHostProps>
                 CommandPalette.OpenRequested -= OnOpen;
                 CommandPalette.HelpRequested -= OnHelp;
             };
-        }, new object[0]);
+        }, Array.Empty<object>());
 
         var items = UseMemo(
             () => PaletteCatalog.Build(ctx),
-            new object[] { ctx.Snapshot, ctx.SelectedPrId ?? "", ctx.Pages.Count });
+            ctx.Snapshot, ctx.SelectedPrId ?? "", ctx.Pages.Count);
 
         var results = open
             ? PaletteRanker.Rank(items, query, 40, CommandPalette.Recent)

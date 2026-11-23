@@ -53,14 +53,14 @@ sealed class ErrorsSettingsCard : Component<PageContext>
         {
             _ = Task.Run(() => setHasToken(services.Secrets.Get(SecretKeys.GrafanaToken) is not null));
             return () => { };
-        }, new object[0]);
+        }, Array.Empty<object>());
 
         UseEffect(() =>
         {
             var url = errors.McpUrl;
             _ = Task.Run(() => setSignedIn(services.IsSignedInToLogs(url)));
             return () => { };
-        }, new object[] { errors.McpUrl });
+        }, errors.McpUrl);
 
         var toggle = ToggleSwitch(errors.Enabled, v => Save(errors with { Enabled = v }), "On", "Off", "Show the Errors page");
         const string help = "Error spikes from your Grafana logs, tied to deploys. Off by default: while it is off there is no Errors page "

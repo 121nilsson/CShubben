@@ -257,7 +257,7 @@ sealed class LinearView : Component<LinearProps>
                     HStack(8, BodyStrong("Out of sync"), Kit.Pill(items.Count.ToString(), Tone.Warning)),
                     Kit.Muted("Places where a pull request and its Linear issue disagree. Each has a one-click fix.").TextWrapping(),
                     FlexColumn(items.Select((item, index) => ReconRow(
-                        item, snap, data, onSelectPr, activeKey, setActiveKey, pick, setPick, busyKey, teams, run, index == 0)).ToArray()) with { RowGap = 8 })
+                        item, snap, data, onSelectPr, activeKey, setActiveKey, pick, setPick, busyKey, teams, run, index == 0).WithKey(item.Kind + "|" + (item.Pr is { } rp ? rp.Repo + "#" + rp.Number : "") + "|" + (item.Issue?.Id ?? ""))).ToArray()) with { RowGap = 8 })
                 with { RowGap = 8 })
                 .Margin(0, 0, 0, 12);
 
@@ -272,7 +272,7 @@ sealed class LinearView : Component<LinearProps>
                     Kit.Heading2(title, issues.Count).Margin(0, 0, 0, 8),
                     issues.Count == 0
                         ? Kit.EmptyNote(empty)
-                        : FlexColumn(issues.Select(i => IssueRow(i, openPrs, mergedPrs, snap.At, onSelectPr, quiet, i.Id == selectedIssue || string.Equals(i.Identifier, selectedIssue, StringComparison.OrdinalIgnoreCase), onSelectIssue)).ToArray()),
+                        : FlexColumn(issues.Select(i => IssueRow(i, openPrs, mergedPrs, snap.At, onSelectPr, quiet, i.Id == selectedIssue || string.Equals(i.Identifier, selectedIssue, StringComparison.OrdinalIgnoreCase), onSelectIssue).WithKey(i.Id)).ToArray()),
                     footer))
                 .Margin(0, 0, 0, 12);
 

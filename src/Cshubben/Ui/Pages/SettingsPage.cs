@@ -61,7 +61,7 @@ sealed class SettingsPage : Component<PageContext>
                 setClaude(await services.CheckClaudeAsync());
             });
             return () => { };
-        }, new object[0]);
+        }, Array.Empty<object>());
 
         void TestGitHub()
         {
@@ -202,7 +202,7 @@ sealed class SettingsPage : Component<PageContext>
             }).MinWidth(200)),
             BodyStrong("Per function"),
             Kit.Muted("Pick a cheaper model or lower effort for summaries. \"Default\" uses the built-in choice for that function (activity summaries default to haiku, low), then the general setting above.").TextWrapping(),
-            FlexColumn(ClaudeFeatures.All.Select(f => FeatureRow(f)).ToArray()) with { RowGap = 6 },
+            FlexColumn(ClaudeFeatures.All.Select(f => FeatureRow(f).WithKey(f.ToString())).ToArray()) with { RowGap = 6 },
             Kit.Muted(ClaudeAuth.SettingsHelp).TextWrapping(),
             FlexRow(
                 PasswordBox(claudeTokenInput, setClaudeTokenInput, placeholderText: "Optional: token from `claude setup-token`").Flex(grow: 1, shrink: 1, basis: 0).MinWidth(120),

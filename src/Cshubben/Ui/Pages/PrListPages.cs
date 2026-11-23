@@ -75,7 +75,7 @@ static class PrListPages
             ? Empty()
             : Card(FlexColumn(
                 Kit.Heading2(title, items.Count).Margin(0, 0, 0, 8),
-                FlexColumn(items.Select(a => Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect, badges is not null && badges.TryGetValue(a.Pr.Id, out var b) ? b : null)).ToArray())))
+                FlexColumn(items.Select(a => Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect, badges is not null && badges.TryGetValue(a.Pr.Id, out var b) ? b : null).WithKey(a.Pr.Id)).ToArray())))
                 .Margin(0, 0, 0, 12);
 
     private static Element Page(string title, string subtitle, IEnumerable<Element> groups) =>
