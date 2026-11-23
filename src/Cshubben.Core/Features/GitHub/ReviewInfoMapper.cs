@@ -19,9 +19,12 @@ public static class ReviewInfoMapper
         if (id.Length == 0) return null;
 
         var direct = false;
+        var teams = new List<string>();
         foreach (var r in J.Items(node, "reviewRequests", "nodes"))
         {
             if (IsViewer(J.StrOrNull(r, "requestedReviewer", "login"), viewer)) direct = true;
+            var team = J.StrOrNull(r, "requestedReviewer", "name");
+            if (!string.IsNullOrWhiteSpace(team) && !teams.Contains(team, StringComparer.OrdinalIgnoreCase)) teams.Add(team);
         }
         foreach (var ev in J.Items(node, "timelineItems", "nodes"))
         {
@@ -61,7 +64,7 @@ public static class ReviewInfoMapper
             if (t is not null) lastCommit = t.Value;
         }
 
-        return new ReviewInfo(id, direct, found ? bestAt : null, lastCommit, decision);
+        return new ReviewInfo(id, direct, found ? bestAt : null, lastCommit, decision, teams);
     }
 
     /// <summary>Maps every node of a data.nodes answer, keyed by PR id.</summary>

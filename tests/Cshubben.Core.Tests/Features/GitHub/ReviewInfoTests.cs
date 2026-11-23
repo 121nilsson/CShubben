@@ -134,4 +134,30 @@ public class ReviewInfoTests
         Assert.Equal(2, map.Count);
         Assert.Equal("B", map["B"].PrId);
     }
+
+    [Fact]
+    public void Team_only_request_records_the_team_name()
+    {
+        var json = """
+            { "id": "P", "reviewRequests": { "nodes": [ { "requestedReviewer": { "__typename": "Team", "name": "Backend" } },
+                                                       { "requestedReviewer": { "__typename": "Team", "name": "backend" } } ] },
+              "timelineItems": { "nodes": [] }, "latestReviews": { "nodes": [] }, "commits": { "nodes": [] } }
+            """;
+        var info = Info(json);
+        Assert.Equal(new[] { "Backend" }, info.RequestedTeams);
+        Assert.Equal("Team: Backend", ReviewQueue.RequestLabel(info));
+    }
+
+    [Fact]
+    public void Personal_request_is_labelled_You_even_when_a_team_was_asked_too()
+    {
+        Assert.Equal("You", ReviewQueue.RequestLabel(Info(Fixtures.ReviewInfoNode)));
+    }
+
+    [Fact]
+    public void Request_label_is_null_without_info_and_plain_Team_when_no_name_is_known()
+    {
+        Assert.Null(ReviewQueue.RequestLabel(null));
+        Assert.Equal("Team", ReviewQueue.RequestLabel(new ReviewInfo("x", false, null, DateTimeOffset.MinValue, ReviewDecision.None)));
+    }
 }

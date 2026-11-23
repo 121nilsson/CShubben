@@ -14,7 +14,7 @@ static class Rows
     /// One PR as a clickable row. Colour is spent only on what needs attention: the pill shows the next action,
     /// and "everything fine" stays quiet.
     /// </summary>
-    public static Element PrRow(PullRequest pr, NextAction action, bool selected, DateTimeOffset now, Action<string> onSelect)
+    public static Element PrRow(PullRequest pr, NextAction action, bool selected, DateTimeOffset now, Action<string> onSelect, Element? badge = null)
     {
         var content = Grid(
             columns: [GridSize.Px(40), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
@@ -31,6 +31,7 @@ static class Rows
                     Kit.Muted("\u2212" + pr.Deletions).Foreground(Kit.Fg(Tone.Danger)),
                     Kit.Muted(pr.ChangedFiles + (pr.ChangedFiles == 1 ? " file" : " files")))).Grid(column: 1),
             HStack(8,
+                badge,
                 pr.Ci == CiState.Failure ? Kit.Pill("CI failing", Tone.Danger) : null,
                 action.IsActionable ? Kit.Pill(action.Label, action.Tone) : Kit.Muted(action.Label))
                 .VAlign(VerticalAlignment.Center).Margin(12, 0, 12, 0).Grid(column: 2),

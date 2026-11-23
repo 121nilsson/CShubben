@@ -48,12 +48,14 @@ public sealed record PullRequest(
 /// <param name="MyReviewAt">When the viewer last reviewed, if ever.</param>
 /// <param name="LastCommitAt">Time of the newest commit.</param>
 /// <param name="MyDecision">The viewer's latest review decision, if any.</param>
+/// <param name="RequestedTeams">Teams with a pending review request on the PR (names as GitHub shows them); null when unknown.</param>
 public sealed record ReviewInfo(
     string PrId,
     bool RequestedDirectly,
     DateTimeOffset? MyReviewAt,
     DateTimeOffset LastCommitAt,
-    ReviewDecision MyDecision);
+    ReviewDecision MyDecision,
+    IReadOnlyList<string>? RequestedTeams = null);
 
 /// <summary>Where a review-queue PR stands from the viewer's point of view.</summary>
 public enum ReviewQueueState
