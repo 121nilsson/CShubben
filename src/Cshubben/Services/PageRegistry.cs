@@ -44,6 +44,7 @@ sealed record PageBadge(int Count, Tone Tone);
 /// <param name="Badge">Optional count for the sidebar.</param>
 /// <param name="NeedsData">When true the shell shows a loading state until the first snapshot arrived.</param>
 /// <param name="Pinned">Pinned entries sit at the bottom of the sidebar, below the spacer.</param>
+/// <param name="Visible">Optional switch from the settings. A page that is not visible has no sidebar entry and no palette entry.</param>
 sealed record PageDef(
     Page Id,
     string Section,
@@ -52,7 +53,12 @@ sealed record PageDef(
     Func<PageContext, Element> Build,
     Func<PageContext, PageBadge?>? Badge = null,
     bool NeedsData = false,
-    bool Pinned = false);
+    bool Pinned = false,
+    Func<AppSettings, bool>? Visible = null)
+{
+    /// <summary>True unless the page has a switch in the settings and it is off.</summary>
+    public bool IsVisible(AppSettings settings) => Visible is null || Visible(settings);
+}
 
 static class PageRegistry
 {
@@ -75,6 +81,8 @@ static class PageRegistry
 
         new(Page.Drift, "Workspace", "\uE898", "Drift",
             c => Component<DriftPage, PageContext>(c)),
+        new(Page.Errors, "Workspace", "", "Errors",
+            ErrorsPage.Build, Visible: s => s.Errors.Enabled),
         new(Page.Linear, "Workspace", "", "Linear",
             ctx => LinearPage.Build(ctx.Snapshot, null, ctx.Select, ctx.OpenSettings)),
         new(Page.Notes, "Workspace", "", "Notes",

@@ -348,6 +348,7 @@ sealed class SettingsPage : Component<PageContext>
                 AppOptions.ReposFirst ? reposCard.Margin(0, 0, 0, 12) : null,
                 githubCard.Margin(0, 0, 0, 12),
                 linearCard.Margin(0, 0, 0, 12),
+                Component<ErrorsSettingsCard, PageContext>(ctx).Margin(0, 0, 0, 12),
                 claudeCard.Margin(0, 0, 0, 12),
                 AppOptions.ReposFirst ? null : reposCard.Margin(0, 0, 0, 12),
                 Kit.SettingsCard("GitHub writes",

@@ -83,6 +83,12 @@ static class Kit
         VStack(4, PageHeader(title, what),
             Card(VStack(8, BodyStrong("Coming soon"), Muted("This page is being built. See PLAN.md for the scope."))));
 
+    /// <summary>Shown when a page is switched off in Settings but still reached (for example with <c>--start</c>).</summary>
+    public static Element PageOff(string title, Action openSettings) =>
+        VStack(12,
+            PageHeader(title, "This page is turned off"),
+            Button("Open Settings", openSettings).AutomationName("Open Settings")).Margin(24, 16);
+
     /// <summary>
     /// A calm full-width message strip with an optional action button (for example "Retry").
     /// Colour comes from the tone's theme tokens.

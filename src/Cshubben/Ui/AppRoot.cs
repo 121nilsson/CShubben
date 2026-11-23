@@ -203,7 +203,7 @@ sealed class AppRoot : Component
         string? currentSection = null;
         foreach (var def in PageRegistry.All)
         {
-            if (def.Pinned) continue;
+            if (def.Pinned || !def.IsVisible(settings)) continue;
             if (def.Section != currentSection)
             {
                 currentSection = def.Section;
@@ -282,6 +282,8 @@ sealed class AppRoot : Component
         var pageDef = PageRegistry.Find(page);
         Element content = pageDef is null
             ? Kit.ComingSoon(page.ToString(), "This page is not registered.")
+            : !pageDef.IsVisible(settings)
+                ? Kit.PageOff(pageDef.Label, OpenSettings)
             : pageDef.NeedsData && !loadedOnce
                 // Never an eternal spinner: if the first load failed, say why and offer Retry / Settings.
                 ? (error is not null
@@ -329,7 +331,7 @@ sealed class AppRoot : Component
         Element grid = sidebar with { Content = content2 };
 
         var paletteCtx = new PaletteContext(snap, selectedId,
-            PageRegistry.All.Where(d => d.Id != Page.Review).Select(d => new PalettePage(d.Id.ToString(), d.Label, d.Glyph)).ToList(),
+            PageRegistry.All.Where(d => d.Id != Page.Review && d.IsVisible(settings)).Select(d => new PalettePage(d.Id.ToString(), d.Label, d.Glyph)).ToList(),
             key => { if (Enum.TryParse<Page>(key, true, out var pg)) { setPage(pg); if (narrow) setSelected(null); } },
             id => Select(id), Refresh, () => setPage(Page.Notes), () => setPage(Page.Settings));
 

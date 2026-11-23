@@ -19,6 +19,7 @@ public static class SecretKeys
 {
     public const string LinearApiKey = "linear.api-key";
     public const string ClaudeOAuthToken = "claude.oauth-token";
+    public const string GrafanaToken = "grafana.token";
 }
 
 /// <summary>Keeps secrets in memory only. Used by tests and as a fallback.</summary>

@@ -77,6 +77,9 @@ public sealed record AppSettings
     /// </summary>
     public bool AllowGitHubWrites { get; init; }
 
+    /// <summary>The Errors module (error spikes from Grafana logs, tied to deploys). Off by default.</summary>
+    public ErrorsSettings Errors { get; init; } = new();
+
     public const int DefaultRefreshSeconds = 60;
 
     public static readonly IReadOnlyList<int> RefreshChoices = new[] { 30, 60, 120, 300 };
@@ -96,5 +99,6 @@ public sealed record AppSettings
         Theme = ThemeChoice.Normalize(Theme),
         RefreshSeconds = RefreshSeconds < 15 || RefreshSeconds > 3600 ? DefaultRefreshSeconds : RefreshSeconds,
         NotesDirectory = NotesDirectory?.Trim() ?? "",
+        Errors = (Errors ?? new ErrorsSettings()).Sanitized(),
     };
 }
