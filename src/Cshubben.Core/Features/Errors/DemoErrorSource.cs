@@ -21,7 +21,7 @@ public sealed class DemoErrorSource : IErrorSource
         }),
 
         // Rising, but still inside what is normal for it: shows the arrow without the spike label.
-        new("notifications-messagefactory", "749c4bb975", 1.0, 3.5, 12, new[]
+        new("notifications-messagefactory", "749c4bb975", 1.0, 2.2, 12, new[]
         {
             new Template(Template.EventHandlerNull, 1),
         }),

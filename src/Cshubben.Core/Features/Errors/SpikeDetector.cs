@@ -15,6 +15,9 @@ public static class SpikeDetector
     /// <summary>1.4826 turns a median absolute deviation into a standard deviation for normally distributed data.</summary>
     private const double MadToSigma = 1.4826;
 
+    /// <summary>A silent history has no deviation; half an error per bucket keeps a first burst of three from being missed.</summary>
+    private const double MinDeviation = 0.5;
+
     public static AppSpike Analyze(ErrorSeries series, SpikeOptions? options = null)
     {
         var o = options ?? new SpikeOptions();
@@ -28,16 +31,17 @@ public static class SpikeDetector
         var now = Mean(counts, historyLength, nowBuckets);
 
         var baseline = 0.0;
-        var deviation = 1.0;
+        var deviation = MinDeviation;
         if (historyLength > 0)
         {
             var history = counts.Take(historyLength).Select(c => (double)c).ToList();
             baseline = Median(history);
             var mad = Median(history.Select(h => Math.Abs(h - baseline)).ToList());
-            deviation = Math.Max(mad * MadToSigma, 1.0);
+            deviation = Math.Max(mad * MadToSigma, MinDeviation);
         }
 
-        var isSpike = now >= o.MinNow && now > baseline + o.K * deviation;
+        // Without any history there is nothing to compare with.
+        var isSpike = historyLength > 0 && now >= o.MinNow && now > baseline + o.K * deviation;
         var factor = now / Math.Max(baseline, 1.0);
 
         var priorLength = Math.Min(Math.Max(o.PriorBuckets, 1), historyLength);

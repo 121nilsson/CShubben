@@ -144,7 +144,7 @@ public static class LokiParser
     /// <summary>One short line of server text for an error message: no line breaks, at most 200 characters.</summary>
     public static string Shorten(string? text)
     {
-        var line = (text ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        var line = System.Text.RegularExpressions.Regex.Replace(text ?? "", @"\s+", " ").Trim();
         return line.Length <= 200 ? line : line.Substring(0, 199) + "…";
     }
 

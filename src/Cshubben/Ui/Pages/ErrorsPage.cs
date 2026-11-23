@@ -141,7 +141,7 @@ sealed class ErrorsPage : Component<PageContext>
                 Kit.Muted(rate)),
             ErrorsKit.Bars(app.Counts, ListBars, 22, 4, tone));
 
-        var accent = Border(Empty()).Width(3).Background(isSelected ? Theme.AccentFill : Theme.CardBackground).CornerRadius(2);
+        var accent = Border(Empty()).Width(3).Background(isSelected ? Theme.Accent : Theme.CardBackground).CornerRadius(2);
         var row = Grid(
             columns: [GridSize.Px(3), GridSize.Star()],
             rows: [GridSize.Auto],
@@ -175,7 +175,7 @@ sealed class ErrorsPage : Component<PageContext>
             Kit.Pill(app.Total + (app.Total == 1 ? " error" : " errors") + " in 24 h", Tone.Neutral));
 
         var chart = app.Total == 0
-            ? Kit.Muted("No errors in the last 24 hours.")
+            ? (Element)Kit.Muted("No errors in the last 24 hours.")
             : VStack(4,
                 ErrorsKit.Bars(app.Counts, ChartBars, 72, 6, app.IsSpike ? Tone.Danger : Tone.Neutral),
                 Grid(
