@@ -148,4 +148,5 @@ Decisions:
 
 Status:
 - 2026-11-23: foundation. Module switch, Settings card (Grafana address and token, app and namespace mappings with repo suggestions, local clones folder, team sharing), Errors page showing connection and mappings, tests in `ErrorsSettingsTests`.
-- Next: Grafana client (LogQL metric queries per app, then log lines on drill-down), spike model and baseline (Core, tested), spike view with trend and deploy markers, Claude analysis.
+- 2026-11-23: spike view (`Features/Errors`). `GrafanaClient` reads Loki through Grafana's datasource proxy (one metric query for all apps, log lines on drill-down), `SpikeDetector` compares the latest hour with the app's own 24 h history (median + 4 robust deviations, at least one error per bucket), trend arrow against the previous 6 h, `ErrorFingerprints` + `ErrorGrouping` group the lines. The page lists apps (rate, trend, mini chart) and shows the picked app's chart and error groups with repo and hints. `--demo` uses `DemoErrorSource`. Settings: namespace, data source UID, include warnings, Test connection. Not verified against a real Grafana, and the UI has not been looked at yet.
+- Next: deploy markers and "first seen after deploy X" (GitHub Deployments/Actions, adapter in the app layer), baseline for the same time of week, Claude analysis, a probe for how far back Loki retention goes.

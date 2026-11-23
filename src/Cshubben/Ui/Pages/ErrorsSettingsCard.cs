@@ -37,6 +37,10 @@ sealed class ErrorsSettingsCard : Component<PageContext>
         var (bindingError, setBindingError) = UseState("");
         var (importText, setImportText) = UseState("");
         var (importMessage, setImportMessage) = UseState("");
+        var (nsInput, setNsInput) = UseState(errors.Namespace);
+        var (dsInput, setDsInput) = UseState(errors.LokiDatasource);
+        var (testing, setTesting) = UseState(false, true);
+        var (testResult, setTestResult) = UseState<ConnectionResult?>(null, true);
 
         UseEffect(() =>
         {
@@ -98,6 +102,33 @@ sealed class ErrorsSettingsCard : Component<PageContext>
                     setHasToken(false);
                 }).IsEnabled(hasToken).Flex(shrink: 0)) with { ColumnGap = 8 },
             Kit.Muted("Use a read-only service account. The token is never written to the settings file.").TextWrapping(),
+            Row("Namespace", FlexRow(
+                TextBox(nsInput, setNsInput, placeholderText: "default").Flex(grow: 1, shrink: 1, basis: 0).MinWidth(120),
+                Button("Save", () =>
+                {
+                    Save(errors with { Namespace = nsInput });
+                    setNsInput(RepoBindings.NormalizeApp(nsInput) ?? ErrorsSettings.DefaultNamespace);
+                }).IsEnabled(nsInput.Trim() != errors.Namespace).Flex(shrink: 0)) with { ColumnGap = 8 }),
+            Row("Loki data source UID", FlexRow(
+                TextBox(dsInput, setDsInput, placeholderText: "Empty: use the first Loki data source").Flex(grow: 1, shrink: 1, basis: 0).MinWidth(120),
+                Button("Save", () => Save(errors with { LokiDatasource = dsInput.Trim() }))
+                    .IsEnabled(dsInput.Trim() != errors.LokiDatasource).Flex(shrink: 0)) with { ColumnGap = 8 }),
+            Row("Include warnings", ToggleSwitch(errors.IncludeWarnings, v => Save(errors with { IncludeWarnings = v }), "On", "Off", "Include warnings in the error counts")),
+            FlexRow(
+                Button(testing ? "Testing…" : "Test connection", () =>
+                {
+                    setTesting(true);
+                    setTestResult(null);
+                    _ = Task.Run(async () =>
+                    {
+                        try { setTestResult(await services.TestGrafanaAsync()); }
+                        finally { setTesting(false); }
+                    });
+                }).IsEnabled(!testing && errors.GrafanaUrl.Length > 0 && hasToken).Flex(shrink: 0),
+                testResult is null
+                    ? Empty()
+                    : Kit.Muted(testResult.Message).TextWrapping().Foreground(Kit.Fg(testResult.Ok ? Tone.Success : Tone.Danger))
+                        .VAlign(VerticalAlignment.Center)) with { ColumnGap = 12 },
         };
 
         // ---- Applications -> repositories ----
