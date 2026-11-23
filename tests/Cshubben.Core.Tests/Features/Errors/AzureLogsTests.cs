@@ -112,11 +112,11 @@ public class McpOAuthTests
     [Fact]
     public void The_authorize_url_carries_pkce_state_and_the_redirect()
     {
-        var url = McpOAuth.BuildAuthorizeUrl("https://x.example/oauth/authorize", "client 1", "http://127.0.0.1:5000/callback", "a/b offline_access", "st", "ch");
+        var url = McpOAuth.BuildAuthorizeUrl("https://x.example/oauth/authorize", "client 1", "http://localhost:5000/callback", "a/b offline_access", "st", "ch");
         var query = McpOAuth.Query(url.Query);
         Assert.Equal("code", query["response_type"]);
         Assert.Equal("client 1", query["client_id"]);
-        Assert.Equal("http://127.0.0.1:5000/callback", query["redirect_uri"]);
+        Assert.Equal("http://localhost:5000/callback", query["redirect_uri"]);
         Assert.Equal("a/b offline_access", query["scope"]);
         Assert.Equal("S256", query["code_challenge_method"]);
         Assert.Equal("ch", query["code_challenge"]);
