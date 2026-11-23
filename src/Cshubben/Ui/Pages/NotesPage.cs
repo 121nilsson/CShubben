@@ -337,7 +337,7 @@ sealed class NotesPage : Component
 
         Element? tagRow = null;
         if (n.Tags.Count > 0)
-            tagRow = HStack(4, n.Tags.Take(3).Select(t => Kit.Pill(t, Tone.Neutral)).ToArray());
+            tagRow = HStack(4, n.Tags.Take(3).Select(t => Kit.Pill(t, Tone.Neutral).WithKey(t)).ToArray());
 
         var button = Button(VStack(4, head, previewLine, tagRow), onClick)
             .SubtleButton()

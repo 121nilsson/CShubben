@@ -104,7 +104,7 @@ sealed class AppRoot : Component
         {
             if (!services.ForcedDemo) Refresh();
             return () => { };
-        }, new object[0]);
+        }, Array.Empty<object>());
 
         // Background refresh while the window is active, and a slow tick so "Updated 2 min ago" stays true.
         UseEffect(() =>
@@ -137,7 +137,7 @@ sealed class AppRoot : Component
                 }
             });
             return () => cts.Cancel();
-        }, new object[0]);
+        }, Array.Empty<object>());
 
         void SaveSettings(AppSettings next)
         {

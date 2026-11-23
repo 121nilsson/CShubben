@@ -293,7 +293,7 @@ sealed class ErrorsPage : Component<PageContext>
         }
         else
         {
-            list = VStack(8, found.Select(g => GroupCard(ctx.Services, errors, app, g, snapshot.Window, now, expanded == g.Key, () => setExpanded(expanded == g.Key ? "" : g.Key))).ToArray());
+            list = VStack(8, found.Select(g => GroupCard(ctx.Services, errors, app, g, snapshot.Window, now, expanded == g.Key, () => setExpanded(expanded == g.Key ? "" : g.Key)).WithKey(g.Key)).ToArray());
         }
 
         return VStack(12, overview, list);
@@ -408,7 +408,7 @@ sealed class ErrorsPage : Component<PageContext>
                     columns: [GridSize.Px(130), GridSize.Star()],
                     rows: [GridSize.Auto],
                     Kit.Muted(s.At.ToLocalTime().ToString("HH:mm:ss") + " · " + ErrorsText.Ago(s.At, now)).Grid(column: 0),
-                    Kit.Muted(s.Pod.Length > 0 ? s.Pod : "-").TextTrimming(TextTrimming.CharacterEllipsis).Grid(column: 1))).ToArray())) with { RowGap = 4 };
+                    Kit.Muted(s.Pod.Length > 0 ? s.Pod : "-").TextTrimming(TextTrimming.CharacterEllipsis).Grid(column: 1)).WithKey(s.At.Ticks.ToString() + "|" + s.Pod)).ToArray())) with { RowGap = 4 };
         }
 
         var pods = group.Pods.Count == 0

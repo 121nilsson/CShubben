@@ -27,7 +27,7 @@ static class OverviewPage
                 items.Count == 0
                     ? Kit.EmptyNote(empty)
                     : FlexColumn(items.Select(a =>
-                        Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect)).ToArray())))
+                        Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect).WithKey(a.Pr.Id)).ToArray())))
             ;
 
         var nothingYet = snap.Authored.Count == 0 && snap.Reviews.Count == 0;

@@ -61,7 +61,7 @@ sealed class PipelineTab : Component<PipelineTabProps>
                 }
             });
             return () => cts.Cancel();
-        }, new object[] { active, pr.Id });
+        }, active, pr.Id);
 
         void Refresh()
         {

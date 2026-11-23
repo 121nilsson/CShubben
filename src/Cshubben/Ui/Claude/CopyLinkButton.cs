@@ -37,7 +37,7 @@ sealed class CopyLinkButton : Component<CopyLinkProps>
                 }
             });
             return () => cts.Cancel();
-        }, new object[] { copied });
+        }, copied);
 
         var url = Props.Url;
         if (string.IsNullOrWhiteSpace(url)) return Empty();

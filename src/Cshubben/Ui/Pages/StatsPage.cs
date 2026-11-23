@@ -87,7 +87,7 @@ static class StatsPage
             HeaderBlock("Where the work happens", "Merged pull requests by repository"),
             report.TopRepos.Count == 0
                 ? Kit.EmptyNote("No merged pull requests in this period.")
-                : FlexColumn(report.TopRepos.Select(r => RepoRow(r, report.TopRepos[0].Count)).ToArray()) with { RowGap = 6 }))
+                : FlexColumn(report.TopRepos.Select(r => RepoRow(r, report.TopRepos[0].Count).WithKey(r.Repo)).ToArray()) with { RowGap = 6 }))
             .Flex(grow: 1, basis: 420);
 
         var more = (FlexRow(
@@ -99,20 +99,20 @@ static class StatsPage
             HeaderBlock("Where you review", "Pull requests you reviewed, by repository"),
             extras.ReviewedRepos.Count == 0
                 ? Kit.EmptyNote("No reviews in this period.")
-                : FlexColumn(extras.ReviewedRepos.Select(r => RepoRow(r, extras.ReviewedRepos[0].Count)).ToArray()) with { RowGap = 6 }))
+                : FlexColumn(extras.ReviewedRepos.Select(r => RepoRow(r, extras.ReviewedRepos[0].Count).WithKey(r.Repo)).ToArray()) with { RowGap = 6 }))
             .Flex(grow: 1, basis: 420);
 
         var weekdayMax = Math.Max(1, extras.Weekdays.Max(d => d.Count));
         var weekdays = Card(VStack(10,
             HeaderBlock("When you merge", "Merged pull requests by weekday (UTC)"),
-            FlexColumn(extras.Weekdays.Select(d => WeekdayRow(d, weekdayMax)).ToArray()) with { RowGap = 6 }))
+            FlexColumn(extras.Weekdays.Select(d => WeekdayRow(d, weekdayMax).WithKey(d.Day.ToString())).ToArray()) with { RowGap = 6 }))
             .Flex(grow: 1, basis: 420);
 
         var slowest = Card(VStack(10,
             HeaderBlock("Slowest to merge", "Your three longest open-to-merge times"),
             extras.Slowest.Count == 0
                 ? Kit.EmptyNote("Nothing merged in this period.")
-                : FlexColumn(extras.Slowest.Select(SlowRow).ToArray()) with { RowGap = 8 }))
+                : FlexColumn(extras.Slowest.Select(pr => SlowRow(pr).WithKey(pr.Repo + "#" + pr.Number)).ToArray()) with { RowGap = 8 }))
             .Flex(grow: 1, basis: 420);
 
         var teamCards = new List<Element>();
@@ -120,11 +120,11 @@ static class StatsPage
         {
             teamCards.Add(Card(VStack(10,
                 HeaderBlock("Most active people", "Merged pull requests, last 30 days, watched repositories"),
-                FlexColumn(team.TopPeople.Select(p => PersonRow(p, team.TopPeople[0].Merged)).ToArray()) with { RowGap = 6 }))
+                FlexColumn(team.TopPeople.Select(p => PersonRow(p, team.TopPeople[0].Merged).WithKey(p.Author)).ToArray()) with { RowGap = 6 }))
                 .Flex(grow: 1, basis: 420));
             teamCards.Add(Card(VStack(10,
                 HeaderBlock("Most active repositories", "Merged pull requests by everyone, last 30 days (" + team.Merged + " in total, " + team.People + " people)"),
-                FlexColumn(team.TopRepos.Select(r => RepoRow(r, team.TopRepos[0].Count)).ToArray()) with { RowGap = 6 }))
+                FlexColumn(team.TopRepos.Select(r => RepoRow(r, team.TopRepos[0].Count).WithKey(r.Repo)).ToArray()) with { RowGap = 6 }))
                 .Flex(grow: 1, basis: 420));
         }
 

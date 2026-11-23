@@ -105,7 +105,7 @@ sealed class TrayHost : Component
         {
             WindowIcon.FromRgba(TrayIconImage.Rgba(32, false), 32, 32),
             WindowIcon.FromRgba(TrayIconImage.Rgba(32, true), 32, 32),
-        }, new object[0]);
+        }, Array.Empty<object>());
 
         var tray = UseTrayIcon(new TrayIconSpec(
             status.NeedsYou > 0 ? icons[1] : icons[0],
@@ -119,7 +119,7 @@ sealed class TrayHost : Component
             controller.Changed += OnChanged;
             OnChanged();
             return () => controller.Changed -= OnChanged;
-        }, new object[0]);
+        }, Array.Empty<object>());
 
         // Left click opens the window, right click shows the menu.
         UseEffect(() =>
@@ -156,7 +156,7 @@ sealed class TrayHost : Component
             };
             window.Closing += onClosing;
             return () => window.Closing -= onClosing;
-        }, new object[] { window ?? (object)"no-window", tray ?? (object)"no-tray" });
+        }, window, tray);
 
         // Started by autostart (--background): begin hidden, once.
         UseEffect(() =>
@@ -168,7 +168,7 @@ sealed class TrayHost : Component
             }
 
             return () => { };
-        }, new object[] { window ?? (object)"no-window", tray ?? (object)"no-tray" });
+        }, window, tray);
 
         return Empty();
     }
