@@ -132,3 +132,20 @@ Remaining:
 - Claude page (`Features/Digest`, `GitHubDigestData`, `DigestPage`): summaries of merged PRs for yesterday, 7 days, 30 days and this year across watched repos, with a free question and a per-run model/effort override. Runs only on a button press.
 - Review workspace: `m` marks a line, `a` asks Claude about the marked range or the selected line (`CodeSelectionBuilder`, `Prompts.CodeQuestion`). Claude sees only those lines.
 - Not done: asking Claude for a full review from the workspace (the PR inspector still has "Draft review"), live check of the Claude page with real data.
+
+## Errors module (error spikes from logs, tied to deploys)
+Goal: see when errors spike per application, tie the spike to the deploy that probably caused it, and let Claude analyse it.
+Logs live in Grafana (Loki: labels `appname`, `namespace`, `loglevel`, `pod`). Cshubben is a local desktop app.
+
+Decisions:
+- **Optional module, off by default** (`AppSettings.Errors.Enabled`). Off means no sidebar entry, no palette entry, no background work and no token needed. `PageDef.Visible` is the generic switch for any page.
+- **Layers.** (1) Deterministic collection and spike detection in Core, no AI. (2) Deploys from GitHub (Deployments/Actions; fallback: a new pod template hash in the pod name means a rollout). (3) Claude on demand: gets a fingerprint, top stack traces and the good/bad deploy SHAs, reads the diff through GitHub, and only uses a worktree on the deploy SHA (never the user's working tree) for deeper analysis.
+- **Mappings** (`RepoBindings`): `appname -> owner/repo` and `namespace prefix -> owner/repo` (stack frames name shared libraries such as BuildingBlocks). Shared inside the team as one line of JSON (no address, token or local folders in it).
+- **Grafana token** only in the credential store (`SecretKeys.GrafanaToken`), never in settings.json. Plain http only for localhost.
+- **Fingerprint** of an error = exception type + logger + top app frame (file:line), never the message (ids and tenant paths vary). Known rule-based classes get their own action, for example the missing `backend_role` claim: the code that requires the role shipped before the claim was added in PolicyServer, so the fix is a PolicyServer change, not code.
+- **Trends**: per app a sparkline, factor against a baseline (same time of week over the last weeks, else the trailing 24 h), arrow up/flat/down and a NEW badge; per error group its own sparkline, first/last seen and pods. "First seen after deploy X" is the strongest signal. Deploy markers on the chart.
+- Logs can hold customer data: redact before anything goes to Claude, and send aggregates and excerpts, not raw logs.
+
+Status:
+- 2026-11-23: foundation. Module switch, Settings card (Grafana address and token, app and namespace mappings with repo suggestions, local clones folder, team sharing), Errors page showing connection and mappings, tests in `ErrorsSettingsTests`.
+- Next: Grafana client (LogQL metric queries per app, then log lines on drill-down), spike model and baseline (Core, tested), spike view with trend and deploy markers, Claude analysis.
