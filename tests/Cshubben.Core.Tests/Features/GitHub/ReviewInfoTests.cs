@@ -160,4 +160,30 @@ public class ReviewInfoTests
         Assert.Null(ReviewQueue.RequestLabel(null));
         Assert.Equal("Team", ReviewQueue.RequestLabel(new ReviewInfo("x", false, null, DateTimeOffset.MinValue, ReviewDecision.None)));
     }
+
+    private static readonly DateTimeOffset T = new(2026, 11, 23, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void Sections_split_personal_requests_team_requests_and_what_is_done()
+    {
+        var teams = new[] { "Backend" };
+        Assert.Equal(ReviewSection.AskedOfYou, ReviewQueue.SectionOf(new ReviewInfo("a", true, null, T, ReviewDecision.None, teams)));
+        Assert.Equal(ReviewSection.AskedOfTeams, ReviewQueue.SectionOf(new ReviewInfo("b", false, null, T, ReviewDecision.None, teams)));
+        // Updated since the viewer's review still needs them, so it stays in its request section.
+        Assert.Equal(ReviewSection.AskedOfTeams, ReviewQueue.SectionOf(new ReviewInfo("c", false, T.AddHours(-2), T, ReviewDecision.Approved, teams)));
+        Assert.Equal(ReviewSection.AskedOfYou, ReviewQueue.SectionOf(new ReviewInfo("d", true, T.AddHours(-2), T, ReviewDecision.ChangesRequested, teams)));
+    }
+
+    [Fact]
+    public void Reviewed_and_settled_goes_to_waiting_on_others_whoever_was_asked()
+    {
+        Assert.Equal(ReviewSection.WaitingOnOthers, ReviewQueue.SectionOf(new ReviewInfo("a", true, T, T.AddHours(-1), ReviewDecision.Approved)));
+        Assert.Equal(ReviewSection.WaitingOnOthers, ReviewQueue.SectionOf(new ReviewInfo("b", false, T, T.AddHours(-1), ReviewDecision.ChangesRequested)));
+    }
+
+    [Fact]
+    public void Missing_info_is_asked_of_you()
+    {
+        Assert.Equal(ReviewSection.AskedOfYou, ReviewQueue.SectionOf(null));
+    }
 }

@@ -34,7 +34,7 @@ static class PrListPages
             groups.Select(g => Group(g.Title, all.Where(g.Match).OrderBy(a => a.Pr.UpdatedAt).ToList(), snap, selectedId, onSelect)));
     }
 
-    /// <summary>The review queue, grouped by who is waiting for whom.</summary>
+    /// <summary>The review queue: asked of you, asked of your teams, and what is waiting on others.</summary>
     public static Element Reviews(HubSnapshot snap, string? selectedId, Action<string> onSelect)
     {
         if (snap.Reviews.Count == 0)
@@ -49,15 +49,20 @@ static class PrListPages
         var all = snap.Reviews.Select(p =>
         {
             snap.ReviewInfos.TryGetValue(p.Id, out var info);
-            return (Item: new Attention(p, NextAction.For(p, info)), State: ReviewQueue.StateOf(info), Direct: info?.RequestedDirectly == true, Label: ReviewQueue.RequestLabel(info));
+            return (Item: new Attention(p, NextAction.For(p, info)), Section: ReviewQueue.SectionOf(info), State: ReviewQueue.StateOf(info),
+                Direct: info?.RequestedDirectly == true, Label: ReviewQueue.RequestLabel(info));
         }).ToList();
-        // Requests addressed to you personally come before requests that reached you through a team.
-        var badges = all.ToDictionary(x => x.Item.Pr.Id, x => x.Label is null ? null : Kit.Pill(x.Label, x.Direct ? Tone.Accent : Tone.Neutral));
 
-        var groups = Enum.GetValues<ReviewQueueState>()
-            .OrderBy(ReviewQueue.Rank)
-            .Select(s => Group(ReviewQueue.Label(s),
-                all.Where(x => x.State == s).OrderByDescending(x => x.Direct).ThenByDescending(x => x.Item.Pr.UpdatedAt).Select(x => x.Item).ToList(),
+        // "You" is implied in the first section and the team in the second needs a pill; the last section shows where it came from.
+        var badges = all.ToDictionary(x => x.Item.Pr.Id, x => x.Label is null || x.Section == ReviewSection.AskedOfYou
+            ? null
+            : Kit.Pill(x.Label, x.Direct ? Tone.Accent : Tone.Neutral));
+
+        var groups = Enum.GetValues<ReviewSection>()
+            .Select(section => Group(ReviewQueue.SectionLabel(section),
+                all.Where(x => x.Section == section)
+                    .OrderBy(x => ReviewQueue.Rank(x.State)).ThenByDescending(x => x.Item.Pr.UpdatedAt)
+                    .Select(x => x.Item).ToList(),
                 snap, selectedId, onSelect, badges));
         return Page("Review queue", "Pull requests where you are a reviewer", groups);
     }
