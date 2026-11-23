@@ -41,12 +41,26 @@ sealed class ErrorsSettingsCard : Component<PageContext>
         var (dsInput, setDsInput) = UseState(errors.LokiDatasource);
         var (testing, setTesting) = UseState(false, true);
         var (testResult, setTestResult) = UseState<ConnectionResult?>(null, true);
+        var (mcpInput, setMcpInput) = UseState(errors.McpUrl);
+        var (wsInput, setWsInput) = UseState(errors.Workspace);
+        var (rgInput, setRgInput) = UseState(errors.ResourceGroup);
+        var (azureError, setAzureError) = UseState("");
+        var (signedIn, setSignedIn) = UseState(false, true);
+        var (signingIn, setSigningIn) = UseState(false, true);
+        var (signMessage, setSignMessage) = UseState("", true);
 
         UseEffect(() =>
         {
             _ = Task.Run(() => setHasToken(services.Secrets.Get(SecretKeys.GrafanaToken) is not null));
             return () => { };
         }, new object[0]);
+
+        UseEffect(() =>
+        {
+            var url = errors.McpUrl;
+            _ = Task.Run(() => setSignedIn(services.IsSignedInToLogs(url)));
+            return () => { };
+        }, new object[] { errors.McpUrl });
 
         var toggle = ToggleSwitch(errors.Enabled, v => Save(errors with { Enabled = v }), "On", "Off", "Show the Errors page");
         const string help = "Error spikes from your Grafana logs, tied to deploys. Off by default: while it is off there is no Errors page "
@@ -77,7 +91,7 @@ sealed class ErrorsSettingsCard : Component<PageContext>
             Save(errors with { GrafanaUrl = url });
         }
 
-        var connectionRows = new Element[]
+        var grafanaRows = new Element[]
         {
             Row("Grafana address", FlexRow(
                 TextBox(urlInput, v => { setUrlInput(v); setUrlError(""); }, placeholderText: "https://grafana.example.com")
@@ -113,23 +127,98 @@ sealed class ErrorsSettingsCard : Component<PageContext>
                 TextBox(dsInput, setDsInput, placeholderText: "Empty: use the first Loki data source").Flex(grow: 1, shrink: 1, basis: 0).MinWidth(120),
                 Button("Save", () => Save(errors with { LokiDatasource = dsInput.Trim() }))
                     .IsEnabled(dsInput.Trim() != errors.LokiDatasource).Flex(shrink: 0)) with { ColumnGap = 8 }),
-            Row("Include warnings", ToggleSwitch(errors.IncludeWarnings, v => Save(errors with { IncludeWarnings = v }), "On", "Off", "Include warnings in the error counts")),
+        };
+
+        // ---- Azure Monitor through the MCP server ----
+        void SaveAzure()
+        {
+            var url = mcpInput.Trim().Length == 0 ? "" : RepoBindings.NormalizeUrl(mcpInput);
+            if (url is null)
+            {
+                setAzureError("Enter the full https:// address of the MCP server.");
+                return;
+            }
+
+            if ((wsInput.Trim().Length > 0 && RepoBindings.NormalizeApp(wsInput) is null)
+                || (rgInput.Trim().Length > 0 && RepoBindings.NormalizeApp(rgInput) is null))
+            {
+                setAzureError("The workspace and resource group names may only have letters, digits, dots, dashes and underscores.");
+                return;
+            }
+
+            setAzureError("");
+            setMcpInput(url);
+            Save(errors with { McpUrl = url, Workspace = wsInput.Trim(), ResourceGroup = rgInput.Trim() });
+        }
+
+        var azureChanged = mcpInput.Trim() != errors.McpUrl || wsInput.Trim() != errors.Workspace || rgInput.Trim() != errors.ResourceGroup;
+        var azureRows = new Element[]
+        {
+            Row("MCP address", TextBox(mcpInput, v => { setMcpInput(v); setAzureError(""); }, placeholderText: "https://…azurecontainerapps.io")
+                .HAlign(HorizontalAlignment.Stretch)),
+            Row("Workspace", TextBox(wsInput, v => { setWsInput(v); setAzureError(""); }, placeholderText: "Log Analytics workspace name")
+                .HAlign(HorizontalAlignment.Stretch)),
+            Row("Resource group", TextBox(rgInput, v => { setRgInput(v); setAzureError(""); }, placeholderText: "Usually the same as the workspace")
+                .HAlign(HorizontalAlignment.Stretch)),
+            HStack(8, Button("Save", SaveAzure).IsEnabled(azureChanged)),
+            azureError.Length > 0 ? Kit.Muted(azureError).TextWrapping().Foreground(Kit.Fg(Tone.Danger)) : Empty(),
+            Row("Sign-in", Text(signedIn ? "Signed in with your Microsoft account" : "Not signed in")),
             FlexRow(
-                Button(testing ? "Testing…" : "Test connection", () =>
+                Button(signingIn ? "Waiting for the browser…" : signedIn ? "Sign in again" : "Sign in", () =>
                 {
-                    setTesting(true);
-                    setTestResult(null);
+                    setSigningIn(true);
+                    setSignMessage("");
+                    var url = errors.McpUrl;
                     _ = Task.Run(async () =>
                     {
-                        try { setTestResult(await services.TestGrafanaAsync()); }
-                        finally { setTesting(false); }
+                        try
+                        {
+                            var result = await services.SignInToLogsAsync(url);
+                            setSignedIn(result.Ok);
+                            setSignMessage(result.Ok ? "" : result.Message);
+                        }
+                        finally { setSigningIn(false); }
                     });
-                }).IsEnabled(!testing && errors.GrafanaUrl.Length > 0 && hasToken).Flex(shrink: 0),
-                testResult is null
-                    ? Empty()
-                    : Kit.Muted(testResult.Message).TextWrapping().Foreground(Kit.Fg(testResult.Ok ? Tone.Success : Tone.Danger))
-                        .VAlign(VerticalAlignment.Center)) with { ColumnGap = 12 },
+                }).IsEnabled(!signingIn && errors.McpUrl.Length > 0 && !azureChanged).Flex(shrink: 0),
+                Button("Sign out", () =>
+                {
+                    services.SignOutOfLogs(errors.McpUrl);
+                    setSignedIn(false);
+                }).IsEnabled(signedIn).Flex(shrink: 0)) with { ColumnGap = 8 },
+            signMessage.Length > 0 ? Kit.Muted(signMessage).TextWrapping().Foreground(Kit.Fg(Tone.Danger)) : Empty(),
+            Kit.Muted("Signing in opens your browser. Only a refresh token is kept, in the Windows credential store.").TextWrapping(),
         };
+
+        var sourceRow = Row("Read logs from", ComboBox(
+            new[] { "Azure Monitor (through the MCP server)", "Grafana (Loki)" },
+            errors.Source == ErrorsSettings.SourceGrafana ? 1 : 0,
+            i => Save(errors with { Source = i == 1 ? ErrorsSettings.SourceGrafana : ErrorsSettings.SourceAzure }))
+            .HAlign(HorizontalAlignment.Stretch));
+
+        var warningsRow = Row("Include warnings", ToggleSwitch(errors.IncludeWarnings, v => Save(errors with { IncludeWarnings = v }), "On", "Off", "Include warnings in the error counts"));
+
+        var grafanaSource = errors.Source == ErrorsSettings.SourceGrafana;
+        var canTest = grafanaSource ? errors.GrafanaUrl.Length > 0 && hasToken : ErrorsServices.IsConfigured(errors) && signedIn && !azureChanged;
+        var testRow = FlexRow(
+            Button(testing ? "Testing…" : "Test connection", () =>
+            {
+                setTesting(true);
+                setTestResult(null);
+                _ = Task.Run(async () =>
+                {
+                    try { setTestResult(await services.TestGrafanaAsync()); }
+                    finally { setTesting(false); }
+                });
+            }).IsEnabled(!testing && canTest).Flex(shrink: 0),
+            testResult is null
+                ? Empty()
+                : Kit.Muted(testResult.Message).TextWrapping().Foreground(Kit.Fg(testResult.Ok ? Tone.Success : Tone.Danger))
+                    .VAlign(VerticalAlignment.Center)) with { ColumnGap = 12 };
+
+        var connectionRows = new Element[] { sourceRow }
+            .Concat(grafanaSource ? grafanaRows : azureRows)
+            .Concat(new Element[] { warningsRow, testRow })
+            .ToArray();
 
         // ---- Applications -> repositories ----
         void AddBinding()
@@ -159,7 +248,7 @@ sealed class ErrorsSettingsCard : Component<PageContext>
         var bindingRows = new Element[]
         {
             BodyStrong("Applications"),
-            Kit.Muted("The application name is the appname label in the logs. Binding it to a repository is what ties a spike to the right deploys and code.").TextWrapping(),
+            Kit.Muted("The application name is the AppRoleName (Azure) or appname (Grafana) in the logs. Binding it to a repository is what ties a spike to the right deploys and code.").TextWrapping(),
             errors.Bindings.Count == 0
                 ? Kit.Muted("No applications are bound yet.")
                 : VStack(4, errors.Bindings.Select(BindingRow).ToArray()),

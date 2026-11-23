@@ -16,14 +16,14 @@ static class ErrorText
     public static Failure Classify(Exception ex, string? service = null)
     {
         var resetAt = AppServices.Current.GitHub?.Rest.LastRateLimit?.ResetAt;
-        var facts = GitHubFailureFacts.From(ex, resetAt) ?? LinearFailureFacts.From(ex) ?? GrafanaFailureFacts.From(ex);
-        var name = service ?? (ex is LinearException ? "Linear" : ex is GrafanaException ? "Grafana" : "GitHub");
+        var facts = GitHubFailureFacts.From(ex, resetAt) ?? LinearFailureFacts.From(ex) ?? GrafanaFailureFacts.From(ex) ?? LogsFailureFacts.From(ex);
+        var name = service ?? (ex is LinearException ? "Linear" : ex is GrafanaException ? "Grafana" : ex is LogsException ? "The log service" : "GitHub");
         return FailureClassifier.Classify(ex, name, DateTimeOffset.UtcNow, facts);
     }
 
     /// <summary>Facts for the diagnostics runner, which classifies per check.</summary>
     public static FailureFacts? FactsFor(Exception ex) =>
-        GitHubFailureFacts.From(ex, AppServices.Current.GitHub?.Rest.LastRateLimit?.ResetAt) ?? LinearFailureFacts.From(ex) ?? GrafanaFailureFacts.From(ex);
+        GitHubFailureFacts.From(ex, AppServices.Current.GitHub?.Rest.LastRateLimit?.ResetAt) ?? LinearFailureFacts.From(ex) ?? GrafanaFailureFacts.From(ex) ?? LogsFailureFacts.From(ex);
 
     /// <summary>One short sentence or two: what happened and what to do.</summary>
     public static string Describe(Exception ex) => Classify(ex).Message;
