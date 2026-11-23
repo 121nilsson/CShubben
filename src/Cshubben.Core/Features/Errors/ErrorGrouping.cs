@@ -33,6 +33,7 @@ public static class ErrorGrouping
         private readonly ErrorFingerprint _fingerprint;
         private readonly int[] _counts;
         private readonly HashSet<string> _pods = new(StringComparer.Ordinal);
+        private readonly List<LogEntry> _samples = new();
         private int _count;
         private DateTimeOffset _first = DateTimeOffset.MaxValue;
         private DateTimeOffset _last = DateTimeOffset.MinValue;
@@ -51,6 +52,20 @@ public static class ErrorGrouping
             if (entry.Pod.Length > 0) _pods.Add(entry.Pod);
             var index = window.IndexOf(entry.At);
             if (index >= 0) _counts[index]++;
+
+            // Keep the newest few lines whole; the rest are only counted.
+            _samples.Add(entry);
+            if (_samples.Count > MaxSamples * 4)
+                Trim();
+        }
+
+        private const int MaxSamples = 5;
+
+        private void Trim()
+        {
+            var keep = _samples.OrderByDescending(s => s.At).Take(MaxSamples).ToList();
+            _samples.Clear();
+            _samples.AddRange(keep);
         }
 
         public ErrorGroup Build() => new(
@@ -65,6 +80,8 @@ public static class ErrorGrouping
             _pods.OrderBy(p => p, StringComparer.Ordinal).ToList(),
             _counts,
             _fingerprint.Method,
-            _fingerprint.File);
+            _fingerprint.File,
+            _fingerprint.Line,
+            _samples.OrderByDescending(s => s.At).Take(MaxSamples).ToList());
     }
 }

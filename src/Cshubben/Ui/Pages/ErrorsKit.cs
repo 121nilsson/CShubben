@@ -32,6 +32,61 @@ static class ErrorsKit
         return Grid(columns: columns, rows: [GridSize.Star()], bars).Height(height);
     }
 
+    /// <summary>Bars with faint lines at the peak and half of it, and the peak written in the corner, so the height means something.</summary>
+    public static Element GridBars(IReadOnlyList<int> counts, int buckets, double height, Tone tone)
+    {
+        var peak = Peak(counts, buckets);
+        Element line(VerticalAlignment at) =>
+            Border(Empty()).Height(1).Background(Theme.SecondaryText).Opacity(0.18).VAlign(at);
+
+        var chart = Bars(counts, buckets, height, tone);
+        if (peak <= 0) return chart;
+
+        return Grid(
+            columns: [GridSize.Star()],
+            rows: [GridSize.Star()],
+            line(VerticalAlignment.Top),
+            line(VerticalAlignment.Center),
+            chart,
+            TextBlock(peak.ToString()).FontSize(11).Foreground(Theme.SecondaryText).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Top).Margin(2, 2, 0, 0)).Height(height);
+    }
+
+    /// <summary>Two time labels under a zoomed chart: when the slice starts and ends (local clock, with the date when it is not today).</summary>
+    public static Element RangeAxis(DateTimeOffset from, DateTimeOffset to)
+    {
+        static string Label(DateTimeOffset t)
+        {
+            var local = t.ToLocalTime();
+            return local.Date == DateTime.Now.Date ? local.ToString("HH:mm") : local.ToString("MMM d HH:mm");
+        }
+
+        return Grid(
+            columns: [GridSize.Star(), GridSize.Star()],
+            rows: [GridSize.Auto],
+            Kit.Muted(Label(from)).Grid(column: 0),
+            Kit.Muted(Label(to)).HAlign(HorizontalAlignment.Right).Grid(column: 1));
+    }
+
+    /// <summary>Clock times (local) under a chart of the last <paramref name="buckets"/> buckets: five evenly spaced labels, the last one "now".</summary>
+    public static Element TimeAxis(ErrorWindow window, int buckets)
+    {
+        var shown = Math.Min(buckets, window.Buckets);
+        var from = window.End - TimeSpan.FromTicks(window.Step.Ticks * shown);
+        const int labels = 5;
+        var columns = new GridSize[labels];
+        var items = new Element[labels];
+        for (var i = 0; i < labels; i++)
+        {
+            columns[i] = GridSize.Star();
+            var at = from + TimeSpan.FromTicks((window.End - from).Ticks * i / (labels - 1));
+            var text = i == labels - 1 ? "now" : at.ToLocalTime().ToString("HH:mm");
+            var label = Kit.Muted(text);
+            items[i] = (i == 0 ? label : i == labels - 1 ? label.HAlign(HorizontalAlignment.Right) : label.HAlign(HorizontalAlignment.Center)).Grid(column: i);
+        }
+
+        return Grid(columns: columns, rows: [GridSize.Auto], items);
+    }
+
     /// <summary>The highest bucket of the last <paramref name="buckets"/> buckets.</summary>
     public static int Peak(IReadOnlyList<int> counts, int buckets)
     {

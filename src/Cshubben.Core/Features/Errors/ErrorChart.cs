@@ -33,6 +33,57 @@ public static class ErrorChart
     }
 }
 
+/// <summary>A slice of a bucket series with the times it covers.</summary>
+public sealed record ChartRange(IReadOnlyList<int> Counts, DateTimeOffset From, DateTimeOffset To);
+
+public static class ErrorZoom
+{
+    /// <summary>
+    /// The buckets around the time an error was seen, so a short burst fills the chart instead of one bar in a day.
+    /// Covers at least <paramref name="minBuckets"/> buckets, with a little margin on both sides, and never leaves the window.
+    /// </summary>
+    public static ChartRange Around(IReadOnlyList<int> counts, ErrorWindow window, DateTimeOffset first, DateTimeOffset last, int minBuckets = 24)
+    {
+        var total = Math.Min(counts.Count, window.Buckets);
+        if (total == 0) return new ChartRange(Array.Empty<int>(), window.Start, window.End);
+
+        var a = window.IndexOf(first);
+        var b = window.IndexOf(last);
+        if (a < 0) a = 0;
+        if (b < 0) b = total - 1;
+        if (b < a) (a, b) = (b, a);
+
+        var span = b - a + 1;
+        var margin = Math.Max(2, span / 5);
+        var start = a - margin;
+        var end = b + margin;
+        var missing = minBuckets - (end - start + 1);
+        if (missing > 0)
+        {
+            start -= missing / 2;
+            end += missing - missing / 2;
+        }
+
+        if (start < 0)
+        {
+            end -= start;
+            start = 0;
+        }
+
+        if (end > total - 1)
+        {
+            start -= end - (total - 1);
+            end = total - 1;
+        }
+
+        start = Math.Max(0, start);
+        var slice = counts.Skip(start).Take(end - start + 1).ToList();
+        var from = window.Start + TimeSpan.FromTicks(window.Step.Ticks * start);
+        var to = window.Start + TimeSpan.FromTicks(window.Step.Ticks * (end + 1));
+        return new ChartRange(slice, from, to);
+    }
+}
+
 /// <summary>The short texts of the Errors page. Pure, so the wording is tested.</summary>
 public static class ErrorsText
 {
@@ -71,7 +122,8 @@ public static class ErrorsText
     public static string Summary(ErrorsSnapshot snapshot)
     {
         if (snapshot.WithErrors == 0) return "No errors in the last 24 hours";
-        var apps = snapshot.WithErrors.ToString(CultureInfo.InvariantCulture) + (snapshot.WithErrors == 1 ? " app" : " apps") + " with errors";
+        var of = snapshot.Apps.Count > snapshot.WithErrors ? " of " + snapshot.Apps.Count.ToString(CultureInfo.InvariantCulture) : "";
+        var apps = snapshot.WithErrors.ToString(CultureInfo.InvariantCulture) + of + (snapshot.WithErrors == 1 && of.Length == 0 ? " app" : " apps") + " with errors";
         return snapshot.Spiking == 0 ? apps : apps + " · " + snapshot.Spiking.ToString(CultureInfo.InvariantCulture) + " spiking";
     }
 

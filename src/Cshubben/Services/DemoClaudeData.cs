@@ -24,7 +24,13 @@ public sealed class DemoClaudeData : IClaudeAssistant
         var number = Field(user, "Number") ?? "#0";
 
         string text;
-        if (user.Contains("Draft a Linear issue", StringComparison.Ordinal))
+        if (request.SystemPrompt.Contains("diagnose a production or test error", StringComparison.Ordinal))
+        {
+            text = "## What happened\nDemo analysis of **" + (Field(user, "Error") ?? "the error") + "**.\n\n" +
+                   "## Likely cause\nIn the real app Claude reads the log line and the code that was deployed.\n\n" +
+                   "## Already fixed?\nUnknown in demo mode.\n\n## Suggested fix\n-\n\n## What to check\n- Nothing was sent to Claude in demo mode.";
+        }
+        else if (user.Contains("Draft a Linear issue", StringComparison.Ordinal))
         {
             text = "{\"title\": " + Json(Shorten(title, 80)) + ", \"description\": " +
                    Json("## Context\nTracks the work in " + repo + " " + number + ".\n\n## Done when\n- the change is merged\n- follow-up tasks are listed") +
