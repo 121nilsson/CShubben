@@ -34,7 +34,8 @@ public static class RunSelection
     {
         var ordered = runs
             .Where(r => !IsPullRequestEvent(r.Event))
-            .Where(r => now - r.UpdatedAt <= TimeSpan.FromDays(MaxRunAgeDays))
+            // CreatedAt, not UpdatedAt: GitHub bumps updated_at on old runs (retention, re-runs), which made month-old failures look fresh.
+            .Where(r => now - r.CreatedAt <= TimeSpan.FromDays(MaxRunAgeDays))
             .OrderByDescending(r => r.CreatedAt)
             .ThenByDescending(r => r.Id);
         var seen = new HashSet<string>(StringComparer.Ordinal);
