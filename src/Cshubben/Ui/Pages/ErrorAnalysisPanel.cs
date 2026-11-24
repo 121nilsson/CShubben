@@ -17,7 +17,7 @@ namespace Cshubben.Ui.Pages;
 sealed record ErrorAnalysisProps(AppServices Services, ErrorsSettings Errors, AppSpike App, ErrorGroup Group);
 
 /// <summary>An analysis kept for the session, with what it was based on.</summary>
-sealed record ErrorAnalysisCache(ClaudeResult Result, string Basis, DateTimeOffset At);
+sealed record ErrorAnalysisCache(ClaudeResult Result, string Basis, DateTimeOffset At, int Redactions = 0);
 
 /// <summary>
 /// "Ask Claude" for one error. Never runs on its own. On the button it reads the code from GitHub (the commit that was deployed,
@@ -84,7 +84,7 @@ sealed class ErrorAnalysisPanel : Component<ErrorAnalysisProps>
                 if (!result.Success)
                     setError(result.Error == ClaudeErrorKind.AuthFailed ? ClaudeAuth.Hint : (result.ErrorMessage ?? "Claude could not analyse the error."));
                 else
-                    Cache[key] = new ErrorAnalysisCache(result, basis, DateTimeOffset.UtcNow);
+                    Cache[key] = new ErrorAnalysisCache(result, basis, DateTimeOffset.UtcNow, prompt.Redactions);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -121,6 +121,9 @@ sealed class ErrorAnalysisPanel : Component<ErrorAnalysisProps>
             body = VStack(8,
                 Border(Kit.Md(c.Result.Text)).Padding(12).CornerRadius(6).Background(Theme.SubtleFill),
                 Kit.Muted("Based on: " + c.Basis).TextWrapping(),
+                c.Redactions > 0
+                    ? Kit.Muted(c.Redactions + (c.Redactions == 1 ? " sensitive value was" : " sensitive values were") + " hidden before the log text was sent to Claude.").TextWrapping()
+                    : null,
                 Kit.Muted(string.Join(" · ", meta)),
                 Button(copied ? "Copied" : "Copy answer", () => setCopied(ExternalActions.Copy(c.Result.Text))).SubtleButton().HAlign(HorizontalAlignment.Left)
                     .AutomationName("Copy the analysis"));

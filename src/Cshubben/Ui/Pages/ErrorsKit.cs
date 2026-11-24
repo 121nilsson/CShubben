@@ -12,34 +12,45 @@ static class ErrorsKit
 {
     /// <summary>
     /// A row of thin bars, one per bucket, growing from the bottom. The bars share the width they are given (one star column each),
-    /// so the chart never overflows a narrow pane. Empty buckets are a faint 2 px line.
+    /// so the chart never overflows a narrow pane. Empty buckets are a faint 2 px line. <paramref name="markers"/> are the buckets
+    /// (counted in the chart, see <see cref="ErrorMarkers"/>) where a deployment happened; each gets a thin accent line.
     /// </summary>
-    public static Element Bars(IReadOnlyList<int> counts, int buckets, double height, Tone tone, int? scaleMax = null)
+    public static Element Bars(IReadOnlyList<int> counts, int buckets, double height, Tone tone, int? scaleMax = null, IReadOnlyCollection<int>? markers = null)
     {
         var tail = ErrorChart.Tail(counts, buckets);
         var heights = ErrorChart.BarHeights(tail, height, 2, scaleMax);
         var columns = new GridSize[heights.Count];
-        var bars = new Element[heights.Count];
-        for (var i = 0; i < bars.Length; i++)
+        var bars = new List<Element>(heights.Count + (markers?.Count ?? 0));
+        for (var i = 0; i < heights.Count; i++)
         {
             columns[i] = GridSize.Star();
             var bar = heights[i] <= 0
                 ? Border(Empty()).Height(2).Background(Theme.SecondaryText).Opacity(0.3)
                 : Border(Empty()).Height(heights[i]).Background(Kit.Fg(tone));
-            bars[i] = bar.VAlign(VerticalAlignment.Bottom).Margin(0, 0, 1, 0).Grid(column: i);
+            bars.Add(bar.VAlign(VerticalAlignment.Bottom).Margin(0, 0, 1, 0).Grid(column: i));
         }
 
-        return Grid(columns: columns, rows: [GridSize.Star()], bars).Height(height);
+        // Added last, so they are drawn on top of the bars.
+        if (markers is not null)
+        {
+            foreach (var marker in markers)
+            {
+                if (marker < 0 || marker >= heights.Count) continue;
+                bars.Add(Border(Empty()).Width(2).Background(Theme.Accent).HAlign(HorizontalAlignment.Left).Grid(column: marker));
+            }
+        }
+
+        return Grid(columns: columns, rows: [GridSize.Star()], bars.ToArray()).Height(height);
     }
 
     /// <summary>Bars with faint lines at the peak and half of it, and the peak written in the corner, so the height means something.</summary>
-    public static Element GridBars(IReadOnlyList<int> counts, int buckets, double height, Tone tone)
+    public static Element GridBars(IReadOnlyList<int> counts, int buckets, double height, Tone tone, IReadOnlyCollection<int>? markers = null)
     {
         var peak = Peak(counts, buckets);
         Element line(VerticalAlignment at) =>
             Border(Empty()).Height(1).Background(Theme.SecondaryText).Opacity(0.18).VAlign(at);
 
-        var chart = Bars(counts, buckets, height, tone);
+        var chart = Bars(counts, buckets, height, tone, null, markers);
         if (peak <= 0) return chart;
 
         return Grid(

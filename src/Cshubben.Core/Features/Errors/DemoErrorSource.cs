@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Cshubben.Core.Features.Errors;
 
@@ -53,6 +55,34 @@ public sealed class DemoErrorSource : IErrorSource
     public static IReadOnlyList<string> AppNames { get; } = Profiles.Select(p => p.App).ToList();
 
     public bool IsDemo => true;
+
+    /// <summary>
+    /// Made-up deployments of an application (newest last), so the chart markers and "started after deploy" can be seen in demos
+    /// and screenshots. The spiking application got a deployment shortly before its spike began.
+    /// </summary>
+    public static IReadOnlyList<DeployedVersion> DeploysFor(string app, DateTimeOffset now)
+    {
+        var minutesAgo = app switch
+        {
+            "binders-api" => new[] { 1020, 52 },
+            "notifications-messagefactory" => new[] { 400 },
+            "properties-api" => new[] { 1300 },
+            _ => Array.Empty<int>(),
+        };
+
+        var creators = new[] { "anna", "peter" };
+        return minutesAgo
+            .Select((m, i) => new DeployedVersion(
+                "prod",
+                Sha(app + "|" + i.ToString(CultureInfo.InvariantCulture)),
+                "main",
+                creators[i % creators.Length],
+                now - TimeSpan.FromMinutes(m)))
+            .ToList();
+    }
+
+    private static string Sha(string seed) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seed)))[..40].ToLowerInvariant();
 
     public Task<ErrorsSnapshot> LoadAsync(CancellationToken cancellationToken = default)
     {

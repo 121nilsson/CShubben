@@ -1,4 +1,5 @@
 using Cshubben.Core.Features.Errors;
+using Cshubben.Core.Features.GitHub;
 using Cshubben.Core.Features.Settings;
 using Cshubben.Core.Shared;
 
@@ -90,4 +91,37 @@ static class ErrorsServices
 
     /// <summary>The cache key of the groups of one application.</summary>
     public static string GroupsKey(string sourceKey, string app) => sourceKey + "|groups|" + app;
+
+    /// <summary>The cache key of the deployments of one repository and environment.</summary>
+    public static string DeploysKey(string sourceKey, string repo, string environment) => sourceKey + "|deploys|" + repo + "|" + environment;
+
+    /// <summary>
+    /// The recent deployments of the repository an application is bound to (newest last), for the chart markers and for tying a
+    /// spike to a deployment. Empty, never an error, when the application is not bound, GitHub is not connected or the read fails:
+    /// the page is complete without them.
+    /// </summary>
+    public static async Task<IReadOnlyList<DeployedVersion>> DeploysAsync(
+        AppServices services, ErrorsSettings settings, string sourceKey, string app, bool demo, CancellationToken cancellationToken)
+    {
+        if (demo) return DemoErrorSource.DeploysFor(app, DateTimeOffset.UtcNow);
+
+        var repo = RepoBindings.RepoFor(settings, app);
+        if (repo is null || services.GitHub is not { } hub) return Array.Empty<DeployedVersion>();
+
+        var environment = ErrorEnvironment.Guess(settings.Workspace, settings.ResourceGroup, settings.Namespace);
+        return await PageCaches.ErrorDeploys.GetAsync(
+            DeploysKey(sourceKey, repo, environment),
+            PageCaches.ErrorsTtl,
+            async () =>
+            {
+                try
+                {
+                    return await new ErrorContextLoader(hub.Rest).LoadDeploysAsync(repo, environment, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is GitHubException or HttpRequestException or ArgumentException)
+                {
+                    return Array.Empty<DeployedVersion>();
+                }
+            }).ConfigureAwait(false);
+    }
 }
