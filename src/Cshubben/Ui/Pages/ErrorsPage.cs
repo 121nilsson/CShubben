@@ -312,9 +312,9 @@ sealed class ErrorsPage : Component<PageContext>
 
         var commitUrl = startLink is null ? null : ErrorLinks.CommitUrl(repo, startLink.Deploy.Sha);
         var overviewActions = FlexRow(
-            commitUrl is null ? null : Button("Open deploy on GitHub", () => ExternalActions.OpenUrl(commitUrl)).SubtleButton().AutomationName("Open the deployed commit on GitHub"),
+            commitUrl is null ? null : Button("Open deploy on GitHub", () => ExternalActions.OpenUrl(commitUrl)).AutomationName("Open the deployed commit on GitHub"),
             Button("Copy summary", () => ExternalActions.Copy(ErrorReport.App(app, window, found ?? Array.Empty<ErrorGroup>(), onset, startLink, repo, now)))
-                .SubtleButton().AutomationName("Copy a summary of " + app.App))
+                .AutomationName("Copy a summary of " + app.App))
             with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
 
         var overview = Card(VStack(12,
