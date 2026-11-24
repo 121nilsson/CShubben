@@ -13,6 +13,9 @@ public enum NotificationKind
 
     /// <summary>A deployment in an important repo failed (background Drift check).</summary>
     DeployFailed,
+
+    /// <summary>An application started to spike in the logs (background Errors check).</summary>
+    ErrorSpike,
     ChangesRequested,
     ReReviewRequested,
     ReviewRequested,
@@ -118,6 +121,9 @@ public sealed record NotificationPrefs
     /// <summary>A deployment in an important repo failed.</summary>
     public bool DeployFailed { get; init; } = true;
 
+    /// <summary>An application started to spike in the logs.</summary>
+    public bool ErrorSpike { get; init; } = true;
+
     /// <summary>A Linear issue was assigned to me.</summary>
     public bool LinearAssigned { get; init; } = true;
 
@@ -162,6 +168,7 @@ public sealed record NotificationPrefs
         NotificationKind.NewInImportantRepo => NewInImportantRepo,
         NotificationKind.MainRed => MainRed,
         NotificationKind.DeployFailed => DeployFailed,
+        NotificationKind.ErrorSpike => ErrorSpike,
         NotificationKind.LinearAssigned => LinearAssigned,
         NotificationKind.LinearOutOfSync => LinearOutOfSync,
         NotificationKind.Comment => Comment,

@@ -1,4 +1,5 @@
 using Cshubben.Core.Composition;
+using Cshubben.Core.Features.Errors;
 using Cshubben.Core.Features.Notifications;
 using Cshubben.Core.Features.Pipeline;
 using Cshubben.Core.Features.Settings;
@@ -17,17 +18,22 @@ static class BackgroundWatch
 {
     public static readonly TimeSpan DriftEvery = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan LinearEvery = TimeSpan.FromMinutes(3);
+    public static readonly TimeSpan ErrorsEvery = TimeSpan.FromMinutes(5);
     private const int MaxDriftRepos = 8;
 
     private static int _driftBusy;
     private static int _linearBusy;
+    private static int _errorsBusy;
+    private static DateTimeOffset _errorsAt = DateTimeOffset.MinValue;
+    private static IReadOnlyList<WatchedErrorSpike>? _errorsBefore;
+    private static string _errorsKey = "";
     private static DateTimeOffset _driftAt = DateTimeOffset.MinValue;
     private static DateTimeOffset _linearAt = DateTimeOffset.MinValue;
     private static IReadOnlyList<WatchedRepoState>? _driftBefore;
     private static WatchedLinear? _linearBefore;
 
     /// <summary>Call after every successful refresh. Returns at once; the checks run on the thread pool.</summary>
-    public static void Tick(HubSnapshot snapshot, AppSettings settings, bool demo)
+    public static void Tick(HubSnapshot snapshot, AppSettings settings, bool demo, AppServices? services = null)
     {
         try
         {
@@ -43,6 +49,14 @@ static class BackgroundWatch
                     _driftAt = now;
                     _ = Task.Run(() => CheckDriftAsync(repos, settings));
                 }
+            }
+
+            if (prefs.ErrorSpike && services is not null && settings.Errors.Enabled && now - _errorsAt >= ErrorsEvery
+                && ErrorsServices.SourceFor(services, settings.Errors) is { } errors
+                && Interlocked.CompareExchange(ref _errorsBusy, 1, 0) == 0)
+            {
+                _errorsAt = now;
+                _ = Task.Run(() => CheckErrorsAsync(errors.Source, errors.Key, settings));
             }
 
             if ((prefs.LinearAssigned || prefs.LinearOutOfSync) && now - _linearAt >= LinearEvery
@@ -85,6 +99,36 @@ static class BackgroundWatch
         finally
         {
             Interlocked.Exchange(ref _driftBusy, 0);
+        }
+    }
+
+    /// <summary>
+    /// Reads the error counts (the same data and cache as the Errors page, so it opens at once) and reports applications that began
+    /// to spike. Only a saved sign-in is used, so a background check never opens a browser. The first check is a baseline.
+    /// </summary>
+    private static async Task CheckErrorsAsync(IErrorSource source, string key, AppSettings settings)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+            var snapshot = await PageCaches.Errors.GetAsync(key, PageCaches.ErrorsTtl, () => source.LoadAsync(timeout.Token)).ConfigureAwait(false);
+            var state = WatchSources.FromErrors(snapshot);
+
+            // A different source or other settings is a new baseline, not a change.
+            if (!string.Equals(_errorsKey, key, StringComparison.Ordinal)) _errorsBefore = null;
+            _errorsKey = key;
+
+            var events = WatchDiff.Errors(_errorsBefore, state);
+            _errorsBefore = state;
+            NotificationsHub.OnExtra(events, settings);
+        }
+        catch (Exception)
+        {
+            // Not signed in, offline or the service is down: try again later. Keep the last state, so an outage is not a new spike.
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _errorsBusy, 0);
         }
     }
 

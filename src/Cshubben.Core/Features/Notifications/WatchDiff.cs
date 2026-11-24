@@ -20,6 +20,12 @@ public sealed record WatchedRepoState(
     string MainDetail,
     IReadOnlyList<WatchedDeployFailure> DeployFailures);
 
+/// <summary>An application whose errors are spiking, as the background Errors check saw it.</summary>
+/// <param name="App">Application name.</param>
+/// <param name="Key">Identifies this spike (the application and when it began), so the same spike is reported once.</param>
+/// <param name="Text">One line for the toast, for example "181 / h now, 7.5× the usual rate".</param>
+public sealed record WatchedErrorSpike(string App, string Key, string Text);
+
 public sealed record WatchedIssue(string Identifier, string Title, string Url);
 
 /// <summary>A pull request and Linear issue that disagree.</summary>
@@ -65,6 +71,34 @@ public static class WatchDiff
 
         return events;
     }
+
+    /// <summary>Address that a toast carries to open the Errors page on one application.</summary>
+    public const string ErrorsScheme = "cshubben://errors/";
+
+    /// <summary>An application that spikes now and did not at the previous check. A spike that goes on is reported once.</summary>
+    public static IReadOnlyList<NotificationEvent> Errors(IReadOnlyList<WatchedErrorSpike>? previous, IReadOnlyList<WatchedErrorSpike> current)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        if (previous is null) return Array.Empty<NotificationEvent>();
+
+        var known = new HashSet<string>(previous.Select(s => s.App), StringComparer.OrdinalIgnoreCase);
+        var events = new List<NotificationEvent>();
+        foreach (var spike in current)
+        {
+            if (known.Contains(spike.App)) continue;
+            events.Add(new NotificationEvent(
+                "error-spike:" + spike.Key, NotificationKind.ErrorSpike, spike.App, "", 0, spike.Text,
+                ErrorsScheme + Uri.EscapeDataString(spike.App), spike.App));
+        }
+
+        return events;
+    }
+
+    /// <summary>The application in a toast address made by <see cref="Errors"/>, or null when it is not one.</summary>
+    public static string? AppFromErrorsUrl(string? url) =>
+        url is not null && url.StartsWith(ErrorsScheme, StringComparison.Ordinal) && url.Length > ErrorsScheme.Length
+            ? Uri.UnescapeDataString(url[ErrorsScheme.Length..])
+            : null;
 
     public static IReadOnlyList<NotificationEvent> Linear(WatchedLinear? previous, WatchedLinear current)
     {

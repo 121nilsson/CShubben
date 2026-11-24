@@ -50,6 +50,7 @@ sealed class NotificationsSettingsCard : Component
             Check("Ready to merge (approved, green, no conflicts)", prefs.ReadyToMerge, (p, v) => p with { ReadyToMerge = v }),
             Check("Main turns red in an important repo", prefs.MainRed, (p, v) => p with { MainRed = v }),
             Check("A deployment fails in an important repo", prefs.DeployFailed, (p, v) => p with { DeployFailed = v }),
+            Check("An application starts to spike in the error logs (Errors page must be on)", prefs.ErrorSpike, (p, v) => p with { ErrorSpike = v }),
             Check("A Linear issue is assigned to me", prefs.LinearAssigned, (p, v) => p with { LinearAssigned = v }),
             Check("A pull request and its Linear issue disagree (merged but issue open, or issue done but PR open)", prefs.LinearOutOfSync, (p, v) => p with { LinearOutOfSync = v }),
             Check("My pull request was approved", prefs.Approved, (p, v) => p with { Approved = v }),
