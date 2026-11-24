@@ -19,7 +19,7 @@ public class WeeklyBaselineTests
     [Fact]
     public void The_last_week_window_starts_where_the_latest_hour_started_a_week_ago()
     {
-        var week = WeeklyBaseline.WindowFor(Now);
+        var week = WeeklyBaseline.WindowFor(Window, TimeZoneInfo.Utc);
         Assert.Equal(24, week.Buckets);
         Assert.Equal(Window.End.AddHours(-1).AddDays(-7), week.Start);
     }
@@ -113,7 +113,7 @@ public class WeeklyBaselineTests
     [Fact]
     public void The_probe_answer_is_read_as_one_bucket_that_spans_the_window()
     {
-        var window = WeeklyBaseline.WindowFor(Now);
+        var window = WeeklyBaseline.WindowFor(Window, TimeZoneInfo.Utc);
         var probe = new ErrorWindow(window.Start, window.End - window.Start, 1);
         var json = "{\"status\":\"success\",\"data\":{\"resultType\":\"matrix\",\"result\":[{\"metric\":{\"appname\":\"api\"},\"values\":[["
             + probe.End.ToUnixTimeSeconds() + ",\"42\"]]}]}}";
@@ -124,10 +124,42 @@ public class WeeklyBaselineTests
     [Fact]
     public void The_azure_probe_counts_rows_in_the_window_and_reads_the_number()
     {
-        var window = WeeklyBaseline.WindowFor(Now);
+        var window = WeeklyBaseline.WindowFor(Window, TimeZoneInfo.Utc);
         Assert.Contains("summarize n = count()", AzureKql.LogCount(window), StringComparison.Ordinal);
         Assert.Equal(5, AzureKql.ParseCount("{\"results\":[{\"n\":5}]}"));
         Assert.Equal(7, AzureKql.ParseCount("[{\"n\":\"7\"}]"));
         Assert.Equal(0, AzureKql.ParseCount("{\"results\":[]}"));
+    }
+
+    [Fact]
+    public void A_clock_change_in_between_moves_the_window_so_it_is_the_same_time_on_the_wall()
+    {
+        var stockholm = TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm");
+
+        // Tuesday 27 October 2026 12:00 in Stockholm, two days after the clocks went back (CEST +02:00 -> CET +01:00).
+        var tuesday = new ErrorWindow(
+            new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.FromHours(1)) - TimeSpan.FromHours(24), TimeSpan.FromMinutes(5), 288);
+        Assert.Equal(new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.FromHours(1)), tuesday.End);
+
+        var week = WeeklyBaseline.WindowFor(tuesday, stockholm);
+
+        // The latest hour started at 11:00 CET; a week before that is 11:00 on the wall, which was still CEST.
+        Assert.Equal(new DateTimeOffset(2026, 10, 20, 11, 0, 0, TimeSpan.FromHours(2)), week.Start);
+        Assert.Equal(24, week.Buckets);
+        Assert.Equal(tuesday.Step, week.Step);
+
+        // Exactly 7 days of absolute time would have been one hour off.
+        Assert.NotEqual(tuesday.End.AddHours(-1).AddDays(-7), week.Start);
+    }
+
+    [Fact]
+    public void A_wall_clock_time_that_does_not_exist_a_week_earlier_moves_to_the_hour_after()
+    {
+        var stockholm = TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm");
+
+        // 2026-04-05 02:30 CEST + 7 days is 2026-03-29 02:30, which did not exist (clocks went 02:00 -> 03:00).
+        var at = new DateTimeOffset(2026, 4, 5, 2, 30, 0, TimeSpan.FromHours(2));
+        var earlier = WeeklyBaseline.SameLocalTimeLastWeek(at, stockholm);
+        Assert.Equal(new DateTimeOffset(2026, 3, 29, 3, 30, 0, TimeSpan.FromHours(2)), earlier);
     }
 }

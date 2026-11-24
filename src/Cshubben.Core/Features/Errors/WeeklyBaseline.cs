@@ -26,11 +26,24 @@ public static class WeeklyBaseline
     public const double Ratio = 2.0;
 
     /// <summary>
-    /// The window to read for last week: two hours that start where the current latest hour started a week ago. Buckets 0 to 11
-    /// are the hour that matches "now"; the hour after it is context for later use.
+    /// The window to read for last week: two hours that start where the latest hour of <paramref name="current"/> started at the same
+    /// local time of day one week earlier. Buckets 0 to 11 are the hour that matches "now"; the hour after it is context.
+    /// It is built from the window the counts were built from, so both line up on the same buckets. Weekly patterns follow the
+    /// clock on the wall, so a clock change in between moves the window by an hour in absolute time.
     /// </summary>
-    public static ErrorWindow WindowFor(DateTimeOffset now) =>
-        ErrorWindow.Ending(now.AddDays(-7).AddHours(1), ErrorWindow.DefaultStep, 2 * HourBuckets);
+    public static ErrorWindow WindowFor(ErrorWindow current, TimeZoneInfo? zone = null)
+    {
+        var latestHour = current.End - TimeSpan.FromTicks(current.Step.Ticks * HourBuckets);
+        return new ErrorWindow(SameLocalTimeLastWeek(latestHour, zone ?? TimeZoneInfo.Local), current.Step, 2 * HourBuckets);
+    }
+
+    /// <summary>The instant one week earlier on the wall clock of <paramref name="zone"/>.</summary>
+    public static DateTimeOffset SameLocalTimeLastWeek(DateTimeOffset at, TimeZoneInfo zone)
+    {
+        var wall = TimeZoneInfo.ConvertTime(at, zone).DateTime.AddDays(-7);
+        if (zone.IsInvalidTime(wall)) wall = wall.AddHours(1);
+        return new DateTimeOffset(wall, zone.GetUtcOffset(wall));
+    }
 
     /// <summary>Shown instead of a comparison when the logs do not reach back a week.</summary>
     public const string Unavailable = "No comparison with last week: the logs do not reach back that far.";

@@ -40,10 +40,12 @@ public static class DeployCorrelation
 
     /// <summary>
     /// The deployment an error group first showed up after. Null when the group was already there when the window began
-    /// (it did not start with a deployment) or when no deployment came shortly before it.
+    /// (it did not start with a deployment), when no deployment came shortly before it, and when <paramref name="complete"/> is false:
+    /// then older log lines were cut off (see <see cref="GroupSampling"/>), so the first line that was read is not the first one.
     /// </summary>
-    public static DeployLink? FirstSeenLink(IEnumerable<DeployedVersion> deploys, ErrorGroup group, ErrorWindow window)
+    public static DeployLink? FirstSeenLink(IEnumerable<DeployedVersion> deploys, ErrorGroup group, ErrorWindow window, bool complete = true)
     {
+        if (!complete) return null;
         if (group.FirstSeen < window.Start + TimeSpan.FromHours(1)) return null;
         return Link(deploys, group.FirstSeen, NewErrorWindow, window.Step);
     }

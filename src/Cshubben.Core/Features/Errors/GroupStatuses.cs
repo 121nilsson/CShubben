@@ -41,14 +41,17 @@ public enum GroupSort
 /// </summary>
 public static class GroupSampling
 {
-    /// <summary>The most log lines read for one application, and the most groups shown.</summary>
+    /// <summary>The most log lines Loki is asked for per application (<see cref="IErrorSource.LineLimit"/> says what a source really reads), and the most groups shown.</summary>
     public const int MaxLines = 1000;
 
     public const int MaxGroups = 50;
 
-    /// <summary>True when the groups cover every error of the window, false when older lines were cut off.</summary>
-    public static bool IsComplete(IReadOnlyList<ErrorGroup> groups) =>
-        groups.Count < MaxGroups && groups.Sum(g => (long)g.Count) < MaxLines;
+    /// <summary>
+    /// True when the groups cover every error of the window, false when older lines were cut off. <paramref name="lineLimit"/> is
+    /// what the source reads at most (<see cref="IErrorSource.LineLimit"/>): a source that reads fewer lines hits its limit sooner.
+    /// </summary>
+    public static bool IsComplete(IReadOnlyList<ErrorGroup> groups, int lineLimit = MaxLines) =>
+        groups.Count < MaxGroups && groups.Sum(g => (long)g.Count) < lineLimit;
 }
 
 /// <summary>Decides the status of an error group from its counts. Pure, so every rule is tested.</summary>

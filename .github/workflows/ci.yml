@@ -131,9 +131,11 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          # On a pull request GITHUB_SHA is the merge commit; the head commit is the one that was pushed.
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           [ -d shots ] && [ "$(ls -A shots)" ] || { echo "no shots"; exit 0; }
-          printf 'commit %s\n%s\n' "$GITHUB_SHA" "$(date -u +%FT%TZ)" > shots/SOURCE.txt
+          printf 'commit %s\n%s\n' "$SOURCE_SHA" "$(date -u +%FT%TZ)" > shots/SOURCE.txt
           cd shots
           git init -q -b ci-screenshots
           git config user.name "github-actions"

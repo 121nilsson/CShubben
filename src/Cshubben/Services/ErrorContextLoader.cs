@@ -40,7 +40,7 @@ sealed class ErrorContextLoader
             .Take(MaxStatusLookups)
             .ToList();
         var statuses = await Task.WhenAll(candidates.Select(d => GetOptionalAsync(
-            baseUrl + "/deployments/" + d.Id.ToString(CultureInfo.InvariantCulture) + "/statuses?per_page=1", cancellationToken))).ConfigureAwait(false);
+            baseUrl + "/deployments/" + d.Id.ToString(CultureInfo.InvariantCulture) + "/statuses?per_page=10", cancellationToken))).ConfigureAwait(false);
         var picked = DeploySelection.Pick(candidates.Select((d, i) => PipelineJson.WithStatus(d, statuses[i])), firstSeen);
 
         if (picked is null)
@@ -94,7 +94,7 @@ sealed class ErrorContextLoader
     }
 
     /// <summary>
-    /// The latest successful deployments to an environment, oldest first (at most <see cref="MaxDeployLookups"/> are looked at).
+    /// The latest deployments to an environment that succeeded at some point, oldest first (at most <see cref="MaxDeployLookups"/> are looked at).
     /// Used to mark deployments on the charts and to tie a spike or a new error to the deployment before it. Reads only.
     /// </summary>
     public async Task<IReadOnlyList<DeployedVersion>> LoadDeploysAsync(string repo, string environment, CancellationToken cancellationToken = default)
@@ -111,9 +111,9 @@ sealed class ErrorContextLoader
         var statuses = await Task.WhenAll(candidates.Select(d => GetOptionalAsync(
             baseUrl + "/deployments/" + d.Id.ToString(CultureInfo.InvariantCulture) + "/statuses?per_page=1", cancellationToken))).ConfigureAwait(false);
 
+        // A deployment counts when it ever succeeded: older ones are "inactive" by now, their newest status says nothing about it.
         return candidates
-            .Select((d, i) => PipelineJson.WithStatus(d, statuses[i]))
-            .Where(d => d.State == DeployState.Success && PipelineJson.IsSha(d.Sha))
+            .Where((d, i) => PipelineJson.EverSucceeded(statuses[i]) && PipelineJson.IsSha(d.Sha))
             .OrderBy(d => d.CreatedAt)
             .Select(d => new DeployedVersion(environment, d.Sha, d.Ref, d.Creator, d.CreatedAt))
             .ToList();

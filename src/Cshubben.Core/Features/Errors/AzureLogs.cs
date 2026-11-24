@@ -38,6 +38,13 @@ public static class AzureKql
         + " | summarize n = count() by AppRoleName, bucket = bin(TimeGenerated, "
         + ((long)window.Step.TotalSeconds).ToString(CultureInfo.InvariantCulture) + "s)";
 
+    /// <summary>
+    /// How many hours back the tool must look to reach the start of <paramref name="window"/>, with an hour to spare. The tool only
+    /// looks as far back as it is told to (25 hours by default), so anything older needs this.
+    /// </summary>
+    public static int LookbackHours(DateTimeOffset now, ErrorWindow window) =>
+        Math.Max(1, (int)Math.Ceiling((now - window.Start).TotalHours)) + 1;
+
     /// <summary>How many log rows of any kind exist in the window, to tell "no errors" from "no logs".</summary>
     public static string LogCount(ErrorWindow window) =>
         "AppTraces | where TimeGenerated >= " + Time(window.Start) + " and TimeGenerated < " + Time(window.End)
@@ -211,6 +218,11 @@ public sealed class AzureLogsErrorSource : IErrorSource
 
     public bool IsDemo => false;
 
+    /// <summary>The most rows read for the error groups of one application.</summary>
+    public const int GroupRowLimit = 400;
+
+    public int LineLimit => GroupRowLimit;
+
     public async Task<ErrorsSnapshot> LoadAsync(CancellationToken cancellationToken = default)
     {
         var now = _clock();
@@ -222,17 +234,16 @@ public sealed class AzureLogsErrorSource : IErrorSource
     public async Task<IReadOnlyList<ErrorGroup>> LoadGroupsAsync(string app, CancellationToken cancellationToken = default)
     {
         var window = ErrorWindow.Default(_clock());
-        var text = await RunAsync("AppExceptions", AzureKql.ErrorLines(window, app, _query.IncludeWarnings, 400), 400, cancellationToken).ConfigureAwait(false);
+        var text = await RunAsync("AppExceptions", AzureKql.ErrorLines(window, app, _query.IncludeWarnings, GroupRowLimit), GroupRowLimit, cancellationToken).ConfigureAwait(false);
         return ErrorGrouping.Group(AzureKql.ParseLines(text, app), window);
     }
 
-    public async Task<LastWeekLogs> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    public async Task<LastWeekLogs> LoadLastWeekAsync(ErrorWindow current, CancellationToken cancellationToken = default)
     {
-        var now = _clock();
-        var window = WeeklyBaseline.WindowFor(now);
+        var window = WeeklyBaseline.WindowFor(current);
 
         // The tool only looks back as many hours as it is told to (25 by default), so ask for the week and a bit.
-        var hours = (int)Math.Ceiling((now - window.Start).TotalHours) + 1;
+        var hours = AzureKql.LookbackHours(_clock(), window);
         var any = await RunAsync("AppTraces", AzureKql.LogCount(window), 1, cancellationToken, hours).ConfigureAwait(false);
         if (AzureKql.ParseCount(any) <= 0) return new LastWeekLogs(Array.Empty<ErrorSeries>(), false);
 

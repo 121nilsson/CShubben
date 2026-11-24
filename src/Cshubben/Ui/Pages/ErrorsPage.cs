@@ -90,15 +90,15 @@ sealed class ErrorsPage : Component<PageContext>
 
         // Same hour a week ago, for "usual for this time of week". Also a bonus: null when it cannot be read.
         var lastWeek = UseResource<LastWeekLogs?>(
-            async ct => resolved is { } r ? await ErrorsServices.LastWeekAsync(r.Source, r.Key, ct) : null,
-            new object[] { sourceKey, tick });
+            async ct => resolved is { } r && snapshot is not null ? await ErrorsServices.LastWeekAsync(r.Source, r.Key, snapshot.Window, ct) : null,
+            new object[] { sourceKey, tick, snapshot?.Window.End.ToUnixTimeSeconds() ?? 0L });
 
         void Refresh()
         {
             if (resolved is { } r)
             {
                 PageCaches.Errors.Remove(r.Key);
-                PageCaches.ErrorLastWeek.Remove(ErrorsServices.LastWeekKey(r.Key));
+                if (snapshot is not null) PageCaches.ErrorLastWeek.Remove(ErrorsServices.LastWeekKey(r.Key, snapshot.Window));
                 if (selected is not null)
                 {
                     PageCaches.ErrorGroups.Remove(ErrorsServices.GroupsKey(r.Key, selected.App));
@@ -160,7 +160,7 @@ sealed class ErrorsPage : Component<PageContext>
                 var list = AppList(snapshot, selected, Pick, quietOpen, setQuietOpen);
                 var detail = selected is null
                     ? Card(Kit.Muted("Pick an application."))
-                    : Detail(ctx, errors, snapshot, selected, groups, deploys, Parts.Peek(lastWeek), now, Refresh, expanded, setExpanded, sort, setSort);
+                    : Detail(ctx, errors, snapshot, selected, groups, deploys, Parts.Peek(lastWeek), resolved?.Source.LineLimit ?? GroupSampling.MaxLines, now, Refresh, expanded, setExpanded, sort, setSort);
 
                 if (narrow)
                 {
@@ -289,6 +289,7 @@ sealed class ErrorsPage : Component<PageContext>
         AsyncValue<IReadOnlyList<ErrorGroup>> groups,
         AsyncValue<IReadOnlyList<DeployedVersion>> deployments,
         LastWeekLogs? lastWeek,
+        int lineLimit,
         DateTimeOffset now,
         Action refresh,
         string expanded,
@@ -370,7 +371,7 @@ sealed class ErrorsPage : Component<PageContext>
         else
         {
             // The groups come from the newest log lines only; when that cut off older ones, "new" cannot be told from "old".
-            var complete = GroupSampling.IsComplete(found);
+            var complete = GroupSampling.IsComplete(found, lineLimit);
             var ordered = GroupOrdering.Order(found, sort, window, now, complete);
 
             var items = new List<Element?>
@@ -378,7 +379,7 @@ sealed class ErrorsPage : Component<PageContext>
                 found.Count > 1 ? SortBar(sort, setSort) : null,
                 complete
                     ? null
-                    : Kit.Muted("Showing the newest " + GroupSampling.MaxLines + " log lines. Older errors are counted in the chart but not listed here, and \"new\" is not shown.").TextWrapping(),
+                    : Kit.Muted("Showing the newest " + lineLimit + " log lines. Older errors are counted in the chart but not listed here, and \"new\" is not shown.").TextWrapping(),
             };
             items.AddRange(ordered.Select(g => (Element?)GroupCard(
                 ctx.Services, errors, app, g, window, now, deploys, running, complete,
@@ -424,7 +425,7 @@ sealed class ErrorsPage : Component<PageContext>
         Action toggle)
     {
         var status = GroupStatuses.Of(group, window, now, complete);
-        var firstSeenAfter = DeployCorrelation.FirstSeenLink(deploys, group, window);
+        var firstSeenAfter = DeployCorrelation.FirstSeenLink(deploys, group, window, complete);
         var warning = group.Kind == ErrorKind.MissingBackendRole;
         var tone = warning ? Tone.Warning : Tone.Danger;
         var repo = RepoBindings.RepoForNamespace(errors, group.Method);
@@ -531,7 +532,7 @@ sealed class ErrorsPage : Component<PageContext>
             with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
 
         var issueDraft = ErrorIssue.Draft(app.App, group, status, repo, running, firstSeenAfter, now);
-        var issue = Component<ErrorIssueButton, ErrorIssueProps>(new ErrorIssueProps(issueDraft, app.App + "|" + group.Key));
+        var issue = Component<ErrorIssueButton, ErrorIssueProps>(new ErrorIssueProps(issueDraft, app.App + "|" + group.Key)).WithKey("issue|" + app.App + "|" + group.Key);
 
         Element? trace = null;
         if (latest is not null)

@@ -6,6 +6,17 @@ namespace Cshubben.Core.Tests.Errors;
 public class ErrorLinksTests
 {
     [Fact]
+    public void The_path_from_a_log_line_cannot_break_or_redirect_the_link()
+    {
+        Assert.Equal(
+            "https://github.com/o/r/blob/HEAD/src/Proj/My%20File%231.cs#L3",
+            ErrorLinks.FileUrl("o/r", "Proj/My File#1.cs", 3));
+        Assert.Equal("https://github.com/o/r/blob/HEAD/src/etc/passwd", ErrorLinks.FileUrl("o/r", "../../etc/./passwd", null));
+        Assert.Equal("https://github.com/o/r/blob/HEAD/src/Proj/File.cs", ErrorLinks.FileUrl("o/r", "Proj\\File.cs", null));
+        Assert.Equal("https://github.com/o/r/blob/HEAD/src/Proj/File.cs", ErrorLinks.FileUrl("o/r", "/Proj/File.cs", null));
+    }
+
+    [Fact]
     public void A_file_link_points_at_the_deployed_commit_when_it_is_known_and_at_HEAD_when_not()
     {
         Assert.Equal(
@@ -21,6 +32,7 @@ public class ErrorLinksTests
     public void Without_a_repository_or_a_file_there_is_no_link()
     {
         Assert.Null(ErrorLinks.FileUrl(null, "Proj/File.cs", 1));
+        Assert.Null(ErrorLinks.FileUrl("o/r", "../..", 1));
         Assert.Null(ErrorLinks.FileUrl("o/r", null, 1));
         Assert.Null(ErrorLinks.CommitUrl("o/r", ""));
         Assert.Equal("https://github.com/o/r/commit/abc1234", ErrorLinks.CommitUrl("o/r", "abc1234"));

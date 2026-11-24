@@ -191,6 +191,13 @@ public static class PipelineJson
         return result;
     }
 
+    /// <summary>
+    /// True when any status of <c>GET /deployments/{id}/statuses</c> is "success". The newest status is not enough: once a newer
+    /// deployment succeeds, GitHub marks the older ones "inactive", but they did go out.
+    /// </summary>
+    public static bool EverSucceeded(JsonElement? statuses) =>
+        Js.Items(statuses).Any(s => string.Equals(Js.Str(s, "state"), "success", StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Applies the newest status from <c>GET /deployments/{id}/statuses</c> (a JSON array, newest first).</summary>
     public static Deployment WithStatus(Deployment deployment, JsonElement? statuses)
     {

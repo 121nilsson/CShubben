@@ -16,7 +16,7 @@ public static class LogRedactor
 
     private const string Hidden = "[text hidden: it could not be checked for sensitive values]";
 
-    private sealed record Rule(Regex Pattern, string Replacement);
+    private sealed record Rule(Regex Pattern, string Replacement, Func<Match, bool>? Accept = null);
 
     private static Regex Make(string pattern, bool ignoreCase = false) =>
         new(pattern, RegexOptions.CultureInvariant | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None), Timeout);
@@ -31,15 +31,25 @@ public static class LogRedactor
         // JSON web tokens: three base64url parts, the first of which is a JSON object (it starts with "eyJ").
         new(Make(@"\beyJ[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]{5,}"), "<token>"),
 
+        // Keys and tokens with a well-known shape, even without a "token=" in front of them: GitHub, Slack, AWS and "sk-" API keys.
+        new(Make(@"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9\-]{10,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_\-]{20,})"), "<token>"),
+
         // "Bearer" and "Basic" are also ordinary words: a bearer token has a digit or a dot in it, and a Basic credential only
         // counts after an Authorization header.
         new(Make(@"\bBearer\s+(?=[A-Za-z0-9._~+/\-]*(?:\d|\.[A-Za-z0-9]))[A-Za-z0-9._~+/\-]{8,}=*", ignoreCase: true), "Bearer <token>"),
         new(Make(@"(?<=\bAuthorization[""']?\s*[:=]\s*[""']?)Basic\s+[A-Za-z0-9+/]{8,}=*", ignoreCase: true), "Basic <token>"),
 
-        // password=..., "client_secret": "...", AccountKey=..., sig=... (connection strings, query strings, JSON).
+        // password=..., "pwd": "...": a password can hold spaces, so an unquoted one runs to the next ; , & quote or line end, or to the next "word:" or "word=".
         new(
             Make(
-                @"(?<key>\b(?:password|passwd|pwd|secret|client_?secret|api_?key|access_?token|refresh_?token|account_?key|shared_?access_?key|sas_?token|signature)\b)(?<sep>[""']?\s*[=:]\s*)(?<val>""[^""]*""|'[^']*'|[^\s;,&""']+)",
+                @"(?<key>\b(?:password|passwd|pwd)\b)(?<sep>[""']?\s*[=:]\s*)(?<val>""[^""]*""|'[^']*'|(?:(?!\s+[A-Za-z_][\w.\-]*\s*[=:])[^;&,""'\r\n])*[^\s;&,""'\r\n])",
+                ignoreCase: true),
+            "${key}${sep}<redacted>"),
+
+        // "client_secret": "...", AccountKey=..., api_key=... (connection strings, query strings, JSON).
+        new(
+            Make(
+                @"(?<key>\b(?:secret|client_?secret|api_?key|access_?token|refresh_?token|account_?key|shared_?access_?key|sas_?token|signature)\b)(?<sep>[""']?\s*[=:]\s*)(?<val>""[^""]*""|'[^']*'|[^\s;,&""']+)",
                 ignoreCase: true),
             "${key}${sep}<redacted>"),
 
@@ -48,11 +58,38 @@ public static class LogRedactor
         // Swedish personal identity number: 811218-9876, 19811218-9876 (always with the dash or plus).
         new(Make(@"(?<![\w\-])(?:19|20)?\d{6}[-+]\d{4}(?![\w\-])"), "<personal-id>"),
 
+        // Twelve digits without a dash: only when the date is possible and the Luhn check digit fits, so ordinary numbers stay.
+        new(
+            Make(@"(?<![\w\-.+])(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{4}(?![\w\-.])"),
+            "<personal-id>",
+            m => LuhnOk(m.Value[2..])),
+
+        // IPv6 address, written in full or with "::" (a bare "::" or a name such as Foo::Bar is not one).
+        new(Make(@"(?<![\w:.])(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}(?![\w:.])"), "<ip>"),
+        new(
+            Make(@"(?<![\w:.])(?:(?:[0-9A-Fa-f]{1,4}:){1,7}:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})?|::[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})(?![\w:.])"),
+            "<ip>"),
+
         // IPv4 address; assembly versions such as Version=4.0.0.0 are left alone.
         new(
             Make(@"(?<![\d.])(?<!Version=)(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?![\d.])"),
             "<ip>"),
     };
+
+    /// <summary>The Luhn check of ten digits, as used for Swedish personal identity numbers.</summary>
+    private static bool LuhnOk(string tenDigits)
+    {
+        var sum = 0;
+        for (var i = 0; i < tenDigits.Length; i++)
+        {
+            var d = tenDigits[i] - '0';
+            if (i % 2 == 0) d *= 2;
+            if (d > 9) d -= 9;
+            sum += d;
+        }
+
+        return tenDigits.Length == 10 && sum % 10 == 0;
+    }
 
     /// <summary>The text without sensitive values, and how many there were.</summary>
     public static Redacted Apply(string? text)
@@ -69,6 +106,7 @@ public static class LogRedactor
                 {
                     // Already redacted by an earlier pass.
                     if (match.Value.EndsWith("<redacted>", StringComparison.Ordinal)) return match.Value;
+                    if (rule.Accept is { } accept && !accept(match)) return match.Value;
                     count++;
                     return match.Result(rule.Replacement);
                 });

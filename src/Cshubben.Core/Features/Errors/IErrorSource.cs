@@ -6,14 +6,23 @@ public interface IErrorSource
     /// <summary>True when the data is made up.</summary>
     bool IsDemo { get; }
 
+    /// <summary>
+    /// The most log lines <see cref="LoadGroupsAsync"/> reads for one application (newest first). When the groups add up to this many,
+    /// older lines were cut off (see <see cref="GroupSampling"/>).
+    /// </summary>
+    int LineLimit { get; }
+
     /// <summary>Counts per application for the last 24 hours, analysed.</summary>
     Task<ErrorsSnapshot> LoadAsync(CancellationToken cancellationToken = default);
 
     /// <summary>The error groups of one application for the last 24 hours, most frequent first.</summary>
     Task<IReadOnlyList<ErrorGroup>> LoadGroupsAsync(string app, CancellationToken cancellationToken = default);
 
-    /// <summary>Counts per application for the two hours that start where the latest hour started one week ago (see <see cref="WeeklyBaseline"/>), after checking that the logs reach back that far.</summary>
-    Task<LastWeekLogs> LoadLastWeekAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Counts per application for the two hours that start where the latest hour of <paramref name="current"/> started one week ago
+    /// (see <see cref="WeeklyBaseline"/>), after checking that the logs reach back that far.
+    /// </summary>
+    Task<LastWeekLogs> LoadLastWeekAsync(ErrorWindow current, CancellationToken cancellationToken = default);
 }
 
 /// <summary>What to read from Grafana. The caller builds it from the settings (this slice does not know about settings).</summary>
@@ -40,6 +49,8 @@ public sealed class GrafanaErrorSource : IErrorSource
 
     public bool IsDemo => false;
 
+    public int LineLimit => GroupSampling.MaxLines;
+
     public async Task<ErrorsSnapshot> LoadAsync(CancellationToken cancellationToken = default)
     {
         var source = await SourceAsync(cancellationToken).ConfigureAwait(false);
@@ -54,15 +65,15 @@ public sealed class GrafanaErrorSource : IErrorSource
     {
         var source = await SourceAsync(cancellationToken).ConfigureAwait(false);
         var window = ErrorWindow.Default(_clock());
-        var lines = await _client.GetErrorLinesAsync(source, window, _query.Namespace, app, _query.IncludeWarnings, 1000, cancellationToken)
+        var lines = await _client.GetErrorLinesAsync(source, window, _query.Namespace, app, _query.IncludeWarnings, LineLimit, cancellationToken)
             .ConfigureAwait(false);
         return ErrorGrouping.Group(lines, window);
     }
 
-    public async Task<LastWeekLogs> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    public async Task<LastWeekLogs> LoadLastWeekAsync(ErrorWindow current, CancellationToken cancellationToken = default)
     {
         var source = await SourceAsync(cancellationToken).ConfigureAwait(false);
-        var window = WeeklyBaseline.WindowFor(_clock());
+        var window = WeeklyBaseline.WindowFor(current);
         if (!await _client.HasLogsAsync(source, window, _query.Namespace, cancellationToken).ConfigureAwait(false))
             return new LastWeekLogs(Array.Empty<ErrorSeries>(), false);
 

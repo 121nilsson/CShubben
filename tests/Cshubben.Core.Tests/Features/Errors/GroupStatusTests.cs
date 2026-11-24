@@ -132,6 +132,18 @@ public class GroupStatusTests
         Assert.True(GroupSampling.IsComplete(Array.Empty<ErrorGroup>()));
     }
 
+    [Fact]
+    public void A_source_that_reads_fewer_lines_is_cut_off_sooner()
+    {
+        ErrorGroup G(int count) => Group("g" + count, TimeSpan.FromHours(1), TimeSpan.FromMinutes(1), count);
+
+        // 400 lines in total is plenty for Loki (1000) but all that Azure reads (400): older lines are missing.
+        var groups = new[] { G(300), G(100) };
+        Assert.True(GroupSampling.IsComplete(groups));
+        Assert.False(GroupSampling.IsComplete(groups, AzureLogsErrorSource.GroupRowLimit));
+        Assert.True(GroupSampling.IsComplete(new[] { G(300), G(99) }, AzureLogsErrorSource.GroupRowLimit));
+    }
+
     [Theory]
     [InlineData(GroupSort.Frequent, "Most frequent")]
     [InlineData(GroupSort.Latest, "Latest")]
