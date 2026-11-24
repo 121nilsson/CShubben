@@ -166,6 +166,15 @@ public class PipelineJsonTests
     }
 
     [Fact]
+    public void Old_run_with_a_recently_bumped_updated_at_is_still_old()
+    {
+        var created = Now - TimeSpan.FromDays(30);
+        var stale = new WorkflowRun(1, "Manual build and deploy", RunState.Failure, "main", "a1b2c3d4e5f6", "workflow_dispatch",
+            "https://github.com/acme/api/actions/runs/1", created, Now - TimeSpan.FromDays(2));
+        Assert.Empty(RunSelection.LatestPerWorkflow(new[] { stale }, Now));
+    }
+
+    [Fact]
     public void Latest_deployment_per_environment_wins_and_noise_is_dropped()
     {
         var latest = RunSelection.LatestPerEnvironment(new[]
