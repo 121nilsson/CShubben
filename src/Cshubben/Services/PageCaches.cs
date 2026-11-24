@@ -21,7 +21,7 @@ static class PageCaches
     public static readonly StaleCache<ErrorsSnapshot> Errors = new();
     public static readonly StaleCache<IReadOnlyList<ErrorGroup>> ErrorGroups = new();
     public static readonly StaleCache<IReadOnlyList<DeployedVersion>> ErrorDeploys = new();
-    public static readonly StaleCache<IReadOnlyList<ErrorSeries>> ErrorLastWeek = new();
+    public static readonly StaleCache<LastWeekLogs> ErrorLastWeek = new();
 
     private static readonly Dictionary<string, DateTimeOffset> Saved = new();
 

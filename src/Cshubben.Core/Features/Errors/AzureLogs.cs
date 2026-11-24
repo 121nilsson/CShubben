@@ -38,6 +38,18 @@ public static class AzureKql
         + " | summarize n = count() by AppRoleName, bucket = bin(TimeGenerated, "
         + ((long)window.Step.TotalSeconds).ToString(CultureInfo.InvariantCulture) + "s)";
 
+    /// <summary>How many log rows of any kind exist in the window, to tell "no errors" from "no logs".</summary>
+    public static string LogCount(ErrorWindow window) =>
+        "AppTraces | where TimeGenerated >= " + Time(window.Start) + " and TimeGenerated < " + Time(window.End)
+        + " | summarize n = count()";
+
+    /// <summary>The number in the first row of a <c>summarize n = count()</c> answer; 0 when there is no row.</summary>
+    public static long ParseCount(string text)
+    {
+        var rows = Rows(text);
+        return rows.Count > 0 && TryNumber(rows[0], "n", out var n) ? (long)n : 0;
+    }
+
     /// <summary>The newest error rows of one application, with the exception's stack as JSON for <see cref="ParseLines"/>.</summary>
     public static string ErrorLines(ErrorWindow window, string app, bool includeWarnings, int limit) =>
         "union"
@@ -214,11 +226,18 @@ public sealed class AzureLogsErrorSource : IErrorSource
         return ErrorGrouping.Group(AzureKql.ParseLines(text, app), window);
     }
 
-    public async Task<IReadOnlyList<ErrorSeries>> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    public async Task<LastWeekLogs> LoadLastWeekAsync(CancellationToken cancellationToken = default)
     {
-        var window = WeeklyBaseline.WindowFor(_clock());
-        var text = await RunAsync("AppTraces", AzureKql.ErrorCounts(window, _query.IncludeWarnings), 5000, cancellationToken).ConfigureAwait(false);
-        return AzureKql.ParseCounts(text, window);
+        var now = _clock();
+        var window = WeeklyBaseline.WindowFor(now);
+
+        // The tool only looks back as many hours as it is told to (25 by default), so ask for the week and a bit.
+        var hours = (int)Math.Ceiling((now - window.Start).TotalHours) + 1;
+        var any = await RunAsync("AppTraces", AzureKql.LogCount(window), 1, cancellationToken, hours).ConfigureAwait(false);
+        if (AzureKql.ParseCount(any) <= 0) return new LastWeekLogs(Array.Empty<ErrorSeries>(), false);
+
+        var text = await RunAsync("AppTraces", AzureKql.ErrorCounts(window, _query.IncludeWarnings), 5000, cancellationToken, hours).ConfigureAwait(false);
+        return new LastWeekLogs(AzureKql.ParseCounts(text, window), true);
     }
 
     /// <summary>A cheap check for the Test connection button: counts the traces of the last hour.</summary>
