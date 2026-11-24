@@ -15,6 +15,7 @@ namespace Cshubben.Services;
 sealed class ErrorContextLoader
 {
     private const int MaxStatusLookups = 6;
+    private const int MaxDeployLookups = 10;
     private readonly GitHubRest _rest;
 
     public ErrorContextLoader(GitHubRest rest)
@@ -90,6 +91,32 @@ sealed class ErrorContextLoader
 
         return new ErrorCodeContext(repo, branch, environment, deployed, prText, note, path2, atDeployed, atDefault,
             changed, PipelineJson.AheadBy(cmp), shownCommits, patch);
+    }
+
+    /// <summary>
+    /// The latest successful deployments to an environment, oldest first (at most <see cref="MaxDeployLookups"/> are looked at).
+    /// Used to mark deployments on the charts and to tie a spike or a new error to the deployment before it. Reads only.
+    /// </summary>
+    public async Task<IReadOnlyList<DeployedVersion>> LoadDeploysAsync(string repo, string environment, CancellationToken cancellationToken = default)
+    {
+        var (owner, name) = GitHubNames.SplitRepo(repo);
+        var baseUrl = GitHubRest.ApiBase + "/repos/" + owner + "/" + name;
+
+        var deployments = await GetOptionalAsync(
+            baseUrl + "/deployments?per_page=30&environment=" + Uri.EscapeDataString(environment), cancellationToken).ConfigureAwait(false);
+        var candidates = PipelineJson.ParseDeployments(deployments)
+            .OrderByDescending(d => d.CreatedAt)
+            .Take(MaxDeployLookups)
+            .ToList();
+        var statuses = await Task.WhenAll(candidates.Select(d => GetOptionalAsync(
+            baseUrl + "/deployments/" + d.Id.ToString(CultureInfo.InvariantCulture) + "/statuses?per_page=1", cancellationToken))).ConfigureAwait(false);
+
+        return candidates
+            .Select((d, i) => PipelineJson.WithStatus(d, statuses[i]))
+            .Where(d => d.State == DeployState.Success && PipelineJson.IsSha(d.Sha))
+            .OrderBy(d => d.CreatedAt)
+            .Select(d => new DeployedVersion(environment, d.Sha, d.Ref, d.Creator, d.CreatedAt))
+            .ToList();
     }
 
     /// <summary>

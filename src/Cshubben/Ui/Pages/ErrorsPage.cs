@@ -14,7 +14,9 @@ namespace Cshubben.Ui.Pages;
 /// <summary>
 /// Errors: which applications have errors in the logs, which ones are spiking, and what the errors are. A list of applications
 /// on the left (rate, trend, a small chart), the picked application on the right (a bigger chart of the last six hours and the
-/// error groups). The page only exists while the module is switched on in Settings. Deploy markers and Claude's analysis come later.
+/// error groups). The page only exists while the module is switched on in Settings. Deployments of the bound repository are marked on
+/// the charts, a spike is tied to the deployment before it, error groups show whether they are new or rising and can be sorted,
+/// and summaries can be copied. Claude's analysis is in <see cref="ErrorAnalysisPanel"/>.
 /// </summary>
 sealed class ErrorsPage : Component<PageContext>
 {
@@ -35,6 +37,7 @@ sealed class ErrorsPage : Component<PageContext>
         var (showDetail, setShowDetail) = UseState(false);
         var (quietOpen, setQuietOpen) = UseState(false);
         var (expanded, setExpanded) = UseState("");
+        var (sort, setSort) = UseState(GroupSort.Frequent);
 
         var resolved = ErrorsServices.SourceFor(ctx.Services, errors);
         var sourceKey = resolved?.Key ?? "";
@@ -59,12 +62,26 @@ sealed class ErrorsPage : Component<PageContext>
             },
             new object[] { sourceKey, selected?.App ?? "", tick });
 
+        // Deployments are a bonus: without them (not bound, no GitHub) the page is complete, only without markers.
+        var deploys = UseResource<IReadOnlyList<DeployedVersion>>(
+            async ct =>
+            {
+                if (resolved is not { } r || selected is null) return Array.Empty<DeployedVersion>();
+                return await ErrorsServices.DeploysAsync(ctx.Services, errors, r.Key, selected.App, r.Source.IsDemo, ct);
+            },
+            new object[] { sourceKey, selected?.App ?? "", tick });
+
         void Refresh()
         {
             if (resolved is { } r)
             {
                 PageCaches.Errors.Remove(r.Key);
-                if (selected is not null) PageCaches.ErrorGroups.Remove(ErrorsServices.GroupsKey(r.Key, selected.App));
+                if (selected is not null)
+                {
+                    PageCaches.ErrorGroups.Remove(ErrorsServices.GroupsKey(r.Key, selected.App));
+                    if (RepoBindings.RepoFor(errors, selected.App) is { } bound)
+                        PageCaches.ErrorDeploys.Remove(ErrorsServices.DeploysKey(r.Key, bound, ErrorEnvironment.Guess(errors.Workspace, errors.ResourceGroup, errors.Namespace)));
+                }
             }
 
             setTick(tick + 1);
@@ -73,7 +90,7 @@ sealed class ErrorsPage : Component<PageContext>
         var loading = Parts.IsLoading(overview) || overview is AsyncValue<ErrorsSnapshot>.Reloading;
         var subtitle = snapshot is null
             ? "Error spikes from your logs"
-            : ErrorsText.Summary(snapshot) + (resolved?.Source.IsDemo == true ? " · demo data" : "");
+            : ErrorsText.Summary(snapshot) + " · updated " + ErrorsText.Ago(snapshot.At, DateTimeOffset.UtcNow) + (resolved?.Source.IsDemo == true ? " · demo data" : "");
 
         var header = Grid(
             columns: [GridSize.Star(), GridSize.Auto],
@@ -120,7 +137,7 @@ sealed class ErrorsPage : Component<PageContext>
                 var list = AppList(snapshot, selected, Pick, quietOpen, setQuietOpen);
                 var detail = selected is null
                     ? Card(Kit.Muted("Pick an application."))
-                    : Detail(ctx, errors, snapshot, selected, groups, now, Refresh, expanded, setExpanded);
+                    : Detail(ctx, errors, snapshot, selected, groups, deploys, now, Refresh, expanded, setExpanded, sort, setSort);
 
                 if (narrow)
                 {
@@ -247,12 +264,19 @@ sealed class ErrorsPage : Component<PageContext>
         ErrorsSnapshot snapshot,
         AppSpike app,
         AsyncValue<IReadOnlyList<ErrorGroup>> groups,
+        AsyncValue<IReadOnlyList<DeployedVersion>> deployments,
         DateTimeOffset now,
         Action refresh,
         string expanded,
-        Action<string> setExpanded)
+        Action<string> setExpanded,
+        GroupSort sort,
+        Action<GroupSort> setSort)
     {
+        var window = snapshot.Window;
         var repo = RepoBindings.RepoFor(errors, app.App);
+        var found = Parts.Peek(groups);
+        var deploys = Parts.Peek(deployments) ?? (IReadOnlyList<DeployedVersion>)Array.Empty<DeployedVersion>();
+        var running = DeployCorrelation.Before(deploys, now);
         Element? bindBanner = repo is null
             ? Kit.Banner(Tone.Accent, "Not bound to a repository",
                 "Bind " + app.App + " to a repository to tie a spike to recent deploys and code.",
@@ -265,22 +289,44 @@ sealed class ErrorsPage : Component<PageContext>
             Kit.Pill(ErrorsText.TrendGlyph(app.Trend) + " " + ErrorsText.TrendWord(app.Trend), Tone.Neutral),
             Kit.Pill(app.Total + (app.Total == 1 ? " error" : " errors") + " in 24 h", Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 6 };
 
+        // Deployments on the chart: a thin line in the bucket of each one.
+        var markers = ErrorMarkers.Indices(
+            ErrorMarkers.TailFrom(window, ChartBars), window.Step, Math.Min(ChartBars, window.Buckets), deploys.Select(d => d.DeployedAt));
+
         var chart = app.Total == 0
             ? (Element)Kit.Muted("No errors in the last 24 hours.")
             : VStack(4,
-                ErrorsKit.GridBars(app.Counts, ChartBars, 110, app.IsSpike ? Tone.Danger : Tone.Neutral),
-                ErrorsKit.TimeAxis(snapshot.Window, ChartBars),
-                Kit.Muted("Peak " + ErrorsKit.Peak(app.Counts, ChartBars) + " errors per " + (int)snapshot.Window.Step.TotalMinutes + " min"));
+                ErrorsKit.GridBars(app.Counts, ChartBars, 110, app.IsSpike ? Tone.Danger : Tone.Neutral, markers),
+                ErrorsKit.TimeAxis(window, ChartBars),
+                Kit.Muted("Peak " + ErrorsKit.Peak(app.Counts, ChartBars) + " errors per " + (int)window.Step.TotalMinutes + " min"
+                        + (markers.Count > 0 ? " · vertical lines mark deploys" : ""))
+                    .AutomationName(ErrorsText.ChartSummary(app.Counts, window, ChartBars) + (markers.Count > 0 ? " Deployments are marked on the chart." : "")));
+
+        // When the spike began and which deployment came just before it.
+        var onset = app.IsSpike ? SpikeOnset.Find(app.Counts, window) : null;
+        var startLink = onset is { } begun ? DeployCorrelation.Link(deploys, begun, DeployCorrelation.SpikeWindow, window.Step) : null;
+        Element? startCard = onset is { } startedAt
+            ? Border(TextBlock(ErrorsText.StartLine(startedAt, now, startLink)).FontSize(13).TextWrapping())
+                .Background(startLink is null ? Theme.SubtleFill : Kit.Bg(Tone.Warning)).CornerRadius(6).Padding(10, 6)
+            : null;
+
+        var commitUrl = startLink is null ? null : ErrorLinks.CommitUrl(repo, startLink.Deploy.Sha);
+        var overviewActions = FlexRow(
+            commitUrl is null ? null : Button("Open deploy on GitHub", () => ExternalActions.OpenUrl(commitUrl)).SubtleButton().AutomationName("Open the deployed commit on GitHub"),
+            Button("Copy summary", () => ExternalActions.Copy(ErrorReport.App(app, window, found ?? Array.Empty<ErrorGroup>(), onset, startLink, repo, now)))
+                .SubtleButton().AutomationName("Copy a summary of " + app.App))
+            with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
 
         var overview = Card(VStack(12,
             Title(app.App).TextTrimming(TextTrimming.CharacterEllipsis),
             repoLine,
             facts,
+            startCard,
             bindBanner,
-            chart.Margin(0, 4, 0, 0)));
+            chart.Margin(0, 4, 0, 0),
+            app.Total == 0 ? null : overviewActions));
 
         Element list;
-        var found = Parts.Peek(groups);
         if (found is null)
         {
             list = groups is AsyncValue<IReadOnlyList<ErrorGroup>>.Error failed
@@ -293,10 +339,45 @@ sealed class ErrorsPage : Component<PageContext>
         }
         else
         {
-            list = VStack(8, found.Select(g => GroupCard(ctx.Services, errors, app, g, snapshot.Window, now, expanded == g.Key, () => setExpanded(expanded == g.Key ? "" : g.Key)).WithKey(g.Key)).ToArray());
+            // The groups come from the newest log lines only; when that cut off older ones, "new" cannot be told from "old".
+            var complete = GroupSampling.IsComplete(found);
+            var ordered = GroupOrdering.Order(found, sort, window, now, complete);
+
+            var items = new List<Element?>
+            {
+                found.Count > 1 ? SortBar(sort, setSort) : null,
+                complete
+                    ? null
+                    : Kit.Muted("Showing the newest " + GroupSampling.MaxLines + " log lines. Older errors are counted in the chart but not listed here, and \"new\" is not shown.").TextWrapping(),
+            };
+            items.AddRange(ordered.Select(g => (Element?)GroupCard(
+                ctx.Services, errors, app, g, window, now, deploys, running, complete,
+                expanded == g.Key, () => setExpanded(expanded == g.Key ? "" : g.Key)).WithKey(g.Key)));
+            list = VStack(8, items.Where(i => i is not null).Select(i => i!).ToArray());
         }
 
         return VStack(12, overview, list);
+    }
+
+    /// <summary>"Sort: Most frequent · Latest · Newest · Rising", the chosen one filled.</summary>
+    private static Element SortBar(GroupSort sort, Action<GroupSort> setSort)
+    {
+        Element Chip(GroupSort option)
+        {
+            var label = GroupOrdering.Label(option);
+            var name = "Sort errors by " + label.ToLowerInvariant() + (option == sort ? ", selected" : "");
+            Element chip = option == sort
+                ? Button(label, () => setSort(option)).AccentButton().AutomationName(name)
+                : Button(label, () => setSort(option)).SubtleButton().AutomationName(name);
+            return chip.WithKey("sort|" + option);
+        }
+
+        return FlexRow(
+            Kit.Muted("Sort").VAlign(VerticalAlignment.Center),
+            Chip(GroupSort.Frequent),
+            Chip(GroupSort.Latest),
+            Chip(GroupSort.Newest),
+            Chip(GroupSort.Rising)) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 4 };
     }
 
     private static Element GroupCard(
@@ -306,9 +387,14 @@ sealed class ErrorsPage : Component<PageContext>
         ErrorGroup group,
         ErrorWindow window,
         DateTimeOffset now,
+        IReadOnlyList<DeployedVersion> deploys,
+        DeployedVersion? running,
+        bool complete,
         bool open,
         Action toggle)
     {
+        var status = GroupStatuses.Of(group, window, now, complete);
+        var firstSeenAfter = DeployCorrelation.FirstSeenLink(deploys, group, window);
         var warning = group.Kind == ErrorKind.MissingBackendRole;
         var tone = warning ? Tone.Warning : Tone.Danger;
         var repo = RepoBindings.RepoForNamespace(errors, group.Method);
@@ -329,18 +415,20 @@ sealed class ErrorsPage : Component<PageContext>
                 location is null
                     ? null
                     : TextBlock(location).FontFamily(mono).FontSize(12).Foreground(Theme.SecondaryText)).Grid(column: 0),
-            Kit.Pill(group.Count + (group.Count == 1 ? " error" : " errors"), tone).VAlign(VerticalAlignment.Top).Margin(12, 0, 0, 0).Grid(column: 1));
+            HStack(6, Badges(status, group.Count, tone)).VAlign(VerticalAlignment.Top).Margin(12, 0, 0, 0).Grid(column: 1));
 
         // The chart zooms in on when this error happened, so a short burst is not one bar among 72.
         var zoom = ErrorZoom.Around(group.Counts, window, group.FirstSeen, group.LastSeen);
+        var zoomMarkers = ErrorMarkers.Indices(zoom.From, window.Step, zoom.Counts.Count, deploys.Select(d => d.DeployedAt));
         var chart = zoom.Counts.Count == 0
             ? null
             : VStack(2,
-                ErrorsKit.GridBars(zoom.Counts, zoom.Counts.Count, 44, tone),
+                ErrorsKit.GridBars(zoom.Counts, zoom.Counts.Count, 44, tone, zoomMarkers),
                 ErrorsKit.RangeAxis(zoom.From, zoom.To));
 
         var meta = FlexRow(
             Kit.Muted("first " + ErrorsText.Ago(group.FirstSeen, now) + " · last " + ErrorsText.Ago(group.LastSeen, now)),
+            (status is GroupStatus.Fading or GroupStatus.Stopped) ? Kit.Muted(GroupStatuses.Label(status).ToLowerInvariant()) : null,
             group.Pods.Count == 0 ? null : Kit.Muted(group.Pods.Count + (group.Pods.Count == 1 ? " pod" : " pods")),
             repo is null ? null : Kit.Pill(repo, Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 12, RowGap = 4 };
 
@@ -356,15 +444,34 @@ sealed class ErrorsPage : Component<PageContext>
                 : Border(TextBlock(group.Hint).FontSize(12).TextWrapping())
                     .Background(Kit.Bg(Tone.Warning)).CornerRadius(6).Padding(10, 6),
             chart,
+            firstSeenAfter is null ? null : Kit.Muted(ErrorsText.DeployLine("First seen", firstSeenAfter)).TextWrapping(),
             meta,
             toggleButton,
-            open ? Details(services, errors, app, group, now) : null));
+            open ? Details(services, errors, app, group, now, status, firstSeenAfter, running) : null));
 
         return body.WithKey(group.Key);
     }
 
+    /// <summary>The pills at the top right of an error: "New" or "Rising" when that is so (quiet otherwise), and how many errors.</summary>
+    private static Element[] Badges(GroupStatus status, int count, Tone tone)
+    {
+        var badges = new List<Element>();
+        if (status == GroupStatus.New) badges.Add(Kit.Pill("New", Tone.Warning));
+        else if (status == GroupStatus.Rising) badges.Add(Kit.Pill("Rising", Tone.Danger));
+        badges.Add(Kit.Pill(count + (count == 1 ? " error" : " errors"), tone));
+        return badges.ToArray();
+    }
+
     /// <summary>The digging part of an error: where in the code, the latest full log line with its stack trace, and recent occurrences.</summary>
-    private static Element Details(AppServices services, ErrorsSettings errors, AppSpike app, ErrorGroup group, DateTimeOffset now)
+    private static Element Details(
+        AppServices services,
+        ErrorsSettings errors,
+        AppSpike app,
+        ErrorGroup group,
+        DateTimeOffset now,
+        GroupStatus status,
+        DeployLink? firstSeenAfter,
+        DeployedVersion? running)
     {
         const string mono = "Cascadia Mono, Consolas";
         var repo = RepoBindings.RepoForNamespace(errors, group.Method) ?? RepoBindings.RepoFor(errors, app.App);
@@ -374,9 +481,8 @@ sealed class ErrorsPage : Component<PageContext>
         Element Label(string text) => TextBlock(text.ToUpperInvariant()).FontSize(11).SemiBold().Foreground(Theme.SecondaryText);
         Element Code(string text) => TextBlock(text).FontFamily(mono).FontSize(12).TextWrapping().IsTextSelectionEnabled();
 
-        string? url = null;
-        if (repo is not null && group.File is not null)
-            url = "https://github.com/" + repo + "/blob/HEAD/src/" + group.File + (group.Line is { } line ? "#L" + line : "");
+        // At the commit that is deployed when that is known, so the line numbers of the stack trace match the code.
+        var url = ErrorLinks.FileUrl(repo, group.File, group.Line, running?.Sha);
 
         var where = FlexColumn(
             Label("Where"),
@@ -384,8 +490,13 @@ sealed class ErrorsPage : Component<PageContext>
             group.File is null ? null : Code(group.File + (group.Line is { } l ? ":" + l : ""))) with { RowGap = 4 };
 
         var actions = FlexRow(
-            url is null ? null : Button("Open in GitHub", () => ExternalActions.OpenUrl(url)).AutomationName("Open the file in GitHub"),
+            url is null
+                ? null
+                : Button(running is null ? "Open in GitHub" : "Open as deployed", () => ExternalActions.OpenUrl(url))
+                    .AutomationName(running is null ? "Open the file in GitHub" : "Open the file in GitHub at the deployed commit"),
             latest is null ? null : Button("Copy log line", () => ExternalActions.Copy(latest.Message)).SubtleButton().AutomationName("Copy the full log line"),
+            Button("Copy summary", () => ExternalActions.Copy(ErrorReport.Group(app.App, group, status, repo, running, firstSeenAfter, now)))
+                .SubtleButton().AutomationName("Copy a summary of this error"),
             group.Method is null ? null : Button("Copy location", () => ExternalActions.Copy(group.Method + (group.File is null ? "" : " (" + group.File + (group.Line is { } n ? ":" + n : "") + ")"))).SubtleButton().AutomationName("Copy the code location"))
             with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
 

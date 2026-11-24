@@ -13,10 +13,10 @@ public sealed record SpikeOptions(int NowBuckets = 12, double K = 4.0, double Mi
 public static class SpikeDetector
 {
     /// <summary>1.4826 turns a median absolute deviation into a standard deviation for normally distributed data.</summary>
-    private const double MadToSigma = 1.4826;
+    internal const double MadToSigma = 1.4826;
 
     /// <summary>A silent history has no deviation; half an error per bucket keeps a first burst of three from being missed.</summary>
-    private const double MinDeviation = 0.5;
+    internal const double MinDeviation = 0.5;
 
     public static AppSpike Analyze(ErrorSeries series, SpikeOptions? options = null)
     {
@@ -75,7 +75,7 @@ public static class SpikeDetector
         return (double)sum / length;
     }
 
-    private static double Median(List<double> values)
+    internal static double Median(List<double> values)
     {
         if (values.Count == 0) return 0;
         var sorted = values.OrderBy(v => v).ToList();

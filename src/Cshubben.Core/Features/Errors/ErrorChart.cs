@@ -33,6 +33,34 @@ public static class ErrorChart
     }
 }
 
+/// <summary>Where things that happened at a point in time (deployments) go on a bar chart.</summary>
+public static class ErrorMarkers
+{
+    /// <summary>The start of a chart that shows the last <paramref name="shown"/> buckets of the window.</summary>
+    public static DateTimeOffset TailFrom(ErrorWindow window, int shown) =>
+        window.End - TimeSpan.FromTicks(window.Step.Ticks * Math.Min(shown, window.Buckets));
+
+    /// <summary>
+    /// The buckets of a chart that start at <paramref name="from"/> and have <paramref name="buckets"/> buckets of
+    /// <paramref name="step"/> that contain one of the <paramref name="times"/>, sorted, without duplicates. Times outside the chart are left out.
+    /// </summary>
+    public static IReadOnlyList<int> Indices(DateTimeOffset from, TimeSpan step, int buckets, IEnumerable<DateTimeOffset> times)
+    {
+        if (buckets <= 0 || step <= TimeSpan.Zero) return Array.Empty<int>();
+
+        var found = new SortedSet<int>();
+        foreach (var time in times)
+        {
+            var ticks = (time - from).Ticks;
+            if (ticks < 0) continue;
+            var index = ticks / step.Ticks;
+            if (index < buckets) found.Add((int)index);
+        }
+
+        return found.ToList();
+    }
+}
+
 /// <summary>A slice of a bucket series with the times it covers.</summary>
 public sealed record ChartRange(IReadOnlyList<int> Counts, DateTimeOffset From, DateTimeOffset To);
 
@@ -95,6 +123,66 @@ public static class ErrorsText
         if (span < TimeSpan.FromMinutes(60)) return ((int)span.TotalMinutes).ToString(CultureInfo.InvariantCulture) + " min ago";
         if (span < TimeSpan.FromHours(48)) return ((int)span.TotalHours).ToString(CultureInfo.InvariantCulture) + " h ago";
         return ((int)span.TotalDays).ToString(CultureInfo.InvariantCulture) + " d ago";
+    }
+
+    /// <summary>"5 min", "2 h 5 min", "1 d": a length of time in the units of <see cref="Ago"/>.</summary>
+    public static string Span(TimeSpan span)
+    {
+        if (span < TimeSpan.FromMinutes(1)) return "less than a minute";
+        if (span < TimeSpan.FromMinutes(60)) return ((int)span.TotalMinutes).ToString(CultureInfo.InvariantCulture) + " min";
+        if (span < TimeSpan.FromHours(48))
+        {
+            var minutes = (int)span.TotalMinutes % 60;
+            return ((int)span.TotalHours).ToString(CultureInfo.InvariantCulture) + " h"
+                + (minutes > 0 && span < TimeSpan.FromHours(6) ? " " + minutes.ToString(CultureInfo.InvariantCulture) + " min" : "");
+        }
+
+        return ((int)span.TotalDays).ToString(CultureInfo.InvariantCulture) + " d";
+    }
+
+    /// <summary>"12 min after deploy 3f9c2ab by anna from main", or "right at deploy ..." within the first minute.</summary>
+    public static string AfterDeploy(DeployLink link)
+    {
+        var d = link.Deploy;
+        var sha = d.Sha.Length > 7 ? d.Sha[..7] : d.Sha;
+        var after = link.After < TimeSpan.FromMinutes(1) ? "right at" : Span(link.After) + " after";
+        return after + " deploy " + sha
+            + (d.Creator.Length > 0 ? " by " + d.Creator : "")
+            + (d.Ref.Length > 0 ? " from " + d.Ref : "");
+    }
+
+    /// <summary>"First seen 12 min after deploy 3f9c2ab by anna from main".</summary>
+    public static string DeployLine(string subject, DeployLink link) => subject + " " + AfterDeploy(link);
+
+    /// <summary>"Started 51 min ago", with the deployment it followed when there is one: "Started 51 min ago, 12 min after deploy ...".</summary>
+    public static string StartLine(DateTimeOffset started, DateTimeOffset now, DeployLink? link) =>
+        "Started " + Ago(started, now) + (link is null ? "" : ", " + AfterDeploy(link));
+
+    /// <summary>"Errors per 5 min over the last 6 hours: 124 in total, peak 18 at 14:35." For screen readers; the clock is in <paramref name="zone"/>.</summary>
+    public static string ChartSummary(IReadOnlyList<int> counts, ErrorWindow window, int shown, TimeZoneInfo? zone = null)
+    {
+        var tail = ErrorChart.Tail(counts, Math.Min(shown, window.Buckets));
+        var span = TimeSpan.FromTicks(window.Step.Ticks * tail.Count);
+        var step = Span(window.Step);
+        var length = span < TimeSpan.FromHours(2)
+            ? ((int)span.TotalMinutes).ToString(CultureInfo.InvariantCulture) + " minutes"
+            : ((int)Math.Round(span.TotalHours)).ToString(CultureInfo.InvariantCulture) + " hours";
+        var total = tail.Sum();
+        if (total == 0) return "No errors in the last " + length + ".";
+
+        var peak = tail.Max();
+        var peakIndex = 0;
+        for (var i = 0; i < tail.Count; i++)
+        {
+            if (tail[i] != peak) continue;
+            peakIndex = i;
+            break;
+        }
+
+        var peakAt = ErrorMarkers.TailFrom(window, tail.Count) + TimeSpan.FromTicks(window.Step.Ticks * peakIndex);
+        var local = TimeZoneInfo.ConvertTime(peakAt, zone ?? TimeZoneInfo.Local);
+        return "Errors per " + step + " over the last " + length + ": " + total.ToString(CultureInfo.InvariantCulture)
+            + " in total, peak " + peak.ToString(CultureInfo.InvariantCulture) + " at " + local.ToString("HH:mm", CultureInfo.InvariantCulture) + ".";
     }
 
     /// <summary>"4.2×" below ten, "12×" from ten.</summary>
