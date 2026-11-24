@@ -14,6 +14,10 @@ C# for WinUI 3). Reactor is a preview and Windows-only.
   keyboard flow (press `?` on the page) and search (Ctrl+F).
 - **Drift**: CI runs and deployments that need attention. **Linear**: issues next to their pull requests, with one-click fixes
   for things that are out of sync. **Notes**: ideas, decisions and files. **Stats**.
+- **Errors** (optional, off by default): error spikes per application from your logs (Azure Monitor through an MCP server, or Grafana/Loki),
+  tied to the deployment just before them. Error groups show whether they are new, rising or fading; each application is compared with the
+  same time last week. Ask Claude to analyse an error, create a Linear issue from it, copy a summary, and get a notification when an application
+  starts to spike. Sensitive values (tokens, passwords, e-mail addresses, personal numbers, IP addresses) are removed before anything goes to Claude or is copied.
 - **Command palette** (Ctrl+K), keyboard shortcuts (`?`), tray icon and notifications, light and dark theme.
 
 ## First run
@@ -48,7 +52,8 @@ Always build with an explicit `-p:Platform=x64` (or `ARM64`). `Cshubben.Core` ha
 ## CI and releases
 
 - `.github/workflows/ci.yml`: core tests on Linux, the app on Windows (x64 on every push, ARM64 on manual runs and tags) and
-  screenshots of every page in several window sizes and both themes (artifact, and the `ci-screenshots` branch).
+  screenshots of every page in several window sizes and both themes (artifact, and the `ci-screenshots` branch, which is updated on pushes and on pull
+  requests from this repository).
 - `.github/workflows/release.yml`: tag `v1.2.3` builds Velopack installers and update packages for x64 and ARM64 and attaches
   them to a GitHub Release. Run it manually for a dry run (nothing is published). The update feed needs a public repository.
 

@@ -63,8 +63,8 @@ sealed class ErrorsSettingsCard : Component<PageContext>
         }, errors.McpUrl);
 
         var toggle = ToggleSwitch(errors.Enabled, v => Save(errors with { Enabled = v }), "On", "Off", "Show the Errors page");
-        const string help = "Error spikes from your Grafana logs, tied to deploys. Off by default: while it is off there is no Errors page "
-            + "and nothing talks to Grafana.";
+        const string help = "Error spikes from your logs (Azure Monitor or Grafana), tied to deploys, with Claude analysis and a notification when an "
+            + "application starts to spike. Off by default: while it is off there is no Errors page, no spike notifications and nothing talks to the log service.";
 
         if (!errors.Enabled) return Kit.SettingsCard("Errors", help, toggle);
 

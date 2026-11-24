@@ -7,6 +7,9 @@ Stack: **.NET 11 / C# 15**, UI with **Microsoft.UI.Reactor** (React-style declar
 - **Language:** code, comments, docs, commit messages and the UI are in **English**. The owner chats in Swedish.
 - **No local toolchain:** the sandbox has no dotnet and no Windows. GitHub Actions is the compiler, the test runner and
   the "eye": push, then watch the run (`gh run watch`), read errors with `gh run view --log-failed`.
+- **Pull requests from the sandbox:** `gh pr create` and the GitHub MCP write calls are blocked here. Push the branch, then open the PR with
+  `gh api repos/121nilsson/cshubben/pulls -f title=... -f head=<branch> -f base=main -f body=...` and merge with
+  `gh api -X PUT repos/121nilsson/cshubben/pulls/<n>/merge -f merge_method=squash`. A branch push alone does not start CI; the pull request does.
 - **Layout:** `src/Cshubben.Core` (UI-agnostic models, logic, data; tested on Linux), `src/Cshubben` (Reactor UI),
   `tests/Cshubben.Core.Tests`. Keep logic in Core, UI thin.
 - **Skills:** `.claude/skills/reactor-ui` (how to write the UI) and `.claude/skills/ci-screenshots` (how to see the app).

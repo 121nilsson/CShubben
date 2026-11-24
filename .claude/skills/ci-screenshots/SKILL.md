@@ -11,14 +11,14 @@ The sandbox cannot run WinUI, so CI runs the app on a Windows runner with determ
 - `scripts/screenshot.ps1` starts `Cshubben.exe --demo --start <page> [--select <prId>] [--tab <n>]` per shot, waits, and saves
   `<shot>.png` (PrintWindow of the window) and `<shot>.screen.png` (screen copy, fallback). `log.txt` lists what happened.
 - Add a shot by adding `"<page> --select <id>"` to the default `-Shots` list in the script (or the workflow). Pages: overview, feed,
-  mine, reviews, drift, linear, notes, stats, settings. Demo PR ids: a1..a8 (mine), r1..r7 (review queue).
+  mine, reviews, review, drift, errors, linear, notes, stats, settings. Demo PR ids: a1..a8 (mine), r1..r7 (review queue).
 - App options are parsed in `src/Cshubben/AppOptions.cs`; add new ones there when a view needs a special starting state.
 
 ## Get the images
 `gh run download` does NOT work from the sandbox (the artifact host is blocked by the egress proxy). CI therefore also force-pushes the
-latest screenshots to the orphan branch `ci-screenshots` (only on pushes to main), which git can fetch:
+latest screenshots to the orphan branch `ci-screenshots` (on pushes and on pull requests from this repository; `SOURCE.txt` names the commit that was pushed), which git can fetch:
 ```
-RUN=$(gh run list -R 121nilsson/CShubben --branch main --limit 1 --json databaseId -q '.[0].databaseId')
+RUN=$(gh run list -R 121nilsson/CShubben --branch <your-branch> --limit 1 --json databaseId -q '.[0].databaseId')
 gh run watch $RUN -R 121nilsson/CShubben --exit-status          # wait for the run to finish
 cd /home/claude/cshubben && rm -rf /tmp/shots && mkdir -p /tmp/shots
 git fetch -q --depth 1 origin ci-screenshots && git --work-tree=/tmp/shots checkout FETCH_HEAD -- . && git reset -q
