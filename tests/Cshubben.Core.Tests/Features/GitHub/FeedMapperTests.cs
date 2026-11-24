@@ -96,6 +96,15 @@ public class FeedMapperTests
     }
 
     [Fact]
+    public void Real_events_api_payload_without_merged_flag_uses_merged_at()
+    {
+        string Closed(string mergedAt) => Fixtures.Event("PullRequestEvent",
+            "{\"action\":\"closed\",\"number\":5,\"pull_request\":{\"number\":5,\"merged_at\":" + mergedAt + "}}");
+        Assert.Equal(FeedKind.Merged, Map(Closed("\"2026-11-20T10:00:00Z\""))!.Kind);
+        Assert.Null(Map(Closed("null")));
+    }
+
+    [Fact]
     public void Opened_pr_has_title_when_the_payload_has_one_and_null_when_not()
     {
         var withTitle = Map(Fixtures.Event("PullRequestEvent", "{\"action\":\"opened\",\"number\":3,\"pull_request\":{\"number\":3,\"title\":\"Hello\"}}"))!;
