@@ -1,3 +1,4 @@
+using Cshubben.Core.Features.Errors;
 using Cshubben.Core.Features.Linear;
 using Cshubben.Core.Features.Notifications;
 using Cshubben.Core.Features.Pipeline;
@@ -22,6 +23,26 @@ public static class WatchSources
                 string.Join(",", r.FailingWorkflows.Select(w => WatchDiff.N(w.Id)).Order(StringComparer.Ordinal)),
                 r.Headline,
                 r.FailedDeploys.Select(d => new WatchedDeployFailure(d.Environment, WatchDiff.N(d.Id))).ToList()))
+            .ToList();
+    }
+
+    /// <summary>
+    /// The applications that spike now. The key holds when the spike began, so the same spike is reported once even if the app
+    /// drops out of the list and comes back inside it.
+    /// </summary>
+    public static IReadOnlyList<WatchedErrorSpike> FromErrors(ErrorsSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        return snapshot.Apps
+            .Where(a => a.IsSpike)
+            .Select(a =>
+            {
+                var began = SpikeOnset.Find(a.Counts, snapshot.Window) ?? snapshot.Window.End;
+                return new WatchedErrorSpike(
+                    a.App,
+                    a.App.ToLowerInvariant() + ":" + WatchDiff.N(began.ToUnixTimeSeconds()),
+                    ErrorsText.PerHour(a, snapshot.Window) + " now, " + ErrorsText.Factor(a.Factor) + " the usual rate");
+            })
             .ToList();
     }
 

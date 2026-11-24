@@ -41,6 +41,9 @@ static class NotificationsHub
     /// <summary>Set by the shell: open the pull request with this id in the inspector. When null the PR opens on GitHub.</summary>
     public static Action<string>? SelectPr { get; set; }
 
+    /// <summary>Set by the shell: open the Errors page on this application.</summary>
+    public static Action<string>? OpenErrors { get; set; }
+
     /// <summary>True when real adapters are active (not demo mode).</summary>
     public static bool IsLive => _live;
 
@@ -194,6 +197,13 @@ static class NotificationsHub
     {
         TrayController.ShowMainWindow();
         if (string.IsNullOrWhiteSpace(url)) return;
+        if (WatchDiff.AppFromErrorsUrl(url) is { } errorsApp)
+        {
+            var open = OpenErrors;
+            if (open is not null) TrayController.RunOnUi(() => open(errorsApp));
+            return;
+        }
+
         var pr = LatestSnapshot?.All.FirstOrDefault(p => string.Equals(p.Url, url, StringComparison.OrdinalIgnoreCase));
         var select = SelectPr;
         if (pr is not null && select is not null)

@@ -14,6 +14,7 @@ public static class NotificationText
         {
             NotificationKind.MainRed => "Main is red: " + e.Repo,
             NotificationKind.DeployFailed => "Deploy failed: " + e.Repo + (e.Detail.Length > 0 ? " (" + e.Detail + ")" : ""),
+            NotificationKind.ErrorSpike => "Errors spiking: " + e.Detail,
             NotificationKind.LinearAssigned => "Assigned to you: " + e.Detail,
             NotificationKind.LinearOutOfSync => "Linear out of sync: " + e.Detail,
             NotificationKind.CiFailed => "CI failed: " + what,

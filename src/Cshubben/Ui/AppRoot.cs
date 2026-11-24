@@ -71,7 +71,7 @@ sealed class AppRoot : Component
                 if (!services.IsDemo) _ = Task.Run(() => SnapshotCache.TrySave(AppPaths.DataDirectory, loaded));
                 IntegrationWiring.AttachGitHub(services);
                 NotificationsHub.OnSnapshot(loaded, services.Settings, services.IsDemo);
-                BackgroundWatch.Tick(loaded, services.Settings, services.IsDemo);
+                BackgroundWatch.Tick(loaded, services.Settings, services.IsDemo, services);
                 PagePrefetch.Tick(loaded, services);
                 setError(null);
                 pausedUntil.Current = null;
@@ -186,6 +186,7 @@ sealed class AppRoot : Component
             return true;
         };
         NotificationsHub.SelectPr = id => { setPage(snap.Find(id)?.Role == PrRole.Authored ? Page.Mine : Page.Reviews); Select(id); };
+        NotificationsHub.OpenErrors = app => { Pages.ErrorsFocus.Request(app); setPage(Page.Errors); };
         PipelineServices.Merged = _ => Refresh();
 
         void OpenSettings()

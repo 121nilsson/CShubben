@@ -18,6 +18,22 @@ namespace Cshubben.Ui.Pages;
 /// the charts, a spike is tied to the deployment before it, error groups show whether they are new or rising and can be sorted,
 /// and summaries can be copied. Claude's analysis is in <see cref="ErrorAnalysisPanel"/>.
 /// </summary>
+/// <summary>Which application the Errors page should open on, set when a spike toast is clicked.</summary>
+static class ErrorsFocus
+{
+    private static string? _pending;
+
+    public static void Request(string app) => _pending = app;
+
+    /// <summary>The requested application, once.</summary>
+    public static string? Take()
+    {
+        var app = _pending;
+        _pending = null;
+        return app;
+    }
+}
+
 sealed class ErrorsPage : Component<PageContext>
 {
     private const int ListBars = 36;
@@ -33,8 +49,9 @@ sealed class ErrorsPage : Component<PageContext>
         var (windowWidth, _) = UseWindowSize();
         var narrow = windowWidth < 900;
         var (tick, setTick) = UseState(0, true);
-        var (picked, setPicked) = UseState("");
-        var (showDetail, setShowDetail) = UseState(false);
+        var focus = ErrorsFocus.Take();
+        var (picked, setPicked) = UseState(focus ?? "");
+        var (showDetail, setShowDetail) = UseState(focus is not null);
         var (quietOpen, setQuietOpen) = UseState(false);
         var (expanded, setExpanded) = UseState("");
         var (sort, setSort) = UseState(GroupSort.Frequent);
