@@ -107,7 +107,7 @@ public sealed class DemoErrorSource : IErrorSource
     }
 
     /// <summary>A quiet week ago: the same baseline, without the spike, so the demo spike reads as "higher than a week ago".</summary>
-    public Task<IReadOnlyList<ErrorSeries>> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    public Task<LastWeekLogs> LoadLastWeekAsync(CancellationToken cancellationToken = default)
     {
         var window = WeeklyBaseline.WindowFor(_clock());
         var series = new List<ErrorSeries>();
@@ -123,7 +123,7 @@ public sealed class DemoErrorSource : IErrorSource
             series.Add(new ErrorSeries(profile.App, counts));
         }
 
-        return Task.FromResult<IReadOnlyList<ErrorSeries>>(series);
+        return Task.FromResult(new LastWeekLogs(series, true));
     }
 
     public Task<IReadOnlyList<ErrorGroup>> LoadGroupsAsync(string app, CancellationToken cancellationToken = default)

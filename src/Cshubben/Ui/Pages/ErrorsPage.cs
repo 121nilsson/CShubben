@@ -72,7 +72,7 @@ sealed class ErrorsPage : Component<PageContext>
             new object[] { sourceKey, selected?.App ?? "", tick });
 
         // Same hour a week ago, for "usual for this time of week". Also a bonus: null when it cannot be read.
-        var lastWeek = UseResource<IReadOnlyList<ErrorSeries>?>(
+        var lastWeek = UseResource<LastWeekLogs?>(
             async ct => resolved is { } r ? await ErrorsServices.LastWeekAsync(r.Source, r.Key, ct) : null,
             new object[] { sourceKey, tick });
 
@@ -271,7 +271,7 @@ sealed class ErrorsPage : Component<PageContext>
         AppSpike app,
         AsyncValue<IReadOnlyList<ErrorGroup>> groups,
         AsyncValue<IReadOnlyList<DeployedVersion>> deployments,
-        IReadOnlyList<ErrorSeries>? lastWeek,
+        LastWeekLogs? lastWeek,
         DateTimeOffset now,
         Action refresh,
         string expanded,
@@ -297,7 +297,9 @@ sealed class ErrorsPage : Component<PageContext>
             Kit.Pill(app.Total + (app.Total == 1 ? " error" : " errors") + " in 24 h", Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 6 };
 
         var weekly = WeeklyBaseline.Compare(app, window, lastWeek);
-        var weeklyLine = app.Total == 0 ? null : WeeklyBaseline.Line(weekly);
+        var weeklyLine = app.Total == 0
+            ? null
+            : lastWeek is { LogsReachBack: false } ? WeeklyBaseline.Unavailable : WeeklyBaseline.Line(weekly);
 
         // Deployments on the chart: a thin line in the bucket of each one.
         var markers = ErrorMarkers.Indices(

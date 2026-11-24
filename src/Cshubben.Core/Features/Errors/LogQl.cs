@@ -51,6 +51,11 @@ public static class LogQl
         "sum by (" + AppLabel + ") (count_over_time(" + Selector(ns, null, includeWarnings) + "["
         + ((long)step.TotalSeconds).ToString(CultureInfo.InvariantCulture) + "s]))";
 
+    /// <summary>All lines (not only errors) per application over one span, to tell "no errors" from "no logs".</summary>
+    public static string AllLines(string ns, TimeSpan span) =>
+        "sum by (" + AppLabel + ") (count_over_time({" + NamespaceLabel + "=" + Quote(ns) + "}["
+        + ((long)span.TotalSeconds).ToString(CultureInfo.InvariantCulture) + "s]))";
+
     /// <summary>The error lines of one application.</summary>
     public static string Lines(string ns, string app, bool includeWarnings) => Selector(ns, app, includeWarnings);
 }

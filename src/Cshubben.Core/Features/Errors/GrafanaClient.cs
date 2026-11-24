@@ -56,6 +56,23 @@ public sealed class GrafanaClient
         return LokiParser.ParseMatrix(text, window);
     }
 
+    /// <summary>
+    /// True when the namespace has any log line at all in the window (all levels). Used to tell "no errors a week ago" from
+    /// "the logs do not go back a week".
+    /// </summary>
+    public async Task<bool> HasLogsAsync(LokiDatasource source, ErrorWindow window, string ns, CancellationToken cancellationToken = default)
+    {
+        var span = window.End - window.Start;
+        var probe = new ErrorWindow(window.Start, span, 1);
+        var path = Loki(source, "query_range")
+                   + "?query=" + Uri.EscapeDataString(LogQl.AllLines(ns, span))
+                   + "&start=" + Seconds(probe.End)
+                   + "&end=" + Seconds(probe.End)
+                   + "&step=" + Seconds(span);
+        var text = await GetAsync(path, cancellationToken).ConfigureAwait(false);
+        return LokiParser.ParseMatrix(text, probe).Any(s => s.Counts.Sum() > 0);
+    }
+
     /// <summary>The newest error lines of one application in the window, oldest first.</summary>
     public async Task<IReadOnlyList<LogEntry>> GetErrorLinesAsync(
         LokiDatasource source,

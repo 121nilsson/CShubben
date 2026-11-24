@@ -99,7 +99,7 @@ static class ErrorsServices
     /// The same hour one week ago for every application. Null, never an error, when it cannot be read (for example when the logs
     /// do not reach back that far): the page is complete without the comparison.
     /// </summary>
-    public static async Task<IReadOnlyList<ErrorSeries>?> LastWeekAsync(IErrorSource source, string sourceKey, CancellationToken cancellationToken)
+    public static async Task<LastWeekLogs?> LastWeekAsync(IErrorSource source, string sourceKey, CancellationToken cancellationToken)
     {
         try
         {
