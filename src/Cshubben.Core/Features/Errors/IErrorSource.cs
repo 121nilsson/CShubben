@@ -11,6 +11,9 @@ public interface IErrorSource
 
     /// <summary>The error groups of one application for the last 24 hours, most frequent first.</summary>
     Task<IReadOnlyList<ErrorGroup>> LoadGroupsAsync(string app, CancellationToken cancellationToken = default);
+
+    /// <summary>Counts per application for the two hours that start where the latest hour started one week ago (see <see cref="WeeklyBaseline"/>).</summary>
+    Task<IReadOnlyList<ErrorSeries>> LoadLastWeekAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>What to read from Grafana. The caller builds it from the settings (this slice does not know about settings).</summary>
@@ -54,6 +57,13 @@ public sealed class GrafanaErrorSource : IErrorSource
         var lines = await _client.GetErrorLinesAsync(source, window, _query.Namespace, app, _query.IncludeWarnings, 1000, cancellationToken)
             .ConfigureAwait(false);
         return ErrorGrouping.Group(lines, window);
+    }
+
+    public async Task<IReadOnlyList<ErrorSeries>> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    {
+        var source = await SourceAsync(cancellationToken).ConfigureAwait(false);
+        var window = WeeklyBaseline.WindowFor(_clock());
+        return await _client.GetErrorSeriesAsync(source, window, _query.Namespace, _query.IncludeWarnings, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<LokiDatasource> SourceAsync(CancellationToken cancellationToken) =>

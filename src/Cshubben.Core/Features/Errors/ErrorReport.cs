@@ -43,7 +43,8 @@ public static class ErrorReport
         DateTimeOffset? onset,
         DeployLink? link,
         string? repo,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        WeeklyComparison? weekly = null)
     {
         var sb = new StringBuilder();
         sb.Append("### ").Append(app.App).Append(": ")
@@ -56,6 +57,8 @@ public static class ErrorReport
                 .Append(app.Total.ToString(CultureInfo.InvariantCulture)).Append(app.Total == 1 ? " error" : " errors")
                 .Append(" in the last 24 hours, ").Append(ErrorsText.TrendWord(app.Trend)).Append('\n');
         }
+
+        if (WeeklyBaseline.Line(weekly) is { } weeklyLine) sb.Append("- ").Append(weeklyLine).Append('\n');
 
         if (onset is { } started)
         {

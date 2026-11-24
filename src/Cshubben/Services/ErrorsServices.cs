@@ -92,6 +92,26 @@ static class ErrorsServices
     /// <summary>The cache key of the groups of one application.</summary>
     public static string GroupsKey(string sourceKey, string app) => sourceKey + "|groups|" + app;
 
+    /// <summary>The cache key of last week's counts.</summary>
+    public static string LastWeekKey(string sourceKey) => sourceKey + "|lastweek";
+
+    /// <summary>
+    /// The same hour one week ago for every application. Null, never an error, when it cannot be read (for example when the logs
+    /// do not reach back that far): the page is complete without the comparison.
+    /// </summary>
+    public static async Task<IReadOnlyList<ErrorSeries>?> LastWeekAsync(IErrorSource source, string sourceKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await PageCaches.ErrorLastWeek.GetAsync(LastWeekKey(sourceKey), PageCaches.ErrorsTtl, () => source.LoadLastWeekAsync(cancellationToken))
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>The cache key of the deployments of one repository and environment.</summary>
     public static string DeploysKey(string sourceKey, string repo, string environment) => sourceKey + "|deploys|" + repo + "|" + environment;
 

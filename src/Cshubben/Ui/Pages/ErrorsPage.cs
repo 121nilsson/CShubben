@@ -71,11 +71,17 @@ sealed class ErrorsPage : Component<PageContext>
             },
             new object[] { sourceKey, selected?.App ?? "", tick });
 
+        // Same hour a week ago, for "usual for this time of week". Also a bonus: null when it cannot be read.
+        var lastWeek = UseResource<IReadOnlyList<ErrorSeries>?>(
+            async ct => resolved is { } r ? await ErrorsServices.LastWeekAsync(r.Source, r.Key, ct) : null,
+            new object[] { sourceKey, tick });
+
         void Refresh()
         {
             if (resolved is { } r)
             {
                 PageCaches.Errors.Remove(r.Key);
+                PageCaches.ErrorLastWeek.Remove(ErrorsServices.LastWeekKey(r.Key));
                 if (selected is not null)
                 {
                     PageCaches.ErrorGroups.Remove(ErrorsServices.GroupsKey(r.Key, selected.App));
@@ -137,7 +143,7 @@ sealed class ErrorsPage : Component<PageContext>
                 var list = AppList(snapshot, selected, Pick, quietOpen, setQuietOpen);
                 var detail = selected is null
                     ? Card(Kit.Muted("Pick an application."))
-                    : Detail(ctx, errors, snapshot, selected, groups, deploys, now, Refresh, expanded, setExpanded, sort, setSort);
+                    : Detail(ctx, errors, snapshot, selected, groups, deploys, Parts.Peek(lastWeek), now, Refresh, expanded, setExpanded, sort, setSort);
 
                 if (narrow)
                 {
@@ -265,6 +271,7 @@ sealed class ErrorsPage : Component<PageContext>
         AppSpike app,
         AsyncValue<IReadOnlyList<ErrorGroup>> groups,
         AsyncValue<IReadOnlyList<DeployedVersion>> deployments,
+        IReadOnlyList<ErrorSeries>? lastWeek,
         DateTimeOffset now,
         Action refresh,
         string expanded,
@@ -288,6 +295,9 @@ sealed class ErrorsPage : Component<PageContext>
             app.IsSpike ? Kit.Pill("Spiking " + ErrorsText.Factor(app.Factor), Tone.Danger) : null,
             Kit.Pill(ErrorsText.TrendGlyph(app.Trend) + " " + ErrorsText.TrendWord(app.Trend), Tone.Neutral),
             Kit.Pill(app.Total + (app.Total == 1 ? " error" : " errors") + " in 24 h", Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 6 };
+
+        var weekly = WeeklyBaseline.Compare(app, window, lastWeek);
+        var weeklyLine = app.Total == 0 ? null : WeeklyBaseline.Line(weekly);
 
         // Deployments on the chart: a thin line in the bucket of each one.
         var markers = ErrorMarkers.Indices(
@@ -313,7 +323,7 @@ sealed class ErrorsPage : Component<PageContext>
         var commitUrl = startLink is null ? null : ErrorLinks.CommitUrl(repo, startLink.Deploy.Sha);
         var overviewActions = FlexRow(
             commitUrl is null ? null : Button("Open deploy on GitHub", () => ExternalActions.OpenUrl(commitUrl)).AutomationName("Open the deployed commit on GitHub"),
-            Button("Copy summary", () => ExternalActions.Copy(ErrorReport.App(app, window, found ?? Array.Empty<ErrorGroup>(), onset, startLink, repo, now)))
+            Button("Copy summary", () => ExternalActions.Copy(ErrorReport.App(app, window, found ?? Array.Empty<ErrorGroup>(), onset, startLink, repo, now, weekly)))
                 .AutomationName("Copy a summary of " + app.App))
             with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
 
@@ -321,6 +331,7 @@ sealed class ErrorsPage : Component<PageContext>
             Title(app.App).TextTrimming(TextTrimming.CharacterEllipsis),
             repoLine,
             facts,
+            weeklyLine is null ? null : Kit.Muted(weeklyLine).TextWrapping(),
             startCard,
             bindBanner,
             chart.Margin(0, 4, 0, 0),

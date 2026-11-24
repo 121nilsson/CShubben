@@ -106,6 +106,26 @@ public sealed class DemoErrorSource : IErrorSource
         return Task.FromResult(ErrorsOverview.Build(window, series, AppNames, now));
     }
 
+    /// <summary>A quiet week ago: the same baseline, without the spike, so the demo spike reads as "higher than a week ago".</summary>
+    public Task<IReadOnlyList<ErrorSeries>> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    {
+        var window = WeeklyBaseline.WindowFor(_clock());
+        var series = new List<ErrorSeries>();
+        foreach (var profile in Profiles)
+        {
+            var counts = new int[window.Buckets];
+            foreach (var entry in Generate(profile, window, spike: false))
+            {
+                var index = window.IndexOf(entry.At);
+                if (index >= 0) counts[index]++;
+            }
+
+            series.Add(new ErrorSeries(profile.App, counts));
+        }
+
+        return Task.FromResult<IReadOnlyList<ErrorSeries>>(series);
+    }
+
     public Task<IReadOnlyList<ErrorGroup>> LoadGroupsAsync(string app, CancellationToken cancellationToken = default)
     {
         var window = ErrorWindow.Default(_clock());
@@ -116,7 +136,7 @@ public sealed class DemoErrorSource : IErrorSource
         return Task.FromResult(groups);
     }
 
-    private static List<LogEntry> Generate(Profile profile, ErrorWindow window)
+    private static List<LogEntry> Generate(Profile profile, ErrorWindow window, bool spike = true)
     {
         var entries = new List<LogEntry>();
         if (profile.Baseline <= 0 || profile.Templates.Length == 0) return entries;
@@ -127,7 +147,7 @@ public sealed class DemoErrorSource : IErrorSource
 
         for (var bucket = 0; bucket < window.Buckets; bucket++)
         {
-            var inSpike = bucket >= window.Buckets - profile.SpikeBuckets;
+            var inSpike = spike && bucket >= window.Buckets - profile.SpikeBuckets;
             var rate = profile.Baseline * (inSpike ? profile.SpikeFactor : 1.0);
             var count = Math.Max(0, (int)Math.Round(rate + (random.NextDouble() - 0.5) * 2 * Math.Sqrt(Math.Max(rate, 0.25))));
             for (var i = 0; i < count; i++)
