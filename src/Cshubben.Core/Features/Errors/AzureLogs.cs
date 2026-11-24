@@ -214,6 +214,13 @@ public sealed class AzureLogsErrorSource : IErrorSource
         return ErrorGrouping.Group(AzureKql.ParseLines(text, app), window);
     }
 
+    public async Task<IReadOnlyList<ErrorSeries>> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    {
+        var window = WeeklyBaseline.WindowFor(_clock());
+        var text = await RunAsync("AppTraces", AzureKql.ErrorCounts(window, _query.IncludeWarnings), 5000, cancellationToken).ConfigureAwait(false);
+        return AzureKql.ParseCounts(text, window);
+    }
+
     /// <summary>A cheap check for the Test connection button: counts the traces of the last hour.</summary>
     public async Task<string> TestAsync(CancellationToken cancellationToken = default)
     {
