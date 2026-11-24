@@ -105,7 +105,8 @@ public static class FeedMapper
             case "opened":
                 return new Parsed(FeedKind.Opened, number.Value, title, string.Empty, author, null);
             case "closed":
-                if (J.Bool(pr, "merged")) return new Parsed(FeedKind.Merged, number.Value, title, string.Empty, author, null);
+                // The REST events API sends a trimmed pull_request without "merged"; merged_at is the reliable signal.
+                if (J.Bool(pr, "merged") || J.StrOrNull(pr, "merged_at") is not null) return new Parsed(FeedKind.Merged, number.Value, title, string.Empty, author, null);
                 return null;
             case "review_requested":
                 var reviewer = J.StrOrNull(payload, "requested_reviewer", "login");
