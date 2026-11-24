@@ -3,6 +3,7 @@ using Cshubben.Core.Logic;
 using Cshubben.Core.Model;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
+using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Xaml;
 using static Microsoft.UI.Reactor.Factories;
 
@@ -14,28 +15,46 @@ static class Rows
     /// One PR as a clickable row. Colour is spent only on what needs attention: the pill shows the next action,
     /// and "everything fine" stays quiet.
     /// </summary>
-    public static Element PrRow(PullRequest pr, NextAction action, bool selected, DateTimeOffset now, Action<string> onSelect, Element? badge = null)
+    public static Element PrRow(PullRequest pr, NextAction action, bool selected, DateTimeOffset now, Action<string> onSelect, Element? badge = null, bool compact = false)
     {
-        var content = Grid(
-            columns: [GridSize.Px(40), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
-            rows: [GridSize.Auto],
-            Avatars.Of(pr.Author, 28).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Center).Grid(column: 0),
-            VStack(2,
-                TextBlock(pr.Title).TextTrimming(TextTrimming.CharacterEllipsis).SemiBold(),
-                HStack(6,
-                    GitHubStyle.Icon(GitIcon.PullRequest, pr.IsDraft ? Tone.Neutral : Tone.Success, 14),
-                    Kit.Muted($"{pr.Repo} #{pr.Number} · {pr.Author}" + (pr.IsDraft ? " · draft" : "")).TextTrimming(TextTrimming.CharacterEllipsis)),
-                HStack(8,
-                    Kit.Muted(pr.SizeLabel),
-                    Kit.Muted("+" + pr.Additions).Foreground(Kit.Fg(Tone.Success)),
-                    Kit.Muted("\u2212" + pr.Deletions).Foreground(Kit.Fg(Tone.Danger)),
-                    Kit.Muted(pr.ChangedFiles + (pr.ChangedFiles == 1 ? " file" : " files")))).Grid(column: 1),
-            HStack(8,
-                badge,
-                pr.Ci == CiState.Failure ? Kit.Pill("CI failing", Tone.Danger) : null,
-                action.IsActionable ? Kit.Pill(action.Label, action.Tone) : Kit.Muted(action.Label))
-                .VAlign(VerticalAlignment.Center).Margin(12, 0, 12, 0).Grid(column: 2),
-            Kit.Muted(Age.Format(pr.UpdatedAt, now)).HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center).Grid(column: 3));
+        var chips = PrStatusChips.For(pr, action);
+        var chipRow = chips.Count == 0 ? null : HStack(4, chips.Select(c => Chip(c, compact).WithKey(c.Text)).ToArray());
+        var actionPill = action.IsActionable ? Kit.Pill(action.Label, action.Tone) : Kit.Muted(action.Label);
+        var ciFailing = pr.Ci == CiState.Failure ? Kit.Pill("CI failing", Tone.Danger) : null;
+
+        var repoLine = HStack(6,
+            GitHubStyle.Icon(GitIcon.PullRequest, pr.IsDraft ? Tone.Neutral : Tone.Success, 14),
+            Kit.Muted($"{pr.Repo} #{pr.Number} · {pr.Author}" + (pr.IsDraft ? " · draft" : "")).TextTrimming(TextTrimming.CharacterEllipsis));
+        var sizeLine = HStack(8,
+            Kit.Muted(pr.SizeLabel),
+            Kit.Muted("+" + pr.Additions).Foreground(Kit.Fg(Tone.Success)),
+            Kit.Muted("−" + pr.Deletions).Foreground(Kit.Fg(Tone.Danger)),
+            Kit.Muted(pr.ChangedFiles + (pr.ChangedFiles == 1 ? " file" : " files")),
+            compact || chipRow is null ? null : chipRow.Margin(6, 0, 0, 0));
+
+        // A narrow list gives the title the whole width: the status chips and the action pill move to their own line below it.
+        var content = compact
+            ? Grid(
+                columns: [GridSize.Px(40), GridSize.Star(), GridSize.Auto],
+                rows: [GridSize.Auto],
+                Avatars.Of(pr.Author, 28).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Top).Margin(0, 2, 0, 0).Grid(column: 0),
+                VStack(3,
+                    TextBlock(pr.Title).TextWrapping().MaxLines(2).TextTrimming(TextTrimming.CharacterEllipsis).SemiBold(),
+                    repoLine,
+                    sizeLine,
+                    FlexRow(chipRow, badge, ciFailing, actionPill) with { Wrap = FlexWrap.Wrap, ColumnGap = 6, RowGap = 4 }).Grid(column: 1),
+                Kit.Muted(Age.Format(pr.UpdatedAt, now)).HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Top).Margin(8, 2, 0, 0).Grid(column: 2))
+            : Grid(
+                columns: [GridSize.Px(40), GridSize.Star(), GridSize.Auto, GridSize.Px(56)],
+                rows: [GridSize.Auto],
+                Avatars.Of(pr.Author, 28).HAlign(HorizontalAlignment.Left).VAlign(VerticalAlignment.Center).Grid(column: 0),
+                VStack(2,
+                    TextBlock(pr.Title).TextTrimming(TextTrimming.CharacterEllipsis).SemiBold(),
+                    repoLine,
+                    sizeLine).Grid(column: 1),
+                HStack(8, badge, ciFailing, actionPill)
+                    .VAlign(VerticalAlignment.Center).Margin(12, 0, 12, 0).Grid(column: 2),
+                Kit.Muted(Age.Format(pr.UpdatedAt, now)).HAlign(HorizontalAlignment.Right).VAlign(VerticalAlignment.Center).Grid(column: 3));
 
         var button = Button(content, () => onSelect(pr.Id))
             .SubtleButton()
@@ -47,6 +66,29 @@ static class Rows
             .Selected(selected)
             .CornerRadius(6)
             .WithKey(pr.Id);
+    }
+
+    /// <summary>
+    /// A status chip. Compact (a narrow list): just an icon, a check for Approved, "CI" for passing checks, and a comment icon
+    /// with the number for open threads. The full text stays as the tooltip and the screen reader name.
+    /// </summary>
+    private static Element Chip(StatusChip chip, bool compact)
+    {
+        if (!compact) return Kit.Pill(chip.Text, chip.Tone);
+
+        Element content = chip.Kind switch
+        {
+            StatusChipKind.Approved => GitHubStyle.Icon(GitIcon.Check, chip.Tone, 12),
+            StatusChipKind.Threads => HStack(3,
+                GitHubStyle.Icon(GitIcon.Comment, chip.Tone, 12),
+                TextBlock(chip.Count.ToString()).FontSize(12).SemiBold().Foreground(Kit.Fg(chip.Tone))),
+            _ => TextBlock("CI").FontSize(12).SemiBold().Foreground(Kit.Fg(chip.Tone)),
+        };
+
+        return Border(content.VAlign(VerticalAlignment.Center))
+            .Background(Kit.Bg(chip.Tone)).CornerRadius(10).Padding(6, 2)
+            .ToolTip(chip.Text)
+            .AutomationName(chip.Text);
     }
 
     public static string KindGlyph(FeedKind kind) => kind switch

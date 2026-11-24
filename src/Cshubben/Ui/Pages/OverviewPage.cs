@@ -11,7 +11,7 @@ namespace Cshubben.Ui.Pages;
 
 static class OverviewPage
 {
-    public static Element Build(HubSnapshot snap, string? selectedId, Action<string> onSelect)
+    public static Element Build(HubSnapshot snap, string? selectedId, Action<string> onSelect, bool compact = false)
     {
         var o = OverviewModel.Compute(snap);
 
@@ -27,7 +27,7 @@ static class OverviewPage
                 items.Count == 0
                     ? Kit.EmptyNote(empty)
                     : FlexColumn(items.Select(a =>
-                        Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect).WithKey(a.Pr.Id)).ToArray())))
+                        Rows.PrRow(a.Pr, a.Action, a.Pr.Id == selectedId, snap.At, onSelect, null, compact).WithKey(a.Pr.Id)).ToArray())))
             ;
 
         var nothingYet = snap.Authored.Count == 0 && snap.Reviews.Count == 0;

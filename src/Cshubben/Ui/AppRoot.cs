@@ -194,7 +194,9 @@ sealed class AppRoot : Component
             if (narrow) setSelected(null);
         }
 
-        var ctx = new PageContext(snap, loadedOnce, selectedId, Select, services, settings, SaveSettings, Refresh, OpenSettings);
+        // Rows show status chips as icons when the list is narrow: window minus the sidebar, the inspector and the page padding.
+        var listWidth = windowWidth - (compact ? 56 : 260) - (selectedId is not null && !narrow ? inspectorWidth : 0) - 48;
+        var ctx = new PageContext(snap, loadedOnce, selectedId, Select, services, settings, SaveSettings, Refresh, OpenSettings, listWidth < 760);
 
         // Sidebar: the platform NavigationView, built from the registry. Entries are grouped by section in registry order;
         // pinned ones (Settings) use the built-in settings item at the bottom.

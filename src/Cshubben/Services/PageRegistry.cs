@@ -28,7 +28,8 @@ sealed record PageContext(
     AppSettings Settings,
     Action<AppSettings> SaveSettings,
     Action Refresh,
-    Action OpenSettings);
+    Action OpenSettings,
+    bool CompactRows = false);
 
 /// <summary>A count shown next to a sidebar entry.</summary>
 sealed record PageBadge(int Count, Tone Tone);
@@ -65,16 +66,16 @@ static class PageRegistry
     public static readonly IReadOnlyList<PageDef> All = new List<PageDef>
     {
         new(Page.Overview, "Overview", "", "Overview",
-            c => OverviewPage.Build(c.Snapshot, c.SelectedId, c.Select),
+            c => OverviewPage.Build(c.Snapshot, c.SelectedId, c.Select, c.CompactRows),
             c => new PageBadge(OverviewModel.Compute(c.Snapshot).NeedsYou, Tone.Warning), NeedsData: true),
         new(Page.Feed, "Overview", "", "Feed",
             c => FeedPage.Build(c.Snapshot, c.Select), NeedsData: true),
 
         new(Page.Mine, "Pull requests", "", "My PRs",
-            c => PrListPages.Mine(c.Snapshot, c.SelectedId, c.Select),
+            c => PrListPages.Mine(c.Snapshot, c.SelectedId, c.Select, c.CompactRows),
             c => new PageBadge(c.Snapshot.Authored.Count, Tone.Neutral), NeedsData: true),
         new(Page.Reviews, "Pull requests", "", "Review queue",
-            c => PrListPages.Reviews(c.Snapshot, c.SelectedId, c.Select),
+            c => PrListPages.Reviews(c.Snapshot, c.SelectedId, c.Select, c.CompactRows),
             c => new PageBadge(WaitingOnYou(c.Snapshot), Tone.Accent), NeedsData: true),
 
         new(Page.Review, "Pull requests", "\uE943", "Code review", BuildReview),
