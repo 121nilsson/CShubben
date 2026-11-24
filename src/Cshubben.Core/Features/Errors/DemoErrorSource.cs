@@ -56,6 +56,8 @@ public sealed class DemoErrorSource : IErrorSource
 
     public bool IsDemo => true;
 
+    public int LineLimit => GroupSampling.MaxLines;
+
     /// <summary>
     /// Made-up deployments of an application (newest last), so the chart markers and "started after deploy" can be seen in demos
     /// and screenshots. The spiking application got a deployment shortly before its spike began.
@@ -107,9 +109,9 @@ public sealed class DemoErrorSource : IErrorSource
     }
 
     /// <summary>A quiet week ago: the same baseline, without the spike, so the demo spike reads as "higher than a week ago".</summary>
-    public Task<LastWeekLogs> LoadLastWeekAsync(CancellationToken cancellationToken = default)
+    public Task<LastWeekLogs> LoadLastWeekAsync(ErrorWindow current, CancellationToken cancellationToken = default)
     {
-        var window = WeeklyBaseline.WindowFor(_clock());
+        var window = WeeklyBaseline.WindowFor(current);
         var series = new List<ErrorSeries>();
         foreach (var profile in Profiles)
         {

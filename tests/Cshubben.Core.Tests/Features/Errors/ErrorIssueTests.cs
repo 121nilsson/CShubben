@@ -55,4 +55,14 @@ public class ErrorIssueTests
         Assert.Contains("**Boom** in api", draft.Description);
         Assert.EndsWith("Created from the Errors page in Cshubben.", draft.Description);
     }
+
+    [Fact]
+    public void A_title_is_not_cut_in_the_middle_of_an_emoji()
+    {
+        // "a: " is 3 chars, so the emoji below starts at index 118: its two halves straddle the cut at 119.
+        var draft = ErrorIssue.Draft("a", Group(new string('x', 115) + "😀" + new string('y', 10), 5), GroupStatus.Ongoing, null, null, null, Now);
+        Assert.EndsWith("…", draft.Title);
+        Assert.False(char.IsHighSurrogate(draft.Title[^2]));
+        Assert.Equal(119, draft.Title.Length);
+    }
 }

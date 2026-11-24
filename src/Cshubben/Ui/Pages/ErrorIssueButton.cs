@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Cshubben.Core.Features.Errors;
 using Cshubben.Core.Features.Linear;
 using Cshubben.Ui.Assist;
@@ -19,21 +20,30 @@ sealed record ErrorIssueProps(ErrorIssueDraft Draft, string Key);
 /// </summary>
 sealed class ErrorIssueButton : Component<ErrorIssueProps>
 {
+    /// <summary>
+    /// Issues made from the Errors page in this session, by error group. Without it the card forgets it made an issue when it is
+    /// collapsed and opened again, and a second click would make a duplicate.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, LinearIssue> Made = new(StringComparer.Ordinal);
+
     public override Element Render()
     {
         var linear = IntegrationServices.Linear;
-        if (!linear.IsConnected) return Empty();
 
+        // Hooks first and always: whether Linear is connected can change while the page is open, and the number of hooks must not.
         var (open, setOpen) = UseState(false);
         var (team, setTeam) = UseState(0);
         var (busy, setBusy) = UseState(false, true);
-        var (created, setCreated) = UseState<LinearIssue?>(null, true);
+        var (created, setCreated) = UseState<LinearIssue?>(Made.TryGetValue(Props.Key, out var earlier) ? earlier : null, true);
         var (error, setError) = UseState("", true);
 
         var teamsResource = UseResource<IReadOnlyList<LinearTeam>>(
-            async ct => open ? await linear.GetTeamsAsync(ct) : Array.Empty<LinearTeam>(),
-            new object[] { Props.Key, open });
+            async ct => open && linear.IsConnected ? await linear.GetTeamsAsync(ct) : Array.Empty<LinearTeam>(),
+            new object[] { Props.Key, open, linear.IsConnected });
         var teams = Parts.Peek(teamsResource) ?? Array.Empty<LinearTeam>();
+        var teamsError = Parts.ErrorOf(teamsResource);
+
+        if (!linear.IsConnected && created is null) return Empty();
 
         async Task Create()
         {
@@ -43,7 +53,9 @@ sealed class ErrorIssueButton : Component<ErrorIssueProps>
             try
             {
                 var chosen = teams[Math.Clamp(team, 0, teams.Count - 1)];
-                setCreated(await linear.CreateIssueAsync(chosen.Id, Props.Draft.Title, Props.Draft.Description, Props.Draft.Priority, CancellationToken.None));
+                var made = await linear.CreateIssueAsync(chosen.Id, Props.Draft.Title, Props.Draft.Description, Props.Draft.Priority, CancellationToken.None);
+                Made[Props.Key] = made;
+                setCreated(made);
                 setOpen(false);
             }
             catch (Exception ex)
@@ -73,10 +85,10 @@ sealed class ErrorIssueButton : Component<ErrorIssueProps>
             FlexRow(
                 names.Length > 0
                     ? ComboBox(names, Math.Clamp(team, 0, names.Length - 1), setTeam).MinWidth(180)
-                    : Kit.Muted(Parts.IsLoading(teamsResource) ? "Loading teams…" : "No teams found."),
+                    : Kit.Muted(Parts.IsLoading(teamsResource) ? "Loading teams…" : teamsError is null ? "No teams found." : "Could not load the teams."),
                 Button("Create issue", () => _ = Create()).AccentButton().IsEnabled(!busy && names.Length > 0),
                 Button("Cancel", () => setOpen(false)).SubtleButton().IsEnabled(!busy))
                 with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 },
-            error.Length > 0 ? Kit.Muted(error).TextWrapping() : null);
+            error.Length > 0 ? Kit.Muted(error).TextWrapping() : teamsError is not null ? Kit.Muted(teamsError).TextWrapping() : null);
     }
 }

@@ -92,18 +92,19 @@ static class ErrorsServices
     /// <summary>The cache key of the groups of one application.</summary>
     public static string GroupsKey(string sourceKey, string app) => sourceKey + "|groups|" + app;
 
-    /// <summary>The cache key of last week's counts.</summary>
-    public static string LastWeekKey(string sourceKey) => sourceKey + "|lastweek";
+    /// <summary>The cache key of last week's counts for the hour that ends the given window, so they always line up with the counts they are compared with.</summary>
+    public static string LastWeekKey(string sourceKey, ErrorWindow current) =>
+        sourceKey + "|lastweek|" + current.End.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// The same hour one week ago for every application. Null, never an error, when it cannot be read (for example when the logs
     /// do not reach back that far): the page is complete without the comparison.
     /// </summary>
-    public static async Task<LastWeekLogs?> LastWeekAsync(IErrorSource source, string sourceKey, CancellationToken cancellationToken)
+    public static async Task<LastWeekLogs?> LastWeekAsync(IErrorSource source, string sourceKey, ErrorWindow current, CancellationToken cancellationToken)
     {
         try
         {
-            return await PageCaches.ErrorLastWeek.GetAsync(LastWeekKey(sourceKey), PageCaches.ErrorsTtl, () => source.LoadLastWeekAsync(cancellationToken))
+            return await PageCaches.ErrorLastWeek.GetAsync(LastWeekKey(sourceKey, current), PageCaches.ErrorsTtl, () => source.LoadLastWeekAsync(current, cancellationToken))
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

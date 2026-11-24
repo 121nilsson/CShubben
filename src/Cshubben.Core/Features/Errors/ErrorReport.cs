@@ -15,7 +15,13 @@ public static class ErrorLinks
         if (string.IsNullOrWhiteSpace(repo) || string.IsNullOrWhiteSpace(file)) return null;
         var reference = string.IsNullOrWhiteSpace(sha) ? "HEAD" : sha.Trim();
         var anchor = line is { } l && l > 0 ? "#L" + l.ToString(CultureInfo.InvariantCulture) : "";
-        return "https://github.com/" + repo.Trim() + "/blob/" + reference + "/src/" + file.Trim().TrimStart('/') + anchor;
+
+        // The path comes from a log line: each part is escaped, and "." and ".." parts are dropped, so odd characters cannot break
+        // or redirect the link.
+        var path = string.Join(
+            "/",
+            file.Trim().Split('/', '\\').Where(p => p.Length > 0 && p != "." && p != "..").Select(Uri.EscapeDataString));
+        return path.Length == 0 ? null : "https://github.com/" + repo.Trim() + "/blob/" + Uri.EscapeDataString(reference) + "/src/" + path + anchor;
     }
 
     /// <summary>A commit on GitHub. Null without a repository or a commit.</summary>

@@ -24,7 +24,13 @@ public static class ErrorIssue
         DateTimeOffset now)
     {
         var title = app + ": " + LogRedactor.Redact(group.Title).Replace("\r", " ").Replace("\n", " ").Trim();
-        if (title.Length > MaxTitle) title = title[..(MaxTitle - 1)] + "…";
+        if (title.Length > MaxTitle)
+        {
+            // Not in the middle of a character that takes two chars (an emoji, say).
+            var cut = MaxTitle - 1;
+            if (char.IsHighSurrogate(title[cut - 1])) cut--;
+            title = title[..cut] + "…";
+        }
 
         var description = ErrorReport.Group(app, group, status, repo, running, firstSeenAfter, now)
             + "\n\nCreated from the Errors page in Cshubben.";

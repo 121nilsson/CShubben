@@ -67,6 +67,14 @@ public class DeployCorrelationTests
     }
 
     [Fact]
+    public void A_first_sighting_is_not_tied_to_a_deployment_when_older_log_lines_were_cut_off()
+    {
+        var first = Now - TimeSpan.FromHours(3);
+        Assert.NotNull(DeployCorrelation.FirstSeenLink(new[] { Deploy(190) }, Group(first, Now), Window, complete: true));
+        Assert.Null(DeployCorrelation.FirstSeenLink(new[] { Deploy(190) }, Group(first, Now), Window, complete: false));
+    }
+
+    [Fact]
     public void An_error_that_was_there_when_the_window_began_did_not_start_with_a_deployment()
     {
         var first = Window.Start + TimeSpan.FromMinutes(3);

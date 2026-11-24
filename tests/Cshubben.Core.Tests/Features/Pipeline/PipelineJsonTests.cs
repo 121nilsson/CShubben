@@ -134,6 +134,16 @@ public class PipelineJsonTests
     }
 
     [Fact]
+    public void A_deployment_that_succeeded_once_still_counts_after_a_newer_one_made_it_inactive()
+    {
+        Assert.True(PipelineJson.EverSucceeded(Parse("""[ { "state": "inactive" }, { "state": "success" } ]""")));
+        Assert.True(PipelineJson.EverSucceeded(Parse("""[ { "state": "SUCCESS" } ]""")));
+        Assert.False(PipelineJson.EverSucceeded(Parse("""[ { "state": "failure" }, { "state": "in_progress" } ]""")));
+        Assert.False(PipelineJson.EverSucceeded(Parse("[]")));
+        Assert.False(PipelineJson.EverSucceeded(null));
+    }
+
+    [Fact]
     public void Release_and_compare_answers()
     {
         var release = PipelineJson.ParseRelease(Parse("""{ "tag_name": "v2.8.0", "published_at": "2026-11-01T00:00:00Z" }"""));
