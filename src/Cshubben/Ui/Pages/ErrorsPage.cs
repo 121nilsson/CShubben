@@ -500,6 +500,9 @@ sealed class ErrorsPage : Component<PageContext>
             group.Method is null ? null : Button("Copy location", () => ExternalActions.Copy(group.Method + (group.File is null ? "" : " (" + group.File + (group.Line is { } n ? ":" + n : "") + ")"))).SubtleButton().AutomationName("Copy the code location"))
             with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 4 };
 
+        var issueDraft = ErrorIssue.Draft(app.App, group, status, repo, running, firstSeenAfter, now);
+        var issue = Component<ErrorIssueButton, ErrorIssueProps>(new ErrorIssueProps(issueDraft, app.App + "|" + group.Key));
+
         Element? trace = null;
         if (latest is not null)
         {
@@ -528,7 +531,7 @@ sealed class ErrorsPage : Component<PageContext>
 
         var analysis = ErrorAnalysisPanel.Build(new ErrorAnalysisProps(services, errors, app, group)).WithKey("analysis|" + group.Key);
 
-        return Border(FlexColumn(analysis, where, actions, trace, occurrences, pods) with { RowGap = 12 })
+        return Border(FlexColumn(analysis, where, actions, issue, trace, occurrences, pods) with { RowGap = 12 })
             .Padding(0, 6, 0, 0);
     }
 }
