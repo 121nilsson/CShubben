@@ -61,6 +61,14 @@ public static class ErrorGrouping
 
         private const int MaxSamples = 5;
 
+        // The key uses placeholders (<n>, <id>) so repeats group; the title shows the newest real line, numbers intact.
+        private string Title()
+        {
+            if (_fingerprint.Kind != ErrorKind.Message || _samples.Count == 0) return _fingerprint.Title;
+            var newest = _samples.OrderByDescending(s => s.At).First();
+            return ErrorFingerprints.DisplayMessage(newest.Message) ?? _fingerprint.Title;
+        }
+
         private void Trim()
         {
             var keep = _samples.OrderByDescending(s => s.At).Take(MaxSamples).ToList();
@@ -70,7 +78,7 @@ public static class ErrorGrouping
 
         public ErrorGroup Build() => new(
             _fingerprint.Key,
-            _fingerprint.Title,
+            Title(),
             _fingerprint.Detail,
             _fingerprint.Hint,
             _fingerprint.Kind,

@@ -149,6 +149,38 @@ public static class ErrorFingerprints
             lineNumber);
     }
 
+    /// <summary>
+    /// The real message line of a plain (no exception) error, numbers and ids intact, for showing as a title. Null when
+    /// the entry is not a plain message or has no text.
+    /// </summary>
+    public static string? DisplayMessage(string? message)
+    {
+        var fingerprint = Of(message);
+        if (fingerprint.Kind != ErrorKind.Message) return null;
+        var lines = (message ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        var skip = lines.Length > 0 && Header.IsMatch(lines[0]) ? 1 : 0;
+        var first = lines.Skip(skip).FirstOrDefault(l => l.Trim().Length > 0 && !ExceptionLine.IsMatch(l) && !Frame.IsMatch(l));
+        if (first is null) return null;
+        var readable = Milliseconds.Replace(first, m => FormatMilliseconds(m.Groups["value"].Value));
+        return Truncate(Spaces.Replace(readable, " ").Trim(), 90);
+    }
+
+    private static readonly Regex Milliseconds = new(@"(?<![\w.])(?<value>\d+(?:\.\d+)?)\s*ms\b", RegexOptions.CultureInvariant);
+
+    /// <summary>Under 10 s stays in ms, 10 s to a minute is "30.01 sec", from a minute "1 min 05 sec".</summary>
+    public static string FormatMilliseconds(string value)
+    {
+        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var ms)) return value + " ms";
+        if (ms < 10_000) return Math.Round(ms, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture) + " ms";
+        var seconds = ms / 1000;
+
+        // Below 59.995 the two-decimal form cannot round up to "60 sec".
+        if (seconds < 59.995) return seconds.ToString("0.##", CultureInfo.InvariantCulture) + " sec";
+        var whole = (long)Math.Round(seconds, MidpointRounding.AwayFromZero);
+        return (whole / 60).ToString(CultureInfo.InvariantCulture) + " min "
+            + (whole % 60).ToString("00", CultureInfo.InvariantCulture) + " sec";
+    }
+
     /// <summary>Ids, hashes and numbers replaced by placeholders, on one line, so repeated errors compare equal.</summary>
     public static string NormalizeMessage(string? text)
     {
