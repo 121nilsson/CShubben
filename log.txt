@@ -1,0 +1,20 @@
+resolution: set to 1920x1080
+screen: 1920x1080
+reviews-640x900: 640x900 printwindow=True settled=1.7s
+notes-640x900: 640x900 printwindow=True settled=1.6s
+notes-n-decision-640x900: 640x900 printwindow=True settled=1.6s
+review-a1-640x900: 640x900 printwindow=True settled=1.6s
+linear-640x900: 640x900 printwindow=True settled=1.6s
+stats-640x900: 640x900 printwindow=True settled=1.6s
+settings-640x900: 640x900 printwindow=True settled=1.7s
+review-a1-1920x1080: 1920x1080 printwindow=True settled=1.7s
+linear-1920x1080: 1920x1080 printwindow=True settled=1.7s
+stats-1920x1080: 1920x1080 printwindow=True settled=1.7s
+linear---issue-API-231-1920x1080: 1920x1080 printwindow=True settled=1.7s
+overview-1920x1080: 1920x1080 printwindow=True settled=1.7s
+overview-a1-1920x1080: 1920x1080 printwindow=True settled=1.7s
+overview-a1-tab3-640x900: 640x900 printwindow=True settled=1.6s
+drift-640x900: 640x900 printwindow=True settled=1.6s
+feed-640x900: 640x900 printwindow=True settled=1.6s
+errors-640x900: 640x900 printwindow=True settled=2.1s
+ow=True settled=2s
