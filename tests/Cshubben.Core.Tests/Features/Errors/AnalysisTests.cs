@@ -180,6 +180,33 @@ public class ErrorGroupingTests
     }
 
     [Fact]
+    public void A_plain_message_group_is_titled_with_the_newest_real_line_but_still_groups_on_placeholders()
+    {
+        var entries = new List<LogEntry>
+        {
+            Entry(1, "p", "HTTP POST /api/uploads responded 500 in 100.25 ms"),
+            Entry(5, "p", "HTTP POST /api/uploads responded 500 in 30086.5493 ms"),
+        };
+
+        var group = Assert.Single(ErrorGrouping.Group(entries, Window));
+        Assert.Equal(2, group.Count);
+        Assert.Equal("HTTP POST /api/uploads responded 500 in 30.09 sec", group.Title);
+    }
+
+    [Theory]
+    [InlineData("250.4", "250 ms")]
+    [InlineData("9999", "9999 ms")]
+    [InlineData("10000", "10 sec")]
+    [InlineData("30086.5493", "30.09 sec")]
+    [InlineData("59990", "59.99 sec")]
+    [InlineData("65000", "1 min 05 sec")]
+    [InlineData("754000", "12 min 34 sec")]
+    public void Durations_in_ms_are_shown_in_a_readable_unit(string ms, string expected)
+    {
+        Assert.Equal(expected, ErrorFingerprints.FormatMilliseconds(ms));
+    }
+
+    [Fact]
     public void No_entries_no_groups()
     {
         Assert.Empty(ErrorGrouping.Group(Array.Empty<LogEntry>(), Window));
