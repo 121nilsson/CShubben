@@ -171,10 +171,12 @@ public static class ErrorFingerprints
     public static string FormatMilliseconds(string value)
     {
         if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var ms)) return value + " ms";
-        if (ms < 10_000) return Math.Round(ms).ToString("0", CultureInfo.InvariantCulture) + " ms";
+        if (ms < 10_000) return Math.Round(ms, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture) + " ms";
         var seconds = ms / 1000;
-        if (seconds < 60) return seconds.ToString("0.##", CultureInfo.InvariantCulture) + " sec";
-        var whole = (int)Math.Round(seconds);
+
+        // Below 59.995 the two-decimal form cannot round up to "60 sec".
+        if (seconds < 59.995) return seconds.ToString("0.##", CultureInfo.InvariantCulture) + " sec";
+        var whole = (long)Math.Round(seconds, MidpointRounding.AwayFromZero);
         return (whole / 60).ToString(CultureInfo.InvariantCulture) + " min "
             + (whole % 60).ToString("00", CultureInfo.InvariantCulture) + " sec";
     }

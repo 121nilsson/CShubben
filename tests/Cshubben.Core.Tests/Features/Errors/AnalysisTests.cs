@@ -199,6 +199,8 @@ public class ErrorGroupingTests
     [InlineData("10000", "10 sec")]
     [InlineData("30086.5493", "30.09 sec")]
     [InlineData("59990", "59.99 sec")]
+    [InlineData("59999.6", "1 min 00 sec")]
+    [InlineData("250.5", "251 ms")]
     [InlineData("65000", "1 min 05 sec")]
     [InlineData("754000", "12 min 34 sec")]
     public void Durations_in_ms_are_shown_in_a_readable_unit(string ms, string expected)
