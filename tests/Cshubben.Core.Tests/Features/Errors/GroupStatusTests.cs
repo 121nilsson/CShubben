@@ -146,9 +146,9 @@ public class GroupStatusTests
 
     [Theory]
     [InlineData(GroupSort.Frequent, "Most frequent")]
-    [InlineData(GroupSort.Latest, "Latest")]
-    [InlineData(GroupSort.Newest, "Newest")]
-    [InlineData(GroupSort.Rising, "Rising")]
+    [InlineData(GroupSort.Latest, "Last seen")]
+    [InlineData(GroupSort.Newest, "First seen")]
+    [InlineData(GroupSort.Rising, "Trending up")]
     public void Every_sort_has_a_label(GroupSort sort, string label) =>
         Assert.Equal(label, GroupOrdering.Label(sort));
 }

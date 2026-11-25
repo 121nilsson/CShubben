@@ -14,6 +14,16 @@ public static class ErrorChart
     }
 
     /// <summary>
+    /// Where bucket <paramref name="index"/> of a series with <paramref name="count"/> buckets lands in <see cref="Tail"/> of
+    /// <paramref name="length"/> buckets (which pads a short series at the start), or -1 when it is not in the tail.
+    /// </summary>
+    public static int TailIndex(int index, int count, int length)
+    {
+        var shifted = index - (count - length);
+        return index < 0 || shifted < 0 || shifted >= length ? -1 : shifted;
+    }
+
+    /// <summary>
     /// Bar heights from 0 to <paramref name="maxHeight"/>. A bucket with errors is never shorter than
     /// <paramref name="minVisible"/>, so a single error can still be seen; an empty bucket has height 0.
     /// <paramref name="scaleMax"/> lets several charts share one scale.

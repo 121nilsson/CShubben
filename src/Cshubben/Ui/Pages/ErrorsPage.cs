@@ -41,6 +41,14 @@ sealed class ErrorsPage : Component<PageContext>
 
     public static Element Build(PageContext ctx) => Component<ErrorsPage, PageContext>(ctx);
 
+    /// <summary>The sidebar badge: how many applications are spiking, from the last snapshot read (none before the first read).</summary>
+    public static PageBadge? Badge(PageContext ctx)
+    {
+        var resolved = ErrorsServices.SourceFor(ctx.Services, ctx.Settings.Errors);
+        var snapshot = resolved is { } r ? PageCaches.Errors.Peek(r.Key) : null;
+        return snapshot is { Spiking: > 0 } ? new PageBadge(snapshot.Spiking, Tone.Danger) : null;
+    }
+
     public override Element Render()
     {
         var ctx = Props;
@@ -245,6 +253,7 @@ sealed class ErrorsPage : Component<PageContext>
     private static Element AppRow(AppSpike app, ErrorWindow window, bool isSelected, int peak, Action<string> pick)
     {
         var tone = app.IsSpike ? Tone.Danger : Tone.Neutral;
+        var level = SpikeLevels.Of(app.Factor);
         var rate = app.Total == 0 ? "no errors" : ErrorsText.PerHour(app, window);
         var quiet = app.Total == 0;
 
@@ -253,7 +262,11 @@ sealed class ErrorsPage : Component<PageContext>
             columns: [GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
             (quiet ? name.Foreground(Theme.SecondaryText) : name).Grid(column: 0),
-            (app.IsSpike ? Kit.Pill(ErrorsText.Factor(app.Factor), Tone.Danger) : Empty()).Margin(8, 0, 0, 0).Grid(column: 1));
+            // The multiplier is the number that matters, so it is the biggest thing in the row, and grows with the spike.
+            (app.IsSpike
+                ? TextBlock(ErrorsText.Factor(app.Factor)).FontSize(SpikeLevels.FontSize(level)).SemiBold().Foreground(Kit.Fg(Tone.Danger))
+                    .AutomationName("spiking " + ErrorsText.Factor(app.Factor) + " above usual")
+                : Empty()).Margin(8, 0, 0, 0).Grid(column: 1));
 
         var glyph = TextBlock(ErrorsText.TrendGlyph(app.Trend)).Foreground(app.IsSpike ? Kit.Fg(Tone.Danger) : Theme.SecondaryText)
             .AutomationName(ErrorsText.TrendWord(app.Trend));
@@ -264,9 +277,12 @@ sealed class ErrorsPage : Component<PageContext>
             HStack(6, glyph, rateText),
             ErrorsKit.Bars(app.Counts, ListBars, 22, tone, peak));
 
-        // A spiking row is tinted, the picked row is filled, and the picked row also has an accent strip.
-        var fill = app.IsSpike ? Kit.Bg(Tone.Danger) : isSelected ? Theme.SubtleFill : Theme.CardBackground;
-        var strip = Border(Empty()).Width(3).Margin(0, 6, 0, 6).CornerRadius(2).Background(isSelected ? Theme.Accent : Theme.CardBackground);
+        // Only a severe spike tints the whole row; lesser spikes get a red edge. The picked row is filled and its strip is the
+        // one blue thing in the list (blue means "picked").
+        var severe = app.IsSpike && level == SpikeLevel.Severe;
+        var fill = severe ? Kit.Bg(Tone.Danger) : isSelected ? Theme.SubtleFill : Theme.CardBackground;
+        var stripColor = isSelected ? Theme.Accent : app.IsSpike ? Kit.Fg(Tone.Danger) : Theme.CardBackground;
+        var strip = Border(Empty()).Width(3).Margin(0, 6, 0, 6).CornerRadius(2).Background(stripColor);
         var row = Border(Grid(
                 columns: [GridSize.Px(3), GridSize.Star()],
                 rows: [GridSize.Auto],
@@ -309,10 +325,20 @@ sealed class ErrorsPage : Component<PageContext>
             : null;
         var repoLine = repo is null ? null : Kit.Muted("Repository: " + repo);
 
+        // When the spike began and which deployment came just before it.
+        var onset = app.IsSpike ? SpikeOnset.Find(app.Counts, window) : null;
+
+        // One time range for the chart and the numbers next to it: the last ChartBars buckets.
+        var shown = Math.Min(ChartBars, window.Buckets);
+        var rangeLabel = ErrorsText.Span(TimeSpan.FromTicks(window.Step.Ticks * shown));
+        var inRange = ErrorChart.Tail(app.Counts, shown).Sum();
+
         var facts = FlexRow(
-            app.IsSpike ? Kit.Pill("Spiking " + ErrorsText.Factor(app.Factor), Tone.Danger) : null,
+            app.IsSpike
+                ? Kit.Pill("Spiking " + ErrorsText.Factor(app.Factor) + (onset is { } since ? " since " + since.ToLocalTime().ToString("HH:mm") : ""), Tone.Danger)
+                : null,
             Kit.Pill(ErrorsText.TrendGlyph(app.Trend) + " " + ErrorsText.TrendWord(app.Trend), Tone.Neutral),
-            Kit.Pill(app.Total + (app.Total == 1 ? " error" : " errors") + " in 24 h", Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 6 };
+            Kit.Pill(inRange + (inRange == 1 ? " error" : " errors") + " in " + rangeLabel, Tone.Neutral)) with { Wrap = FlexWrap.Wrap, ColumnGap = 8, RowGap = 6 };
 
         var weekly = WeeklyBaseline.Compare(app, window, lastWeek);
         var weeklyLine = app.Total == 0
@@ -323,17 +349,21 @@ sealed class ErrorsPage : Component<PageContext>
         var markers = ErrorMarkers.Indices(
             ErrorMarkers.TailFrom(window, ChartBars), window.Step, Math.Min(ChartBars, window.Buckets), deploys.Select(d => d.DeployedAt));
 
+        // The shaded part of the chart starts where the spike began.
+        var shadeFrom = onset is { } begin ? ErrorChart.TailIndex(window.IndexOf(begin), app.Counts.Count, shown) : -1;
+
         var chart = app.Total == 0
             ? (Element)Kit.Muted("No errors in the last 24 hours.")
             : VStack(4,
-                ErrorsKit.GridBars(app.Counts, ChartBars, 110, app.IsSpike ? Tone.Danger : Tone.Neutral, markers),
+                ErrorsKit.GridBars(app.Counts, ChartBars, 110, app.IsSpike ? Tone.Danger : Tone.Neutral, markers, shadeFrom >= 0 ? shadeFrom : null),
                 ErrorsKit.TimeAxis(window, ChartBars),
-                Kit.Muted("Peak " + ErrorsKit.Peak(app.Counts, ChartBars) + " errors per " + (int)window.Step.TotalMinutes + " min"
+                Kit.Muted("Last " + rangeLabel + " · peak " + ErrorsKit.Peak(app.Counts, ChartBars) + " errors per " + (int)window.Step.TotalMinutes + " min"
+                        + (app.Total > inRange ? " · " + app.Total + " in 24 h" : "")
+                        + (shadeFrom >= 0 ? " · shaded since the spike began" : "")
                         + (markers.Count > 0 ? " · vertical lines mark deploys" : ""))
+                    .TextWrapping()
                     .AutomationName(ErrorsText.ChartSummary(app.Counts, window, ChartBars) + (markers.Count > 0 ? " Deployments are marked on the chart." : "")));
 
-        // When the spike began and which deployment came just before it.
-        var onset = app.IsSpike ? SpikeOnset.Find(app.Counts, window) : null;
         var startLink = onset is { } begun ? DeployCorrelation.Link(deploys, begun, DeployCorrelation.SpikeWindow, window.Step) : null;
         Element? startCard = onset is { } startedAt
             ? Border(TextBlock(ErrorsText.StartLine(startedAt, now, startLink)).FontSize(13).TextWrapping())
@@ -379,7 +409,7 @@ sealed class ErrorsPage : Component<PageContext>
                 found.Count > 1 ? SortBar(sort, setSort) : null,
                 complete
                     ? null
-                    : Kit.Muted("Showing the newest " + lineLimit + " log lines. Older errors are counted in the chart but not listed here, and \"new\" is not shown.").TextWrapping(),
+                    : Kit.Muted("ⓘ Showing the newest " + lineLimit + " log lines. Older errors are counted in the chart but not listed here, and \"new\" is not shown.").TextWrapping(),
             };
             items.AddRange(ordered.Select(g => (Element?)GroupCard(
                 ctx.Services, errors, app, g, window, now, deploys, running, complete,
@@ -390,7 +420,7 @@ sealed class ErrorsPage : Component<PageContext>
         return VStack(12, overview, list);
     }
 
-    /// <summary>"Sort: Most frequent · Latest · Newest · Rising", the chosen one filled.</summary>
+    /// <summary>"Sort: Most frequent · Last seen · First seen · Trending up". The chosen one is a plain bordered button: blue is kept for selection of an application.</summary>
     private static Element SortBar(GroupSort sort, Action<GroupSort> setSort)
     {
         Element Chip(GroupSort option)
@@ -398,7 +428,7 @@ sealed class ErrorsPage : Component<PageContext>
             var label = GroupOrdering.Label(option);
             var name = "Sort errors by " + label.ToLowerInvariant() + (option == sort ? ", selected" : "");
             Element chip = option == sort
-                ? Button(label, () => setSort(option)).AccentButton().AutomationName(name)
+                ? Button(label, () => setSort(option)).AutomationName(name)
                 : Button(label, () => setSort(option)).SubtleButton().AutomationName(name);
             return chip.WithKey("sort|" + option);
         }

@@ -83,7 +83,7 @@ static class PageRegistry
         new(Page.Drift, "Workspace", "\uE898", "Drift",
             c => Component<DriftPage, PageContext>(c)),
         new(Page.Errors, "Workspace", "", "Errors",
-            ErrorsPage.Build, Visible: s => s.Errors.Enabled),
+            ErrorsPage.Build, ErrorsPage.Badge, Visible: s => s.Errors.Enabled),
         new(Page.Linear, "Workspace", "", "Linear",
             ctx => LinearPage.Build(ctx.Snapshot, null, ctx.Select, ctx.OpenSettings)),
         new(Page.Notes, "Workspace", "", "Notes",

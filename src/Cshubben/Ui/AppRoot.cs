@@ -310,7 +310,8 @@ sealed class AppRoot : Component
             banners.Add(FailureView.Strip(Tone.Accent, "Demo data", notice,
                 Button("Open Settings", OpenSettings).AutomationName("Open Settings"),
                 Button("Retry", Refresh).AutomationName("Retry")));
-        if (warning is not null && error is null)
+        // The warning is about GitHub data (CI, reviews); the Errors page does not use it, so it stays out of that page.
+        if (warning is not null && error is null && page != Page.Errors)
             banners.Add(Kit.Banner(Tone.Warning, "Partial data", warning));
 
         var bannerStack = banners.Count == 0
