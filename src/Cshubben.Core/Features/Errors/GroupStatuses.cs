@@ -123,9 +123,9 @@ public static class GroupOrdering
 {
     public static string Label(GroupSort sort) => sort switch
     {
-        GroupSort.Latest => "Latest",
-        GroupSort.Newest => "Newest",
-        GroupSort.Rising => "Rising",
+        GroupSort.Latest => "Last seen",
+        GroupSort.Newest => "First seen",
+        GroupSort.Rising => "Trending up",
         _ => "Most frequent",
     };
 

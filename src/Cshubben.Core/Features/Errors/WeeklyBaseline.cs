@@ -83,7 +83,7 @@ public static class WeeklyBaseline
         {
             WeeklyVerdict.Higher => "Higher than a week ago: " + now + " now, " + then + " at this time last week.",
             WeeklyVerdict.Lower => "Lower than a week ago: " + now + " now, " + then + " at this time last week.",
-            _ => "Usual for this time of week: " + now + " now, " + then + " a week ago.",
+            _ => "Usual for this time of week: " + now + " now, " + then + " at this time last week.",
         };
     }
 

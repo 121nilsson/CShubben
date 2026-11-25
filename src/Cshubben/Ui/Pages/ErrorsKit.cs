@@ -15,15 +15,22 @@ static class ErrorsKit
     /// so the chart never overflows a narrow pane. Empty buckets are a faint 2 px line. <paramref name="markers"/> are the buckets
     /// (counted in the chart, see <see cref="ErrorMarkers"/>) where a deployment happened; each gets a thin accent line.
     /// </summary>
-    public static Element Bars(IReadOnlyList<int> counts, int buckets, double height, Tone tone, int? scaleMax = null, IReadOnlyCollection<int>? markers = null)
+    public static Element Bars(IReadOnlyList<int> counts, int buckets, double height, Tone tone, int? scaleMax = null, IReadOnlyCollection<int>? markers = null, int? shadeFrom = null)
     {
         var tail = ErrorChart.Tail(counts, buckets);
         var heights = ErrorChart.BarHeights(tail, height, 2, scaleMax);
         var columns = new GridSize[heights.Count];
-        var bars = new List<Element>(heights.Count + (markers?.Count ?? 0));
+        var bars = new List<Element>(heights.Count + (markers?.Count ?? 0) + heights.Count);
         for (var i = 0; i < heights.Count; i++)
         {
             columns[i] = GridSize.Star();
+            // A faint wash behind the buckets from the shaded one on (when a spike started), drawn first so the bars sit on top.
+            if (shadeFrom is { } from && i >= from)
+                bars.Add(Border(Empty()).Background(Kit.Bg(Tone.Danger)).Opacity(0.6).Grid(column: i));
+        }
+
+        for (var i = 0; i < heights.Count; i++)
+        {
             var bar = heights[i] <= 0
                 ? Border(Empty()).Height(2).Background(Theme.SecondaryText).Opacity(0.3)
                 : Border(Empty()).Height(heights[i]).Background(Kit.Fg(tone));
@@ -44,13 +51,13 @@ static class ErrorsKit
     }
 
     /// <summary>Bars with faint lines at the peak and half of it, and the peak written in the corner, so the height means something.</summary>
-    public static Element GridBars(IReadOnlyList<int> counts, int buckets, double height, Tone tone, IReadOnlyCollection<int>? markers = null)
+    public static Element GridBars(IReadOnlyList<int> counts, int buckets, double height, Tone tone, IReadOnlyCollection<int>? markers = null, int? shadeFrom = null)
     {
         var peak = Peak(counts, buckets);
         Element line(VerticalAlignment at) =>
             Border(Empty()).Height(1).Background(Theme.SecondaryText).Opacity(0.18).VAlign(at);
 
-        var chart = Bars(counts, buckets, height, tone, null, markers);
+        var chart = Bars(counts, buckets, height, tone, null, markers, shadeFrom);
         if (peak <= 0) return chart;
 
         return Grid(

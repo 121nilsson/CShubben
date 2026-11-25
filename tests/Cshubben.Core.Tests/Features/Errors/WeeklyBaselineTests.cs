@@ -74,7 +74,7 @@ public class WeeklyBaselineTests
     [Theory]
     [InlineData(WeeklyVerdict.Higher, 120, 24, "Higher than a week ago: 120 / h now, 24 / h at this time last week.")]
     [InlineData(WeeklyVerdict.Lower, 24, 120, "Lower than a week ago: 24 / h now, 120 / h at this time last week.")]
-    [InlineData(WeeklyVerdict.Usual, 60, 55, "Usual for this time of week: 60 / h now, 55 / h a week ago.")]
+    [InlineData(WeeklyVerdict.Usual, 60, 55, "Usual for this time of week: 60 / h now, 55 / h at this time last week.")]
     [InlineData(WeeklyVerdict.Higher, 30, 0, "Higher than a week ago: 30 / h now, none at this time last week.")]
     public void The_sentence_names_both_rates(WeeklyVerdict verdict, double now, double last, string expected)
     {
