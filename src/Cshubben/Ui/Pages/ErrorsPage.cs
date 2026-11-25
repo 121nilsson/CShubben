@@ -361,6 +361,7 @@ sealed class ErrorsPage : Component<PageContext>
                         + (app.Total > inRange ? " · " + app.Total + " in 24 h" : "")
                         + (shadeFrom >= 0 ? " · shaded since the spike began" : "")
                         + (markers.Count > 0 ? " · vertical lines mark deploys" : ""))
+                    .TextWrapping()
                     .AutomationName(ErrorsText.ChartSummary(app.Counts, window, ChartBars) + (markers.Count > 0 ? " Deployments are marked on the chart." : "")));
 
         var startLink = onset is { } begun ? DeployCorrelation.Link(deploys, begun, DeployCorrelation.SpikeWindow, window.Step) : null;

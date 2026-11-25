@@ -26,7 +26,7 @@ static class ErrorsKit
             columns[i] = GridSize.Star();
             // A faint wash behind the buckets from the shaded one on (when a spike started), drawn first so the bars sit on top.
             if (shadeFrom is { } from && i >= from)
-                bars.Add(Border(Empty()).Background(Kit.Bg(Tone.Danger)).Opacity(0.6).Grid(column: i));
+                bars.Add(Border(Empty()).Background(Kit.Bg(Tone.Danger)).Grid(column: i));
         }
 
         for (var i = 0; i < heights.Count; i++)
